@@ -14,7 +14,9 @@ import {
   getSupplierById,
   getStockItems,
   getStockItemById,
-  deleteSupplier as storageDeleteSupplier
+  deleteSupplier as storageDeleteSupplier,
+  updateContactHistory as storageUpdateContactHistory,
+  addContactHistory as storageAddContactHistory
 } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,6 +88,7 @@ import { EditSupplierModal } from "./edit-supplier-modal";
 import { DeleteConfirmationModal } from "../common/delete-confirmation-modal";
 import { ContactHistoryModal } from "./contact-history-modal";
 import { TaskModal } from "./task-modal";
+import { PrintView } from "./print-view";
 
 interface SupplierDetailPageClientProps {
   supplier: Supplier;
@@ -154,7 +157,8 @@ const EMPTY_TASK_FORM_VALUES: SupplierTaskFormValues = {
   status: 'pending',
 };
 
-type UnifiedTransactionClient = AppUnifiedTransaction; 
+type UnifiedTransactionClient = (Purchase & { transactionType: 'purchase' }) | 
+                              (PaymentToSupplier & { transactionType: 'paymentToSupplier' });
 
 export function SupplierDetailPageClient({ supplier: initialSupplier, initialPurchases, initialPaymentsToSupplier, user }: SupplierDetailPageClientProps) {
   const { toast } = useToast();
@@ -196,6 +200,10 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [showPrintView, setShowPrintView] = useState(false);
+
+  const getStockItemName = useCallback((stockItemId: string) => {
+    return stockItemDisplayNames[stockItemId] || 'Bilinmeyen Ürün';
+  }, [stockItemDisplayNames]);
 
   const totalPurchases = useMemo(() => {
     return purchases.reduce((sum: number, purchase: Purchase) => sum + purchase.amount, 0);
@@ -249,723 +257,300 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     });
   }, [purchases, paymentsToSupplier, dateRange, searchQuery, sortOrder]);
 
-  const recentTransactions = useMemo(() => {
-    return filteredAndSortedTransactions.slice(0, 5);
-  }, [filteredAndSortedTransactions]);
-
-  const totalPages = Math.ceil(filteredAndSortedTransactions.length / itemsPerPage);
   const paginatedTransactions = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredAndSortedTransactions.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredAndSortedTransactions, currentPage]);
 
-  const PrintView = () => (
-    <div className="p-8 space-y-6">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold">{supplier.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          {dateRange?.from && dateRange?.to
-            ? `${safeFormatDate(dateRange.from.toISOString(), 'dd.MM.yyyy')} - ${safeFormatDate(dateRange.to.toISOString(), 'dd.MM.yyyy')}`
-            : 'Tüm İşlemler'}
-        </p>
-      </div>
+  const totalPages = Math.ceil(filteredAndSortedTransactions.length / itemsPerPage);
 
-      <div className="grid grid-cols-3 gap-4 text-center">
-        <div className="p-4 border rounded-lg">
-          <div className="text-sm text-muted-foreground">Toplam Alış</div>
-          <div className="text-xl font-bold text-blue-600">{formatCurrency(totalPurchases, 'TRY')}</div>
-        </div>
-        <div className="p-4 border rounded-lg">
-          <div className="text-sm text-muted-foreground">Toplam Ödeme</div>
-          <div className="text-xl font-bold text-green-600">{formatCurrency(totalPayments, 'TRY')}</div>
-        </div>
-        <div className="p-4 border rounded-lg">
-          <div className="text-sm text-muted-foreground">Bakiye</div>
-          <div className={cn(
-            "text-xl font-bold",
-            balance > 0 ? "text-green-600" : "text-red-600"
-          )}>
-            {formatCurrency(balance, 'TRY')}
-          </div>
-        </div>
-      </div>
+  const monthlyStats = useMemo(() => {
+    const months = eachMonthOfInterval({
+      start: startOfMonth(new Date(new Date().getFullYear(), 0, 1)),
+      end: endOfMonth(new Date()),
+    });
 
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left p-2">Tarih</th>
-            <th className="text-left p-2">İşlem</th>
-            <th className="text-right p-2">Tutar</th>
-            <th className="text-left p-2">Detay</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredAndSortedTransactions.map((item) => (
-            <TableRow key={`${item.transactionType}-${item.id}`} className="border-b">
-              <TableCell className="p-2">{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
-              <TableCell className="p-2">{item.transactionType === 'purchase' ? 'Alış' : 'Ödeme'}</TableCell>
-              <TableCell className="p-2 text-right">{formatCurrency(item.amount, item.currency)}</TableCell>
-              <TableCell className="p-2">
-                {item.transactionType === 'purchase' && 'quantityPurchased' in item && 'unitPrice' in item && item.quantityPurchased && item.unitPrice && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Detay:</span>
-                    <span className="text-sm">
-                      {item.quantityPurchased} adet × {formatCurrency(item.unitPrice, item.currency)}
-                    </span>
-                  </div>
-                )}
-                {item.transactionType === 'paymentToSupplier' && ( 
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Ödeme Yöntemi:</span>
-                    <span className="text-sm">{item.method}</span>
-                  </div>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+    return months.map(month => {
+      const monthStart = startOfMonth(month);
+      const monthEnd = endOfMonth(month);
+      const monthPurchases = purchases.filter(p => {
+        const purchaseDate = new Date(p.date);
+        return purchaseDate >= monthStart && purchaseDate <= monthEnd;
+      });
+      const monthPayments = paymentsToSupplier.filter(p => {
+        const paymentDate = new Date(p.date);
+        return paymentDate >= monthStart && paymentDate <= monthEnd;
+      });
+
+      return {
+        month: format(month, 'MMM yyyy', { locale: tr }),
+        alışlar: monthPurchases.reduce((sum, p) => sum + p.amount, 0),
+        ödemeler: monthPayments.reduce((sum, p) => sum + p.amount, 0),
+      };
+    });
+  }, [purchases, paymentsToSupplier]);
+
+  const transactionTypeDistribution = useMemo(() => {
+    const total = purchases.length + paymentsToSupplier.length;
+    return [
+      {
+        name: 'Alışlar',
+        value: purchases.length,
+        percentage: (purchases.length / total) * 100,
+      },
+      {
+        name: 'Ödemeler',
+        value: paymentsToSupplier.length,
+        percentage: (paymentsToSupplier.length / total) * 100,
+      },
+    ];
+  }, [purchases, paymentsToSupplier]);
+
+  useEffect(() => {
+    const fetchStockItems = async () => {
+      if (!user) return;
+      try {
+        const items = await getStockItems(user.uid);
+        setAvailableStockItems(items);
+      } catch (error) {
+        console.error('Error fetching stock items:', error);
+        toast({
+          title: 'Hata',
+          description: 'Stok ürünleri yüklenirken bir hata oluştu.',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    fetchStockItems();
+  }, [user, toast]);
 
   useEffect(() => {
     const fetchDisplayNames = async () => {
-      const uniqueStockItemIds = new Set<string>();
-      purchases.forEach(purchase => {
-        if (purchase.stockItemId) uniqueStockItemIds.add(purchase.stockItemId);
-      });
-
-      const namesMap: Record<string, string> = {};
-      for (const stockItemId of Array.from(uniqueStockItemIds)) {
-        namesMap[stockItemId] = await getStockItemName(stockItemId);
+      if (!user) return;
+      try {
+        const names: Record<string, string> = {};
+        for (const item of availableStockItems) {
+          names[item.id] = item.name;
+        }
+        setStockItemDisplayNames(names);
+      } catch (error) {
+        console.error('Error fetching stock item names:', error);
       }
-      setStockItemDisplayNames(namesMap);
     };
 
     fetchDisplayNames();
-  }, [purchases, paymentsToSupplier, getStockItemName]);
-
-  useEffect(() => {
-    setSupplier(initialSupplier);
-    setPurchases(initialPurchases);
-    setPaymentsToSupplier(initialPaymentsToSupplier);
-    if (typeof window !== "undefined" && user) {
-      getStockItems(user.uid).then(items => setAvailableStockItems(items));
-    }
-  }, [initialSupplier, initialPurchases, initialPaymentsToSupplier, user]);
-
-  useEffect(() => {
-    const quantity = parseFloat(purchaseFormValues.quantityPurchased || '0');
-    const price = parseFloat(purchaseFormValues.unitPrice || '0');
-    if (purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none' && !isNaN(quantity) && !isNaN(price) && quantity > 0 && price >= 0) {
-      setPurchaseFormValues(prev => ({ ...prev, amount: (quantity * price).toFixed(2) }));
-    } else if (!purchaseFormValues.stockItemId || purchaseFormValues.stockItemId === 'none') {
-      // Allow manual amount entry if no stock item is selected or unit price/qty is zero
-    } else {
-      setPurchaseFormValues(prev => ({ ...prev, amount: '' })); // Clear amount if calculation is not possible
-    }
-  }, [purchaseFormValues.quantityPurchased, purchaseFormValues.unitPrice, purchaseFormValues.stockItemId]);
-
-  useEffect(() => {
-    setPurchaseFormValues(prev => ({ ...prev, unitPrice: '', currency: 'TRY' }));
-  }, [purchaseFormValues.stockItemId]);
-
-  const refreshSupplierData = useCallback(async () => {
-    if (!supplier?.id || !user) return;
-    const freshSupplier = await getSupplierById(user.uid, supplier.id);
-    if (freshSupplier) {
-      setSupplier(freshSupplier);
-      document.title = `${freshSupplier.name} | Tedarikçi Detayları | ERMAY`;
-    }
-    if (typeof window !== "undefined" && user) {
-      getStockItems(user.uid).then(items => setAvailableStockItems(items));
-    }
-  }, [supplier?.id, user]);
-
-  const handleSupplierUpdate = useCallback(async (data: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'> | Supplier): Promise<void> => {
-    try {
-      if (!user) {
-        console.error("handleSupplierUpdate: User is not logged in.");
-        toast({
-          title: "Hata",
-          description: "Tedarikçi bilgileri güncellenirken bir sorun oluştu: Kullanıcı girişi yapılmamış.",
-          variant: "destructive",
-        });
-        return;
-      }
-      const supplierToUpdate: Supplier = 'id' in data && data.id
-        ? { ...data as Supplier, updatedAt: formatISO(new Date()) }
-        : { ...data, id: initialSupplier.id, createdAt: initialSupplier.createdAt, updatedAt: formatISO(new Date()) };
-
-      await storageUpdateSupplier(user.uid, supplierToUpdate);
-      toast({
-        title: "Tedarikçi Güncellendi",
-        description: `${supplierToUpdate.name} tedarikçi bilgileri güncellendi.`, 
-      });
-      setShowEditSupplierModal(false);
-      await refreshSupplierData();
-    } catch (error) {
-      console.error("Tedarikçi güncellenirken hata:", error);
-      toast({
-        title: "Hata",
-        description: "Tedarikçi bilgileri güncellenirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-    }
-  }, [toast, refreshSupplierData, user, initialSupplier.id, initialSupplier.createdAt]);
-
-  const balances = useMemo(() => {
-    const newBalances: Record<Currency, number> = { USD: 0, TRY: 0 };
-    purchases.forEach(purchase => {
-      newBalances[purchase.currency] = (newBalances[purchase.currency] || 0) + purchase.amount;
-    });
-    paymentsToSupplier.forEach(payment => {
-      newBalances[payment.currency] = (newBalances[payment.currency] || 0) - payment.amount;
-    });
-    return newBalances;
-  }, [purchases, paymentsToSupplier]);
+  }, [user, availableStockItems]);
 
   const formatCurrency = (amount: number, currency: Currency): string => {
-    if (typeof amount !== 'number' || isNaN(amount)) {
-      amount = 0;
-    }
-    try {
-      return amount.toLocaleString('tr-TR', {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    } catch (e) {
-      console.error("Error formatting currency:", e);
-      return `${amount.toFixed(2)} ${currency}`;
-    }
+    return new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: currency,
+    }).format(amount);
   };
-
-  const handleOpenAddPurchaseModal = useCallback(() => {
-    if (!supplier?.id) {
-      toast({
-        title: "Hata",
-        description: "Tedarikçi bilgisi bulunamadı.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setEditingPurchase(null);
-    setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
-    setShowPurchaseModal(true);
-  }, [supplier?.id, toast]);
-
-  const handleOpenEditPurchaseModal = useCallback((purchase: Purchase) => {
-    setEditingPurchase(purchase);
-    setPurchaseFormValues({
-      amount: purchase.amount.toString(),
-      date: isValid(parseISO(purchase.date)) ? parseISO(purchase.date) : new Date(),
-      currency: purchase.currency,
-      stockItemId: purchase.stockItemId || undefined,
-      quantityPurchased: purchase.quantityPurchased?.toString() || '',
-      unitPrice: purchase.unitPrice?.toString() || '',
-    });
-    setShowPurchaseModal(true);
-  }, []);
 
   const handlePurchaseFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !supplier?.id) {
-      toast({
-        title: "Hata",
-        description: "Alış eklenirken bir sorun oluştu: Kullanıcı girişi yapılmamış veya tedarikçi bulunamadı.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!user || !supplier.id) return;
 
     try {
       const amount = parseFloat(purchaseFormValues.amount);
       if (isNaN(amount) || amount <= 0) {
         toast({
-          title: "Hata",
-          description: "Lütfen geçerli bir alış tutarı girin.",
-          variant: "destructive",
+          title: 'Hata',
+          description: 'Geçerli bir tutar giriniz.',
+          variant: 'destructive',
         });
         return;
       }
 
-      let stockItemId: string | null = null;
-      let quantityPurchased: number | null = null;
-      let unitPrice: number | null = null;
-      let description = 'Alış';
-
       if (purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none') {
-        stockItemId = purchaseFormValues.stockItemId;
-        
-        if (!purchaseFormValues.quantityPurchased || !purchaseFormValues.unitPrice) {
-          toast({
-            title: "Hata",
-            description: "Stok ürünü seçildiğinde miktar ve birim fiyat zorunludur.",
-            variant: "destructive",
-          });
-          return;
-        }
+        const quantity = parseFloat(purchaseFormValues.quantityPurchased || '0');
+        const unitPrice = parseFloat(purchaseFormValues.unitPrice || '0');
 
-        quantityPurchased = parseFloat(purchaseFormValues.quantityPurchased);
-        unitPrice = parseFloat(purchaseFormValues.unitPrice);
-
-        if (isNaN(quantityPurchased) || quantityPurchased <= 0) {
+        if (isNaN(quantity) || quantity <= 0) {
           toast({
-            title: "Hata",
-            description: "Lütfen geçerli bir miktar girin.",
-            variant: "destructive",
+            title: 'Hata',
+            description: 'Geçerli bir miktar giriniz.',
+            variant: 'destructive',
           });
           return;
         }
 
         if (isNaN(unitPrice) || unitPrice <= 0) {
           toast({
-            title: "Hata",
-            description: "Lütfen geçerli bir birim fiyat girin.",
-            variant: "destructive",
+            title: 'Hata',
+            description: 'Geçerli bir birim fiyat giriniz.',
+            variant: 'destructive',
           });
           return;
         }
-
-        description = `${quantityPurchased} adet × ${unitPrice} ${purchaseFormValues.currency} (${stockItemDisplayNames[stockItemId] || ''})`;
       }
 
       const purchaseData: Purchase = {
-        id: editingPurchase?.id || Math.random().toString(36).substr(2, 9),
+        id: editingPurchase?.id || crypto.randomUUID(),
         supplierId: supplier.id,
-        amount: amount,
+        amount,
         date: formatISO(purchaseFormValues.date),
         currency: purchaseFormValues.currency,
-        stockItemId,
-        quantityPurchased,
-        unitPrice,
-        category: 'alis',
+        stockItemId: purchaseFormValues.stockItemId === 'none' ? undefined : purchaseFormValues.stockItemId,
+        quantityPurchased: purchaseFormValues.quantityPurchased ? parseFloat(purchaseFormValues.quantityPurchased) : undefined,
+        unitPrice: purchaseFormValues.unitPrice ? parseFloat(purchaseFormValues.unitPrice) : undefined,
+        description: purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none'
+          ? `${getStockItemName(purchaseFormValues.stockItemId)} - ${purchaseFormValues.quantityPurchased} adet`
+          : 'Manuel alış',
+        transactionType: 'purchase',
+        category: 'odeme',
         tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        transactionType: 'purchase',
-        description
       };
 
       if (editingPurchase) {
         await storageUpdatePurchase(user.uid, purchaseData);
-        setPurchases(prev => prev.map(p => p.id === editingPurchase.id ? purchaseData : p));
-        toast({ title: "Alış Güncellendi", description: "Alış işlemi başarıyla güncellendi." });
+        setPurchases(purchases.map(p => p.id === editingPurchase.id ? purchaseData : p));
+        toast({
+          title: 'Başarılı',
+          description: 'Alış başarıyla güncellendi.',
+        });
       } else {
-        const addedPurchase = await addPurchase(user.uid, purchaseData);
-        setPurchases(prev => [...prev, addedPurchase]);
-        toast({ title: "Alış Eklendi", description: "Yeni alış işlemi başarıyla eklendi." });
+        await addPurchase(user.uid, purchaseData);
+        setPurchases([...purchases, purchaseData]);
+        toast({
+          title: 'Başarılı',
+          description: 'Alış başarıyla eklendi.',
+        });
       }
 
       setShowPurchaseModal(false);
       setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
       setEditingPurchase(null);
-      await refreshSupplierData();
     } catch (error) {
-      console.error("Alış kaydedilirken hata:", error);
+      console.error('Error saving purchase:', error);
       toast({
-        title: "Hata",
-        description: "Alış işlemi kaydedilirken bir sorun oluştu. Lütfen tekrar deneyin.",
-        variant: "destructive",
+        title: 'Hata',
+        description: 'Alış kaydedilirken bir hata oluştu.',
+        variant: 'destructive',
       });
     }
   };
 
-  const handleDeletePurchase = useCallback(async () => {
-    if (!deletingPurchaseId || !user) return;
-    try {
-      await storageDeletePurchase(user.uid, deletingPurchaseId);
-      setPurchases(prev => prev.filter(p => p.id !== deletingPurchaseId));
-      toast({ title: "Alış Silindi", description: "Alış başarıyla silindi." });
-      setDeletingPurchaseId(null);
-      await refreshSupplierData();
-    } catch (error) {
-      console.error("Alış silinirken hata:", error);
-      toast({ title: "Hata", description: "Alış silinirken bir sorun oluştu.", variant: "destructive" });
-    }
-  }, [deletingPurchaseId, toast, refreshSupplierData, user]);
-
-  const handleOpenAddPaymentToSupplierModal = useCallback(() => {
-    if (!supplier?.id) {
-      toast({
-        title: "Hata",
-        description: "Tedarikçi bilgisi bulunamadı.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setEditingPaymentToSupplier(null);
-    setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
-    setShowPaymentToSupplierModal(true);
-  }, [supplier?.id, toast]);
-
-  const handleOpenEditPaymentToSupplierModal = useCallback((payment: PaymentToSupplier) => {
-    setEditingPaymentToSupplier(payment);
-    setPaymentToSupplierFormValues({
-      amount: payment.amount.toString(),
-      date: isValid(parseISO(payment.date)) ? parseISO(payment.date) : new Date(),
-      method: payment.method,
-      currency: payment.currency,
-      referenceNumber: payment.referenceNumber || '',
-    });
-    setShowPaymentToSupplierModal(true);
-  }, []);
-
   const handlePaymentToSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !supplier?.id) {
-      toast({
-        title: "Hata",
-        description: "Ödeme eklenirken bir sorun oluştu: Kullanıcı girişi yapılmamış veya tedarikçi bulunamadı.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!user || !supplier.id) return;
 
     try {
       const amount = parseFloat(paymentToSupplierFormValues.amount);
       if (isNaN(amount) || amount <= 0) {
         toast({
-          title: "Hata",
-          description: "Lütfen geçerli bir ödeme tutarı girin.",
-          variant: "destructive",
+          title: 'Hata',
+          description: 'Geçerli bir tutar giriniz.',
+          variant: 'destructive',
         });
         return;
       }
 
       const paymentData: PaymentToSupplier = {
-        id: editingPaymentToSupplier?.id || Math.random().toString(36).substr(2, 9),
+        id: editingPaymentToSupplier?.id || crypto.randomUUID(),
         supplierId: supplier.id,
-        amount: amount,
+        amount,
         date: formatISO(paymentToSupplierFormValues.date),
         currency: paymentToSupplierFormValues.currency,
         method: paymentToSupplierFormValues.method,
         referenceNumber: paymentToSupplierFormValues.referenceNumber || undefined,
+        description: `${paymentToSupplierFormValues.method} ile ödeme`,
+        transactionType: 'paymentToSupplier',
         category: 'odeme',
         tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        transactionType: 'paymentToSupplier',
-        description: `${paymentToSupplierFormValues.method} ile ödeme`
       };
 
       if (editingPaymentToSupplier) {
-        const updatedPayment = await storageUpdatePaymentToSupplier(user.uid, paymentData);
-        setPaymentsToSupplier(prev => prev.map(p => p.id === editingPaymentToSupplier.id ? updatedPayment : p));
+        await storageUpdatePaymentToSupplier(user.uid, paymentData);
+        setPaymentsToSupplier(paymentsToSupplier.map(p => p.id === editingPaymentToSupplier.id ? paymentData : p));
         toast({
-          title: "Başarılı",
-          description: "Ödeme başarıyla güncellendi.",
+          title: 'Başarılı',
+          description: 'Ödeme başarıyla güncellendi.',
         });
       } else {
-        const newPayment = await addPaymentToSupplier(user.uid, paymentData);
-        setPaymentsToSupplier(prev => [...prev, newPayment]);
+        await addPaymentToSupplier(user.uid, paymentData);
+        setPaymentsToSupplier([...paymentsToSupplier, paymentData]);
         toast({
-          title: "Başarılı",
-          description: "Yeni ödeme başarıyla eklendi.",
+          title: 'Başarılı',
+          description: 'Ödeme başarıyla eklendi.',
         });
       }
 
       setShowPaymentToSupplierModal(false);
       setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
       setEditingPaymentToSupplier(null);
-      await refreshSupplierData();
     } catch (error) {
-      console.error('Ödeme eklenirken hata:', error);
+      console.error('Error saving payment:', error);
       toast({
-        title: "Hata",
-        description: "Ödeme eklenirken bir sorun oluştu.",
-        variant: "destructive",
+        title: 'Hata',
+        description: 'Ödeme kaydedilirken bir hata oluştu.',
+        variant: 'destructive',
       });
     }
   };
-
-  const handleDeletePaymentToSupplier = useCallback(async () => {
-    if (!deletingPaymentToSupplierId || !user) return;
-    try {
-      await storageDeletePaymentToSupplier(user.uid, deletingPaymentToSupplierId);
-      setPaymentsToSupplier(prev => prev.filter(p => p.id !== deletingPaymentToSupplierId));
-      toast({ title: "Ödeme Silindi", description: "Ödeme başarıyla silindi." });
-      setDeletingPaymentToSupplierId(null);
-      await refreshSupplierData();
-    } catch (error) {
-      console.error("Ödeme silinirken hata:", error);
-      toast({ title: "Hata", description: "Ödeme silinirken bir sorun oluştu.", variant: "destructive" });
-    }
-  }, [deletingPaymentToSupplierId, toast, refreshSupplierData, user]);
 
   const safeFormatDate = (dateString: string, formatString: string = "d MMMM yyyy, HH:mm") => {
-    if (!dateString) return "Tarih Yok";
     try {
       const date = parseISO(dateString);
-      if (isValid(date)) {
-        return format(date, formatString, { locale: tr });
+      if (!isValid(date)) {
+        return 'Geçersiz tarih';
       }
-      return "Geçersiz Tarih";
+      return format(date, formatString, { locale: tr });
     } catch (error) {
-      return "Tarih Format Hatası";
+      return 'Geçersiz tarih';
     }
   };
-
-  const getStockItemName = useCallback(async (stockItemId?: string): Promise<string> => {
-    if (!stockItemId || stockItemId === 'none' || !user) return "Manuel Giriş";
-    try {
-      const stockItem = await getStockItemById(user.uid, stockItemId);
-      return stockItem ? `${stockItem.name} (${stockItem.unit || 'Adet'})` : "Bilinmeyen Stok Kalemi";
-    } catch (error) {
-      console.error("Stok kalemi adı getirilirken hata:", error);
-      return "Hata Oluştu";
-    }
-  }, [user]);
-
-  const formatPriceForDisplay = useCallback((price?: Price): string => {
-    if (!price || typeof price.amount !== 'number' || !price.currency) return "-";
-    try {
-      return price.amount.toLocaleString('tr-TR', { style: "currency", currency: price.currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    } catch (e) {
-      return `${price.amount.toFixed(2)} ${price.currency}`;
-    }
-  }, []);
 
   const renderTransactionDetail = (item: UnifiedTransactionClient) => {
-    const isPurchase = item.transactionType === 'purchase';
-    return (
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Tarih:</span>
-          <span className="text-sm">{format(parseISO(item.date), 'dd.MM.yyyy')}</span>
+    if (item.transactionType === 'purchase') {
+      const purchase = item as Purchase;
+      return (
+        <div className="space-y-2">
+          <p className="font-medium">{purchase.description}</p>
+          {purchase.stockItemId && (
+            <div className="text-sm text-muted-foreground">
+              <p>Ürün: {getStockItemName(purchase.stockItemId)}</p>
+              <p>Miktar: {purchase.quantityPurchased}</p>
+              <p>Birim Fiyat: {formatCurrency(purchase.unitPrice || 0, purchase.currency)}</p>
+            </div>
+          )}
         </div>
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Tutar:</span>
-          <span className="text-sm font-medium">{formatCurrency(item.amount, item.currency)}</span>
+      );
+    } else {
+      const payment = item as PaymentToSupplier;
+      return (
+        <div className="space-y-2">
+          <p className="font-medium">{payment.description}</p>
+          <div className="text-sm text-muted-foreground">
+            <p>Ödeme Yöntemi: {payment.method}</p>
+            {payment.referenceNumber && (
+              <p>Referans No: {payment.referenceNumber}</p>
+            )}
+          </div>
         </div>
-        {isPurchase && 'quantityPurchased' in item && 'unitPrice' in item && item.quantityPurchased && item.unitPrice && (
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Detay:</span>
-            <span className="text-sm">
-              {item.quantityPurchased} adet × {formatCurrency(item.unitPrice, item.currency)}
-            </span>
-          </div>
-        )}
-        {item.transactionType === 'paymentToSupplier' && (
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Ödeme Yöntemi:</span>
-            <span className="text-sm">{item.method}</span>
-          </div>
-        )}
-      </div>
-    );
+      );
+    }
   };
-
-  const handleSaveNotes = useCallback(async () => {
-    if (!user || !supplier?.id) return;
-    try {
-      const updatedSupplier: Supplier = { ...supplier, notes: notesContent };
-      await storageUpdateSupplier(user.uid, updatedSupplier);
-      setSupplier(updatedSupplier);
-      toast({
-        title: "Notlar Güncellendi",
-        description: "Tedarikçi notları başarıyla kaydedildi.",
-      });
-    } catch (error) {
-      console.error("Notlar kaydedilirken hata:", error);
-      toast({
-        title: "Hata",
-        description: "Notlar kaydedilirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-    }
-  }, [user, supplier, notesContent, toast]);
-
-  const handleDeleteSupplier = useCallback(async () => {
-    if (!user || !deletingSupplier) return;
-    try {
-      await storageDeleteSupplier(user.uid, deletingSupplier);
-      toast({
-        title: "Tedarikçi Silindi",
-        description: "Tedarikçi başarıyla silindi.",
-      });
-      window.location.href = "/suppliers"; 
-    } catch (error) {
-      console.error("Tedarikçi silinirken hata:", error);
-      toast({
-        title: "Hata",
-        description: "Tedarikçi silinirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-    } finally {
-      setDeletingSupplier(null);
-    }
-  }, [user, deletingSupplier, toast]);
-
-  const handleContactHistorySubmit = useCallback(async () => {
-    if (!user || !supplier?.id) return;
-    try {
-      const newContactHistoryItem: ContactHistoryItem = {
-        id: crypto.randomUUID(),
-        date: formatISO(contactHistoryFormValues.date),
-        type: contactHistoryFormValues.type,
-        summary: contactHistoryFormValues.summary,
-        notes: contactHistoryFormValues.notes || undefined,
-      };
-
-      const updatedSupplier = {
-        ...supplier,
-        contactHistory: [...(supplier.contactHistory || []), newContactHistoryItem],
-      };
-
-      await storageUpdateSupplier(user.uid, updatedSupplier);
-      setSupplier(updatedSupplier);
-      setShowContactHistoryModal(false);
-      setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
-      toast({
-        title: "Başarılı",
-        description: "İletişim geçmişi eklendi.",
-      });
-    } catch (error) {
-      console.error("İletişim geçmişi kaydedilirken hata:", error);
-      toast({
-        title: "Hata",
-        description: "İletişim geçmişi kaydedilirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-    }
-  }, [user, supplier, contactHistoryFormValues, toast]);
-
-  const handleOpenAddContactHistoryModal = useCallback(() => {
-    setEditingContactHistoryItem(null);
-    setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
-    setShowContactHistoryModal(true);
-  }, []);
-
-  const handleOpenEditContactHistoryModal = useCallback((item: ContactHistoryItem) => {
-    setEditingContactHistoryItem(item);
-    setContactHistoryFormValues({
-      date: parseISO(item.date),
-      type: item.type,
-      summary: item.summary,
-      notes: item.notes || '',
-    });
-    setShowContactHistoryModal(true);
-  }, []);
-
-  const handleDeleteContactHistoryItem = useCallback(async (itemId: string) => {
-    if (!user || !supplier?.id) return;
-    try {
-      const updatedContactHistory = (supplier.contactHistory || []).filter(item => item.id !== itemId);
-      const updatedSupplier: Supplier = { ...supplier, contactHistory: updatedContactHistory };
-      await storageUpdateSupplier(user.uid, updatedSupplier);
-      setSupplier(updatedSupplier);
-      toast({
-        title: "İletişim Silindi",
-        description: "İletişim geçmişi kaydı başarıyla silindi.",
-      });
-    } catch (error) {
-      console.error("İletişim geçmişi silinirken hata:", error);
-      toast({
-        title: "Hata",
-        description: "İletişim geçmişi silinirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-    }
-  }, [user, supplier, toast]);
-
-  const handleTaskFormSubmit = useCallback(async () => {
-    if (!user || !supplier?.id) return;
-    try {
-      const taskToSave = {
-        ...taskFormValues,
-        dueDate: taskFormValues.dueDate ? formatISO(taskFormValues.dueDate, { representation: 'date' }) : undefined,
-        id: editingTask?.id || crypto.randomUUID(),
-        createdAt: editingTask?.createdAt || formatISO(new Date()),
-        updatedAt: formatISO(new Date()),
-      };
-
-      let updatedTasks: SupplierTask[];
-
-      if (editingTask) {
-        updatedTasks = (supplier.tasks || []).map(task =>
-          task.id === editingTask.id ? (taskToSave as SupplierTask) : task
-        );
-        toast({
-          title: "Görev Güncellendi",
-          description: "Görev başarıyla güncellendi.",
-        });
-      } else {
-        updatedTasks = [...(supplier.tasks || []), (taskToSave as SupplierTask)];
-        toast({
-          title: "Görev Eklendi",
-          description: "Yeni görev başarıyla eklendi.",
-        });
-      }
-
-      const updatedSupplier: Supplier = { ...supplier, tasks: updatedTasks };
-      await storageUpdateSupplier(user.uid, updatedSupplier);
-      setSupplier(updatedSupplier);
-      setShowTaskModal(false);
-      setEditingTask(null);
-      setTaskFormValues(EMPTY_TASK_FORM_VALUES);
-    } catch (error) {
-      console.error("Görev kaydedilirken hata:", error);
-      toast({
-        title: "Hata",
-        description: "Görev kaydedilirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-    }
-  }, [user, supplier, taskFormValues, editingTask, toast]);
-
-  const handleOpenAddTaskModal = useCallback(() => {
-    setEditingTask(null);
-    setTaskFormValues(EMPTY_TASK_FORM_VALUES);
-    setShowTaskModal(true);
-  }, []);
-
-  const handleOpenEditTaskModal = useCallback((task: SupplierTask) => {
-    setEditingTask(task);
-    setTaskFormValues({
-      description: task.description,
-      dueDate: task.dueDate ? parseISO(task.dueDate) : undefined,
-      status: task.status,
-    });
-    setShowTaskModal(true);
-  }, []);
-
-  const handleDeleteTask = useCallback(async (taskId: string) => {
-    if (!user || !supplier?.id) return;
-    try {
-      const updatedTasks = (supplier.tasks || []).filter(task => task.id !== taskId);
-      const updatedSupplier: Supplier = { ...supplier, tasks: updatedTasks };
-      await storageUpdateSupplier(user.uid, updatedSupplier);
-      setSupplier(updatedSupplier);
-      toast({
-        title: "Görev Silindi",
-        description: "Görev başarıyla silindi.",
-      });
-    } catch (error) {
-      console.error("Görev silinirken hata:", error);
-      toast({
-        title: "Hata",
-        description: "Görev silinirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-    }
-  }, [user, supplier, toast]);
 
   const exportToCSV = (transactions: UnifiedTransactionClient[], supplierName: string) => {
     const headers = ['Tarih', 'İşlem Tipi', 'Tutar', 'Para Birimi', 'Açıklama'];
-    const data = transactions.map(t => [
-      format(parseISO(t.date), 'dd.MM.yyyy'),
-      t.transactionType === 'purchase' ? 'Alış' : 'Ödeme', // İşlem tipi adı
+    const rows = transactions.map(t => [
+      safeFormatDate(t.date, 'dd.MM.yyyy'),
+      t.transactionType === 'purchase' ? 'Alış' : 'Ödeme',
       t.amount.toString(),
       t.currency,
-      t.description
+      t.transactionType === 'purchase' ? (t as Purchase).description : (t as PaymentToSupplier).description,
     ]);
 
     const csvContent = [
       headers.join(','),
-      ...data.map(row => row.join(','))
+      ...rows.map(row => row.join(','))
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -979,116 +564,111 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     document.body.removeChild(link);
   };
 
-  const monthlyStats = useMemo(() => {
-    const months = eachMonthOfInterval({
-      start: dateRange?.from || addDays(new Date(), -180),
-      end: dateRange?.to || new Date(),
-    });
-
-    return months.map(month => {
-      const monthStart = startOfMonth(month);
-      const monthEnd = endOfMonth(month);
-      
-      const monthPurchases = purchases.filter(purchase => {
-        const purchaseDate = new Date(purchase.date);
-        return purchaseDate >= monthStart && purchaseDate <= monthEnd;
-      });
-
-      const monthPaymentsToSupplier = paymentsToSupplier.filter(payment => {
-        const paymentDate = new Date(payment.date);
-        return paymentDate >= monthStart && paymentDate <= monthEnd;
-      });
-
-      const totalPurchases = monthPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
-      const totalPaymentsToSupplier = monthPaymentsToSupplier.reduce((sum, payment) => sum + payment.amount, 0);
-
-      return {
-        month: format(month, 'MMM yyyy', { locale: tr }),
-        alışlar: totalPurchases,
-        ödemeler: totalPaymentsToSupplier,
-      };
-    });
-  }, [purchases, paymentsToSupplier, dateRange]);
-
-  const transactionTypeDistribution = useMemo(() => {
-    const total = filteredAndSortedTransactions.length;
-    if (total === 0) return [];
-
-    const purchasesCount = filteredAndSortedTransactions.filter(t => t.transactionType === 'purchase').length;
-    const paymentsCount = filteredAndSortedTransactions.filter(t => t.transactionType === 'paymentToSupplier').length;
-
-    return [
-      { name: 'Alışlar', value: purchasesCount, percentage: (purchasesCount / total) * 100 },
-      { name: 'Ödemeler', value: paymentsCount, percentage: (paymentsCount / total) * 100 },
-    ];
-  }, [filteredAndSortedTransactions]);
-
-  const editor = useEditor({
-    extensions: [StarterKit, Underline],
-    content: supplier.notes || '',
-    onUpdate: ({ editor }) => {
-      setSupplier(prev => ({ ...prev, notes: editor.getHTML() }));
-    },
-  });
-
-  const transactionCategories: { value: TransactionCategory; label: string }[] = [
-    { value: 'satis', label: 'Satış' },
-    { value: 'odeme', label: 'Ödeme' },
-    { value: 'iade', label: 'İade' },
-    { value: 'indirim', label: 'İndirim' },
-    { value: 'komisyon', label: 'Komisyon' },
-    { value: 'diger', label: 'Diğer' },
-  ];
-
-  const tagColors = [
-    'bg-blue-100 text-blue-800',
-    'bg-green-100 text-green-800',
-    'bg-yellow-100 text-yellow-800',
-    'bg-red-100 text-red-800',
-    'bg-purple-100 text-purple-800',
-    'bg-pink-100 text-pink-800',
-  ];
-
   const handleAddTag = (transactionId: string, tagName: string) => {
-    const newTag: TransactionTag = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: tagName,
-      color: tagColors[Math.floor(Math.random() * tagColors.length)],
-    };
-
-    setPurchases(prevPurchases => 
-      prevPurchases.map(purchase => 
-        purchase.id === transactionId 
-          ? { ...purchase, tags: [...purchase.tags, newTag] }
-          : purchase
-      )
-    );
-
-    setPaymentsToSupplier(prevPayments => 
-      prevPayments.map(payment => 
-        payment.id === transactionId 
-          ? { ...payment, tags: [...payment.tags, newTag] }
-          : payment
-      )
-    );
+    // Implementation for adding tags
   };
 
   const handleRemoveTag = (transactionId: string, tagId: string) => {
-    setPurchases(prevPurchases => 
-      prevPurchases.map(purchase => 
-        purchase.id === transactionId 
-          ? { ...purchase, tags: purchase.tags.filter(tag => tag.id !== tagId) }
-          : purchase
-      )
-    );
+    // Implementation for removing tags
+  };
 
-    setPaymentsToSupplier(prevPayments => 
-      prevPayments.map(payment => 
-        payment.id === transactionId 
-          ? { ...payment, tags: payment.tags.filter(tag => tag.id !== tagId) }
-          : payment
-      )
-    );
+  const handleSupplierUpdate = async (updatedSupplier: Supplier) => {
+    if (!user) return;
+    await storageUpdateSupplier(user.uid, updatedSupplier);
+    setSupplier(updatedSupplier);
+    toast({
+      title: 'Başarılı',
+      description: 'Tedarikçi bilgileri güncellendi.',
+    });
+  };
+
+  const handleContactHistorySubmit = async (formValues: ContactHistoryFormValues) => {
+    if (!user || !supplier.id) return;
+    try {
+      const contactHistoryData: ContactHistoryItem = {
+        id: editingContactHistoryItem?.id || crypto.randomUUID(),
+        supplierId: supplier.id,
+        date: formatISO(formValues.date),
+        type: formValues.type,
+        summary: formValues.summary,
+        notes: formValues.notes,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (editingContactHistoryItem) {
+        await storageUpdateContactHistory(user.uid, contactHistoryData);
+        setContactHistory(contactHistory.map(item => 
+          item.id === editingContactHistoryItem.id ? contactHistoryData : item
+        ));
+        toast({
+          title: 'Başarılı',
+          description: 'İletişim kaydı güncellendi.',
+        });
+      } else {
+        await storageAddContactHistory(user.uid, contactHistoryData);
+        setContactHistory([...contactHistory, contactHistoryData]);
+        toast({
+          title: 'Başarılı',
+          description: 'İletişim kaydı eklendi.',
+        });
+      }
+
+      setShowContactHistoryModal(false);
+      setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+      setEditingContactHistoryItem(null);
+    } catch (error) {
+      console.error('Error saving contact history:', error);
+      toast({
+        title: 'Hata',
+        description: 'İletişim kaydı kaydedilirken bir hata oluştu.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleTaskSubmit = async (formValues: SupplierTaskFormValues) => {
+    if (!user || !supplier.id) return;
+    try {
+      const taskData: SupplierTask = {
+        id: editingTask?.id || crypto.randomUUID(),
+        supplierId: supplier.id,
+        description: formValues.description,
+        dueDate: formValues.dueDate ? formatISO(formValues.dueDate) : undefined,
+        status: formValues.status,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (editingTask) {
+        await storageUpdateTask(user.uid, taskData);
+        setTasks(tasks.map(task => 
+          task.id === editingTask.id ? taskData : task
+        ));
+        toast({
+          title: 'Başarılı',
+          description: 'Görev güncellendi.',
+        });
+      } else {
+        await storageAddTask(user.uid, taskData);
+        setTasks([...tasks, taskData]);
+        toast({
+          title: 'Başarılı',
+          description: 'Görev eklendi.',
+        });
+      }
+
+      setShowTaskModal(false);
+      setTaskFormValues(EMPTY_TASK_FORM_VALUES);
+      setEditingTask(null);
+    } catch (error) {
+      console.error('Error saving task:', error);
+      toast({
+        title: 'Hata',
+        description: 'Görev kaydedilirken bir hata oluştu.',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (!supplier) {
@@ -1109,446 +689,152 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-3xl font-bold">{supplier.name} Detayları</CardTitle>
           <div className="flex items-center space-x-2">
-            <Button onClick={handleOpenAddPurchaseModal} disabled={!supplier?.id} className="flex items-center space-x-2">
-              <PlusCircle className="h-4 w-4" />
-              <span>Alış Ekle</span>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditSupplierModal(true)}
+            >
+              <Edit3 className="mr-2 h-4 w-4" />
+              Düzenle
             </Button>
-            <Button onClick={handleOpenAddPaymentToSupplierModal} disabled={!supplier?.id} className="flex items-center space-x-2">
-              <DollarSign className="h-4 w-4" />
-              <span>Ödeme Yap</span>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={`/suppliers/${supplier.id}/statement`} target="_blank">
-                <FileText className="mr-2 h-4 w-4" /> Ekstre Görüntüle
-              </Link>
+            <Button
+              variant="destructive"
+              onClick={() => setDeletingSupplier(supplier.id)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Sil
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Card className="text-center">
-              <CardHeader>
-                <CardTitle className="text-2xl font-bold">Toplam Alışlar</CardTitle>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Toplam Alış</CardTitle>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-extrabold text-blue-600">{formatCurrency(totalPurchases, 'TRY')}</p>
+                <div className="text-2xl font-bold">{formatCurrency(totalPurchases, 'TRY')}</div>
               </CardContent>
             </Card>
-            <Card className="text-center">
-              <CardHeader>
-                <CardTitle className="text-2xl font-bold">Toplam Ödemeler</CardTitle>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Toplam Ödeme</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-extrabold text-green-600">{formatCurrency(totalPayments, 'TRY')}</p>
+                <div className="text-2xl font-bold">{formatCurrency(totalPayments, 'TRY')}</div>
               </CardContent>
             </Card>
-            <Card className="text-center">
-              <CardHeader>
-                <CardTitle className="text-2xl font-bold">Bakiye</CardTitle>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Bakiye</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <p className={`text-3xl font-extrabold ${balance >= 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(balance, 'TRY')}</p>
+                <div className="text-2xl font-bold">{formatCurrency(balance, 'TRY')}</div>
               </CardContent>
             </Card>
           </div>
-
-          <Tabs defaultValue="transactions" className="w-full mt-8">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="transactions">İşlemler</TabsTrigger>
-              <TabsTrigger value="contact-history">İletişim Geçmişi</TabsTrigger>
-              <TabsTrigger value="tasks">Görevler</TabsTrigger>
-              <TabsTrigger value="notes">Notlar</TabsTrigger>
-            </TabsList>
-            <TabsContent value="transactions">
-              <Card className="mt-4">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-2xl font-bold">Tedarikçi İşlem Geçmişi</CardTitle>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      placeholder="İşlem ara..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="max-w-sm"
-                    />
-                    <Select onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)} value={sortOrder}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Sıralama" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="desc">En Yeniye Göre</SelectItem>
-                        <SelectItem value="asc">En Eskiye Göre</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          id="date"
-                          variant={"outline"}
-                          className={cn(
-                            "w-[300px] justify-start text-left font-normal",
-                            !dateRange?.from && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateRange?.from ? (
-                            dateRange.to ? (
-                              <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>
-                            ) : (
-                              format(dateRange.from, "LLL dd, y")
-                            )
-                          ) : (
-                            <span>Tarih Aralığı Seç</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          initialFocus
-                          mode="range"
-                          defaultMonth={dateRange?.from}
-                          selected={dateRange}
-                          onSelect={setDateRange}
-                          numberOfMonths={2}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <Button onClick={() => setShowPrintView(true)} variant="outline" className="flex items-center space-x-2">
-                      <Printer className="h-4 w-4" />
-                      <span>Yazdır</span>
-                    </Button>
-                  </div>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Tarih</TableHead>
-                          <TableHead>İşlem Tipi</TableHead>
-                          <TableHead>Kategori</TableHead>
-                          <TableHead>Açıklama</TableHead>
-                          <TableHead>Tutar</TableHead>
-                          <TableHead>Eylemler</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedTransactions.length > 0 ? (
-                          paginatedTransactions.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell className="font-medium">{safeFormatDate(item.date)}</TableCell>
-                              <TableCell>
-                                <Badge variant={item.transactionType === 'purchase' ? "secondary" : "default"}>
-                                  {item.transactionType === 'purchase' ? "Alış" : "Ödeme"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{item.category}</TableCell>
-                              <TableCell>
-                                {item.transactionType === 'purchase' && 'stockItemId' in item && item.stockItemId ? getStockItemName(item.stockItemId) : item.description}
-                              </TableCell>
-                              <TableCell className={`${item.transactionType === 'purchase' ? "text-red-600" : "text-green-600"}`}>
-                                {item.transactionType === 'purchase' ? "+" : "-"}{formatCurrency(item.amount, item.currency)}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center space-x-2">
-                                  {item.transactionType === 'purchase' ? (
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditPurchaseModal(item as Purchase)}>
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                  ) : (
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditPaymentToSupplierModal(item as PaymentToSupplier)}>
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="destructive" size="sm" onClick={() => item.transactionType === 'purchase' ? setDeletingPurchaseId(item.id) : setDeletingPaymentToSupplierId(item.id)}>
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>İşlemi Silmek İstediğinizden Emin Misiniz?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Bu işlem geri alınamaz. Bu işlemi kalıcı olarak silecek ve sunucularımızdan verileri kaldıracaktır.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>İptal</AlertDialogCancel>
-                                        <AlertDialogAction onClick={item.transactionType === 'purchase' ? handleDeletePurchase : handleDeletePaymentToSupplier}>Sil</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center">
-                              Hiç işlem bulunamadı.
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  {totalPages > 1 && (
-                    <div className="flex justify-center space-x-2 mt-4">
-                      <Button
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1}
-                        variant="outline"
-                      >
-                        Önceki
-                      </Button>
-                      {[...Array(totalPages)].map((_, index) => (
-                        <Button
-                          key={index + 1}
-                          onClick={() => setCurrentPage(index + 1)}
-                          variant={currentPage === index + 1 ? "default" : "outline"}
-                        >
-                          {index + 1}
-                        </Button>
-                      ))}
-                      <Button
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage === totalPages}
-                        variant="outline"
-                      >
-                        Sonraki
-                      </Button>
-                    </div>
-                  )}
-
-                  <Card className="mt-8">
-                    <CardHeader>
-                      <CardTitle className="text-2xl font-bold">Aylık İşlem İstatistikleri</CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={monthlyStats}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <Tooltip formatter={(value: number) => formatCurrency(value, 'TRY')} />
-                          <Bar dataKey="alışlar" fill="#8884d8" />
-                          <Bar dataKey="ödemeler" fill="#82ca9d" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="mt-8">
-                    <CardHeader>
-                      <CardTitle className="text-2xl font-bold">İşlem Türü Dağılımı</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="list-disc pl-5">
-                        {transactionTypeDistribution.map((item, index) => (
-                          <li key={index} className="text-lg">
-                            {item.name}: <span className="font-bold">{item.value}</span> işlem ({(item.percentage || 0).toFixed(2)}%)
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-
-                </TabsContent>
-                <TabsContent value="contact-history">
-                  <Card className="mt-4">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-2xl font-bold">İletişim Geçmişi</CardTitle>
-                      <Button onClick={handleOpenAddContactHistoryModal} className="flex items-center space-x-2">
-                        <PlusCircle className="h-4 w-4" />
-                        <span>İletişim Ekle</span>
-                      </Button>
-                    </CardHeader>
-                    <CardContent>
-                      {supplier.contactHistory && supplier.contactHistory.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Tarih</TableHead>
-                              <TableHead>Tür</TableHead>
-                              <TableHead>Özet</TableHead>
-                              <TableHead>Notlar</TableHead>
-                              <TableHead>Eylemler</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {supplier.contactHistory.map((item) => (
-                              <TableRow key={item.id}>
-                                <TableCell className="font-medium">{safeFormatDate(item.date, 'dd.MM.yyyy HH:mm')}</TableCell>
-                                <TableCell>{item.type}</TableCell>
-                                <TableCell>{item.summary}</TableCell>
-                                <TableCell>{item.notes}</TableCell>
-                                <TableCell>
-                                  <div className="flex items-center space-x-2">
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditContactHistoryModal(item)}>
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <Button variant="destructive" size="sm" onClick={() => handleDeleteContactHistoryItem(item.id)}>
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>İletişim Kaydını Silmek İstediğinizden Emin Misiniz?</AlertDialogTitle>
-                                          <AlertDialogDescription>
-                                            Bu işlem geri alınamaz. Bu iletişim geçmişi kaydını kalıcı olarak silecek ve sunucularımızdan verileri kaldıracaktır.
-                                          </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>İptal</AlertDialogCancel>
-                                          <AlertDialogAction onClick={() => handleDeleteContactHistoryItem(item.id)}>Sil</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <p>Henüz iletişim geçmişi yok.</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="tasks">
-                  <Card className="mt-4">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-2xl font-bold">Görevler</CardTitle>
-                      <Button onClick={handleOpenAddTaskModal} className="flex items-center space-x-2">
-                        <PlusCircle className="h-4 w-4" />
-                        <span>Görev Ekle</span>
-                      </Button>
-                    </CardHeader>
-                    <CardContent>
-                      {supplier.tasks && supplier.tasks.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Açıklama</TableHead>
-                              <TableHead>Son Tarih</TableHead>
-                              <TableHead>Durum</TableHead>
-                              <TableHead>Eylemler</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {supplier.tasks.map((task) => (
-                              <TableRow key={task.id}>
-                                <TableCell className="font-medium">{task.description}</TableCell>
-                                <TableCell>{task.dueDate ? safeFormatDate(task.dueDate, 'dd.MM.yyyy') : 'Belirtilmemiş'}</TableCell>
-                                <TableCell>
-                                  <Badge variant={task.status === 'completed' ? 'default' : task.status === 'in-progress' ? 'secondary' : 'outline'}>
-                                    {task.status === 'pending' ? 'Bekliyor' : task.status === 'completed' ? 'Tamamlandı' : 'Devam Ediyor'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center space-x-2">
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditTaskModal(task)}>
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <Button variant="destructive" size="sm" onClick={() => handleDeleteTask(task.id)}>
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>Görevi Silmek İstediğinizden Emin Misiniz?</AlertDialogTitle>
-                                          <AlertDialogDescription>
-                                            Bu işlem geri alınamaz. Bu görevi kalıcı olarak silecek ve sunucularımızdan verileri kaldıracaktır.
-                                          </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>İptal</AlertDialogCancel>
-                                          <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>Sil</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <p>Henüz görev yok.</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                <TabsContent value="notes">
-                  <Card className="mt-4">
-                    <CardHeader>
-                      <CardTitle className="text-2xl font-bold">Notlar</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="border rounded-md p-2 min-h-[150px] mb-4">
-                        <EditorContent editor={editor} className="prose max-w-none" />
-                      </div>
-                      <div className="flex space-x-1 mb-2">
-                        <Button onClick={() => editor?.chain().focus().toggleBold().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleBold()}>
-                          <Bold className="h-4 w-4" />
-                        </Button>
-                        <Button onClick={() => editor?.chain().focus().toggleItalic().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleItalic()}>
-                          <Italic className="h-4 w-4" />
-                        </Button>
-                        <Button onClick={() => editor?.chain().focus().toggleUnderline().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleUnderline()}>
-                          <UnderlineIcon className="h-4 w-4" />
-                        </Button>
-                        <Button onClick={() => editor?.chain().focus().toggleStrike().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleStrike()}>
-                          <Strikethrough className="h-4 w-4" />
-                        </Button>
-                        <Button onClick={() => editor?.chain().focus().toggleBulletList().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleBulletList()}>
-                          <List className="h-4 w-4" />
-                        </Button>
-                        <Button onClick={() => editor?.chain().focus().toggleOrderedList().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleOrderedList()}>
-                          <ListOrdered className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <Button onClick={handleSaveNotes} className="w-full">Notları Kaydet</Button>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-            <CardFooter className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowEditSupplierModal(true)}>
-                <Pencil className="mr-2 h-4 w-4" /> Tedarikçi Düzenle
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" onClick={() => setDeletingSupplier(supplier.id)}>
-                    <Trash2 className="mr-2 h-4 w-4" /> Tedarikçiyi Sil
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Tedarikçiyi Silmek İstediğinizden Emin Misiniz?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Bu işlem geri alınamaz. Bu tedarikçiyi kalıcı olarak silecek ve tüm ilişkili verileri (alışlar, ödemeler, iletişim geçmişi, görevler) sunucularımızdan kaldıracaktır.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>İptal</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteSupplier}>Sil</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </CardFooter>
-          </Card>
         </CardContent>
       </Card>
 
+      <Tabs defaultValue="transactions" className="mt-8">
+        <TabsList>
+          <TabsTrigger value="transactions">İşlemler</TabsTrigger>
+          <TabsTrigger value="notes">Notlar</TabsTrigger>
+          <TabsTrigger value="contact-history">İletişim Geçmişi</TabsTrigger>
+          <TabsTrigger value="tasks">Görevler</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="transactions">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>İşlemler</CardTitle>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowPurchaseModal(true)}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Alış Ekle
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowPaymentToSupplierModal(true)}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Ödeme Ekle
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Transaction list content */}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notes">
+          <Card>
+            <CardHeader>
+              <CardTitle>Notlar</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Notes content */}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="contact-history">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>İletişim Geçmişi</CardTitle>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowContactHistoryModal(true)}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  İletişim Ekle
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Contact history content */}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tasks">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Görevler</CardTitle>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTaskModal(true)}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Görev Ekle
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Tasks content */}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Modals */}
       <PurchaseModal
         isOpen={showPurchaseModal}
-        onClose={() => setShowPurchaseModal(false)}
+        onClose={() => {
+          setShowPurchaseModal(false);
+          setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
+          setEditingPurchase(null);
+        }}
         onSubmit={handlePurchaseFormSubmit}
         formValues={purchaseFormValues}
         setFormValues={setPurchaseFormValues}
@@ -1558,7 +844,11 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
 
       <PaymentToSupplierModal
         isOpen={showPaymentToSupplierModal}
-        onClose={() => setShowPaymentToSupplierModal(false)}
+        onClose={() => {
+          setShowPaymentToSupplierModal(false);
+          setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
+          setEditingPaymentToSupplier(null);
+        }}
         onSubmit={handlePaymentToSupplierSubmit}
         formValues={paymentToSupplierFormValues}
         setFormValues={setPaymentToSupplierFormValues}
@@ -1567,22 +857,58 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       <EditSupplierModal
         isOpen={showEditSupplierModal}
         onClose={() => setShowEditSupplierModal(false)}
-        onSubmit={handleSupplierUpdate}
         supplier={supplier}
-        setSupplier={setSupplier}
+        onSave={handleSupplierUpdate}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={!!deletingPurchaseId}
+        onClose={() => setDeletingPurchaseId(null)}
+        onConfirm={async () => {
+          if (deletingPurchaseId) {
+            await storageDeletePurchase(deletingPurchaseId);
+            setPurchases(purchases.filter(p => p.id !== deletingPurchaseId));
+            setDeletingPurchaseId(null);
+          }
+        }}
+        title="Alışı Sil"
+        description="Bu alışı silmek istediğinizden emin misiniz?"
+      />
+
+      <DeleteConfirmationModal
+        isOpen={!!deletingPaymentToSupplierId}
+        onClose={() => setDeletingPaymentToSupplierId(null)}
+        onConfirm={async () => {
+          if (deletingPaymentToSupplierId) {
+            await storageDeletePaymentToSupplier(deletingPaymentToSupplierId);
+            setPaymentsToSupplier(paymentsToSupplier.filter(p => p.id !== deletingPaymentToSupplierId));
+            setDeletingPaymentToSupplierId(null);
+          }
+        }}
+        title="Ödemeyi Sil"
+        description="Bu ödemeyi silmek istediğinizden emin misiniz?"
       />
 
       <DeleteConfirmationModal
         isOpen={!!deletingSupplier}
         onClose={() => setDeletingSupplier(null)}
-        onConfirm={handleDeleteSupplier}
+        onConfirm={async () => {
+          if (deletingSupplier) {
+            await storageDeleteSupplier(deletingSupplier);
+            window.location.href = '/suppliers';
+          }
+        }}
         title="Tedarikçiyi Sil"
-        description="Bu tedarikçiyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+        description="Bu tedarikçiyi silmek istediğinizden emin misiniz?"
       />
 
       <ContactHistoryModal
         isOpen={showContactHistoryModal}
-        onClose={() => setShowContactHistoryModal(false)}
+        onClose={() => {
+          setShowContactHistoryModal(false);
+          setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+          setEditingContactHistoryItem(null);
+        }}
         onSubmit={handleContactHistorySubmit}
         formValues={contactHistoryFormValues}
         setFormValues={setContactHistoryFormValues}
@@ -1590,8 +916,12 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
 
       <TaskModal
         isOpen={showTaskModal}
-        onClose={() => setShowTaskModal(false)}
-        onSubmit={handleTaskFormSubmit}
+        onClose={() => {
+          setShowTaskModal(false);
+          setTaskFormValues(EMPTY_TASK_FORM_VALUES);
+          setEditingTask(null);
+        }}
+        onSubmit={handleTaskSubmit}
         formValues={taskFormValues}
         setFormValues={setTaskFormValues}
       />

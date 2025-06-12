@@ -1,42 +1,37 @@
 import React from 'react';
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PurchaseFormValues, Currency, StockItem } from "@/lib/types";
-import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { Dispatch, SetStateAction } from "react";
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { CalendarIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { PaymentToSupplierFormValues, Currency } from '@/lib/types';
 
-interface PurchaseModalProps {
+interface PaymentToSupplierModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => Promise<void>;
-  formValues: PurchaseFormValues;
-  setFormValues: Dispatch<SetStateAction<PurchaseFormValues>>;
-  availableStockItems: StockItem[];
-  stockItemDisplayNames: Record<string, string>;
+  formValues: PaymentToSupplierFormValues;
+  setFormValues: (values: PaymentToSupplierFormValues) => void;
 }
 
-export function PurchaseModal({
+export function PaymentToSupplierModal({
   isOpen,
   onClose,
   onSubmit,
   formValues,
   setFormValues,
-  availableStockItems,
-  stockItemDisplayNames
-}: PurchaseModalProps) {
+}: PaymentToSupplierModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Alış Ekle</DialogTitle>
+          <DialogTitle>Ödeme Ekle</DialogTitle>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid gap-4">
@@ -92,50 +87,31 @@ export function PurchaseModal({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="stockItem">Stok Ürünü</Label>
+              <Label htmlFor="method">Ödeme Yöntemi</Label>
               <Select
-                value={formValues.stockItemId}
-                onValueChange={(value) => setFormValues({ ...formValues, stockItemId: value })}
+                value={formValues.method}
+                onValueChange={(value) => setFormValues({ ...formValues, method: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Stok ürünü seçin" />
+                  <SelectValue placeholder="Ödeme yöntemi seçin" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Stok ürünü yok</SelectItem>
-                  {availableStockItems.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {stockItemDisplayNames[item.id] || item.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="nakit">Nakit</SelectItem>
+                  <SelectItem value="krediKarti">Kredi Kartı</SelectItem>
+                  <SelectItem value="havale">Havale/EFT</SelectItem>
+                  <SelectItem value="diger">Diğer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {formValues.stockItemId && formValues.stockItemId !== 'none' && (
-              <>
-                <div className="grid gap-2">
-                  <Label htmlFor="quantity">Miktar</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    step="1"
-                    value={formValues.quantityPurchased}
-                    onChange={(e) => setFormValues({ ...formValues, quantityPurchased: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="unitPrice">Birim Fiyat</Label>
-                  <Input
-                    id="unitPrice"
-                    type="number"
-                    step="0.01"
-                    value={formValues.unitPrice}
-                    onChange={(e) => setFormValues({ ...formValues, unitPrice: e.target.value })}
-                    required
-                  />
-                </div>
-              </>
-            )}
+            <div className="grid gap-2">
+              <Label htmlFor="referenceNumber">Referans No</Label>
+              <Input
+                id="referenceNumber"
+                value={formValues.referenceNumber || ''}
+                onChange={(e) => setFormValues({ ...formValues, referenceNumber: e.target.value })}
+                placeholder="Opsiyonel"
+              />
+            </div>
           </div>
           <div className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={onClose}>

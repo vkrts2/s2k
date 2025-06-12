@@ -56,8 +56,14 @@ export interface Customer extends BaseEntity {
 
 export interface Supplier extends BaseEntity {
   name: string;
-  contactHistory?: ContactHistoryItem[]; // Yeni alan
-  tasks?: SupplierTask[]; // Yeni alan
+  email?: string;
+  phone?: string;
+  address?: string;
+  taxNumber?: string;
+  taxOffice?: string;
+  notes?: string;
+  contactHistory?: ContactHistoryItem[];
+  tasks?: SupplierTask[];
 }
 
 export type TransactionCategory =
@@ -114,10 +120,32 @@ export interface PaymentFormValues {
   referenceNumber?: string | null;
 }
 
+export interface PaymentToSupplierFormValues {
+  amount: string;
+  date: Date;
+  method: string;
+  currency: Currency;
+  referenceNumber?: string | null;
+}
+
+export interface ContactHistoryFormValues {
+  date: Date;
+  type: 'phone' | 'email' | 'meeting' | 'other';
+  summary: string;
+  notes: string;
+}
+
+export interface SupplierTaskFormValues {
+  description: string;
+  dueDate?: Date;
+  status: 'pending' | 'completed' | 'in-progress';
+}
+
 export interface Sale extends BaseEntity {
   customerId: string;
   stockItemId?: string | null;
   quantity?: number | null;
+  quantitySold?: number | null;
   unitPrice?: number | null;
   totalPrice?: number | null;
   amount: number;
@@ -271,10 +299,8 @@ export interface Quotation {
   updatedAt: string; // ISO string format
 }
 
-type PaymentToSupplierFormValues = {
-  amount: string;
-  date: Date;
-  method: string | null; // null da olabilir
-  currency: Currency;
-  referenceNumber?: string | null; // null da olabilir
-};
+export interface SupplierTask extends BaseEntity {
+  description: string;
+  dueDate?: string;
+  status: 'pending' | 'completed' | 'in-progress';
+}

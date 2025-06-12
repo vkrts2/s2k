@@ -3,7 +3,7 @@ import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy } from "firebase/firestore";
 import { getDoc, limit } from "firebase/firestore";
 import { formatISO, parseISO, format, addDays } from 'date-fns';
-import type { Customer, Sale, Payment, Currency, Supplier, Purchase, PaymentToSupplier, TodoItem, PortfolioItem, ArchivedFile, UsefulLink, StockItem, Price, Quotation, QuotationItem } from "./types";
+import type { Customer, Sale, Payment, Currency, Supplier, Purchase, PaymentToSupplier, TodoItem, PortfolioItem, ArchivedFile, UsefulLink, StockItem, Price, Quotation, QuotationItem, ContactHistoryItem, SupplierTask } from "./types";
 // import { storeFileInDB, deleteFileFromDB } from './indexedDBStorage'; // Firebase Storage kullanılacaksa bu kısım değişecek
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -876,4 +876,38 @@ export const updateQuotation = async (uid: string, updatedQuotation: Quotation):
 export const deleteQuotation = async (uid: string, quotationId: string): Promise<void> => {
   const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), quotationId);
   await deleteDoc(quotationDocRef);
+};
+
+// Contact History Functions
+export const addContactHistory = async (uid: string, contactHistoryData: Omit<ContactHistoryItem, 'id'>): Promise<ContactHistoryItem> => {
+  const docRef = await addDoc(_getUserCollectionRef(uid, "contactHistory"), contactHistoryData);
+  return { ...contactHistoryData, id: docRef.id } as ContactHistoryItem;
+};
+
+export const updateContactHistory = async (uid: string, contactHistoryData: ContactHistoryItem): Promise<ContactHistoryItem> => {
+  const contactHistoryDocRef = doc(_getUserCollectionRef(uid, "contactHistory"), contactHistoryData.id);
+  await updateDoc(contactHistoryDocRef, contactHistoryData);
+  return contactHistoryData;
+};
+
+export const deleteContactHistory = async (uid: string, contactHistoryId: string): Promise<void> => {
+  const contactHistoryDocRef = doc(_getUserCollectionRef(uid, "contactHistory"), contactHistoryId);
+  await deleteDoc(contactHistoryDocRef);
+};
+
+// Task Functions
+export const addTask = async (uid: string, taskData: Omit<SupplierTask, 'id'>): Promise<SupplierTask> => {
+  const docRef = await addDoc(_getUserCollectionRef(uid, "tasks"), taskData);
+  return { ...taskData, id: docRef.id } as SupplierTask;
+};
+
+export const updateTask = async (uid: string, taskData: SupplierTask): Promise<SupplierTask> => {
+  const taskDocRef = doc(_getUserCollectionRef(uid, "tasks"), taskData.id);
+  await updateDoc(taskDocRef, taskData);
+  return taskData;
+};
+
+export const deleteTask = async (uid: string, taskId: string): Promise<void> => {
+  const taskDocRef = doc(_getUserCollectionRef(uid, "tasks"), taskId);
+  await deleteDoc(taskDocRef);
 };
