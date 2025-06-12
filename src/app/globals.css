@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: 210 25% 10%; /* Very Dark Gray/Blue */
+    --foreground: 210 25% 90%; /* Light Gray */
+    --card: 210 25% 15%; /* Darker card */
+    --card-foreground: 210 25% 90%;
+    --popover: 210 25% 15%;
+    --popover-foreground: 210 25% 90%;
+    --primary: 207 88% 60%; /* #64B5F6 Calm Blue - slightly darker for dark mode */
+    --primary-foreground: 210 40% 98%; /* Light text on primary */
+    --secondary: 207 50% 25%; /* Darker muted blue */
+    --secondary-foreground: 207 50% 85%; /* Lighter blue text */
+    --muted: 210 20% 20%; /* Dark Muted Gray */
+    --muted-foreground: 210 20% 60%; /* Lighter Muted Gray text */
+    --accent: 260 46% 58%; /* #9575CD Muted Purple - slightly darker */
+    --accent-foreground: 210 25% 98%; /* Light text on accent */
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 20% 25%;
+    --input: 210 20% 22%;
+    --ring: 207 88% 60%;
+    --radius: 0.5rem;
+
+    --chart-1: 207 88% 60%;
+    --chart-2: 260 46% 58%;
+    --chart-3: 30 70% 60%;
+    --chart-4: 120 35% 50%;
+    --chart-5: 330 65% 55%;
+
+    /* Sidebar Specific Vars (Dark Theme is now default) */
+    --sidebar-background: 220 15% 12%; /* Even darker or distinct dark */
+    --sidebar-foreground: 220 15% 80%;
+    --sidebar-primary: 207 88% 60%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 220 15% 22%;
+    --sidebar-accent-foreground: 220 15% 90%;
+    --sidebar-border: 220 15% 8%;
+    --sidebar-ring: 207 88% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* AGGRESSIVE PRINT STYLES */
+  @media print {
+    /* Reset all CSS properties and force light color scheme */
+    html {
+      all: initial !important;
+      font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif !important;
+      background-color: white !important;
+      color: black !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-scheme: light !important;
+    }
+
+    body {
+      background-color: white !important;
+      color: black !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-scheme: light !important;
+      margin: 0 !important;
+      padding: 0.01cm !important; /* Body için genel sayfa kenar boşluğu - Görseldeki kırmızı çizgilere kadar daha da küçültüldü */
+    }
+
+    /* Ensure .dark class is completely ignored */
+    html.dark,
+    html.dark body,
+    html.dark *:not(.no-print) {
+      background-color: white !important;
+      color: black !important;
+      border-color: #ddd !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      filter: none !important;
+      -webkit-filter: none !important;
+      color-scheme: light !important;
+    }
+
+    /* Reset specific Tailwind classes that might have backgrounds/colors */
+    .bg-background, .bg-card, .bg-popover, .bg-secondary, .bg-muted {
+      background-color: white !important;
+    }
+    .text-foreground, .text-card-foreground, .text-popover-foreground, .text-secondary-foreground, .text-muted-foreground {
+      color: black !important;
+    }
+
+    /* Ensure no hidden elements appear */
+    .no-print {
+      display: none !important;
+    }
+
+    /* Tables, cards, etc. might need specific overrides */
+    table, th, td {
+      border: 1px solid #ddd !important;
+      background-color: white !important;
+      color: black !important;
+    }
+    th {
+      background-color: #f2f2f2 !important;
+      color: black !important;
+    }
+    .card {
+        background-color: white !important;
+        color: black !important;
+        border: 1px solid #eee !important;
+        box-shadow: none !important;
+    }
+
+    /* Text colors for specific classes like text-green-600, text-red-600 should remain */
+    .text-green-600 { color: green !important; }
+    .text-red-600 { color: red !important; }
+    .text-destructive { color: red !important; }
+    .text-primary { color: black !important; }
+
+    /* Ensure padding/margin resets if needed - Removed aggressive resets */
+    /* .p-4, .sm\:p-6, .md\:p-8 { padding: 0 !important; } */
+    /* .m-4, .sm\:m-6, .md\:m-8 { margin: 0 !important; } */
+  }
+}
