@@ -62,7 +62,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { PlusCircle, Trash2, DollarSign, ShoppingCart, Edit3, Pencil, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline } from 'lucide-react';
+import { PlusCircle, Trash2, DollarSign, ShoppingCart, Edit3, Pencil, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline as UnderlineIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isValid, formatISO, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -80,6 +80,7 @@ import { useEditor } from '@tiptap/react';
 import { EditorContent } from '@tiptap/react';
 import { Badge } from "@/components/ui/badge";
 import { TransactionCategory, TransactionTag } from "@/lib/types";
+import Underline from '@tiptap/extension-underline';
 
 interface CustomerDetailPageClientProps {
   customer: Customer;
@@ -93,14 +94,15 @@ type SaleFormValues = {
   date: Date;
   currency: Currency;
   stockItemId?: string;
-  quantitySold?: string;
+  quantity?: string; // quantitySold yerine quantity
   unitPrice?: string; // Bu birim fiyatı, amount hesaplandıktan sonra da saklanacak.
 };
 type PaymentFormValues = {
   amount: string;
   date: Date;
-  method: string;
+  method: 'nakit' | 'krediKarti' | 'havale' | 'diger'; // string yerine belirli tipler
   currency: Currency;
+  referenceNumber?: string; // Ekledim
 };
 
 // Yeni: İletişim Geçmişi Form Değerleri
@@ -123,14 +125,15 @@ const EMPTY_SALE_FORM_VALUES: SaleFormValues = {
   date: new Date(),
   currency: 'TRY',
   stockItemId: 'none', // undefined yerine 'none' olarak ayarlandı
-  quantitySold: '',
+  quantity: '',
   unitPrice: '',
 };
 const EMPTY_PAYMENT_FORM_VALUES: PaymentFormValues = {
   amount: '',
   date: new Date(),
-  method: 'cash', // Default payment method
+  method: 'nakit', // Default payment method
   currency: 'TRY',
+  referenceNumber: '',
 };
 
 // Yeni: Boş İletişim Geçmişi Form Değerleri
@@ -148,7 +151,7 @@ const EMPTY_TASK_FORM_VALUES: TaskFormValues = {
   status: 'pending',
 };
 
-type UnifiedTransaction = (Sale & { transactionType: 'sale' }) | (Payment & { transactionType: 'payment', description: string });
+type UnifiedTransactionClient = AppUnifiedTransaction; // AppUnifiedTransaction olarak güncellendi
 
 export function CustomerDetailPageClient({ customer: initialCustomer, initialSales, initialPayments, user }: CustomerDetailPageClientProps) {
   const [customer, setCustomer] = useState<Customer>(initialCustomer);
@@ -192,13 +195,13 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   const itemsPerPage = 10;
   const [showPrintView, setShowPrintView] = useState(false);
 
-  // Calculate totals
+  // Calculate totals with memoization
   const totalSales = useMemo(() => {
-    return sales.reduce((sum, sale) => sum + sale.amount, 0);
+    return sales.reduce((sum: number, sale: Sale) => sum + sale.amount, 0);
   }, [sales]);
 
   const totalPayments = useMemo(() => {
-    return payments.reduce((sum, payment) => sum + payment.amount, 0);
+    return payments.reduce((sum: number, payment: Payment) => sum + payment.amount, 0);
   }, [payments]);
 
   const balance = useMemo(() => {
@@ -207,46 +210,54 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
   // Combine sales and payments into a unified list
   const unifiedTransactions = useMemo(() => {
-    const salesWithType = sales.map(sale => ({ ...sale, transactionType: 'sale' as const }));
-    const paymentsWithType = payments.map(payment => ({ ...payment, transactionType: 'payment' as const }));
-    return [...salesWithType, ...paymentsWithType] as UnifiedTransaction[];
+    const all = [
+      ...sales.map(s => ({ ...s, transactionType: 'sale' as const })),
+      ...payments.map(p => ({ ...p, transactionType: 'payment' as const }))
+    ];
+    // Tarihe göre artan sırada sırala (eskiden yeniye)
+    return all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [sales, payments]);
 
-  // Filter transactions by date range
+  // Optimize transaction filtering and sorting
   const filteredAndSortedTransactions = useMemo(() => {
-    let filtered = unifiedTransactions;
-    
-    // Apply date range filter
-    if (dateRange?.from && dateRange?.to) {
-      filtered = filtered.filter(item => {
-        const itemDate = new Date(item.date);
-        return itemDate >= dateRange.from! && itemDate <= dateRange.to!;
-      });
-    }
-    
-    // Apply search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((item: UnifiedTransaction) => {
-        const amount = item.amount.toString();
-        const date = safeFormatDate(item.date, 'dd MMMM yyyy');
-        const stockItemName = item.transactionType === 'sale' && 'stockItemId' in item && item.stockItemId 
-          ? stockItemDisplayNames[item.stockItemId] 
-          : '';
-        
-        return amount.includes(query) || 
-               date.toLowerCase().includes(query) || 
-               stockItemName.toLowerCase().includes(query);
-      });
-    }
+    const all: (Sale | Payment)[] = [
+      ...sales.map((s: Sale) => ({ ...s, transactionType: 'sale' as const })),
+      ...payments.map((p: Payment) => ({ ...p, transactionType: 'payment' as const }))
+    ];
 
-    // Apply sorting
-    return filtered.sort((a: UnifiedTransaction, b: UnifiedTransaction) => {
+    // Apply date range filter
+    const filtered = all.filter(item => {
+      const itemDate = parseISO(item.date);
+      return (!dateRange?.from || itemDate >= dateRange.from) &&
+             (!dateRange?.to || itemDate <= dateRange.to);
+    });
+
+    // Apply search query filter
+    const searched = searchQuery
+      ? filtered.filter(item => {
+          const searchLower = searchQuery.toLowerCase();
+          const description = (item.transactionType === 'sale' && (item as Sale).description) || 
+                              (item.transactionType === 'payment' && (item as Payment).description) || '';
+          return (
+            item.amount.toString().includes(searchLower) ||
+            description.toLowerCase().includes(searchLower) ||
+            format(parseISO(item.date), 'dd.MM.yyyy').includes(searchLower)
+          );
+        })
+      : filtered;
+
+    // Apply sorting with proper type checking
+    return searched.sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
-      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
     });
-  }, [unifiedTransactions, searchQuery, sortOrder, stockItemDisplayNames, dateRange]);
+  }, [sales, payments, dateRange, searchQuery, sortOrder]);
+
+  // Optimize recent transactions calculation
+  const recentTransactions = useMemo(() => {
+    return filteredAndSortedTransactions.slice(0, 5);
+  }, [filteredAndSortedTransactions]);
 
   // Pagination
   const totalPages = Math.ceil(filteredAndSortedTransactions.length / itemsPerPage);
@@ -254,11 +265,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredAndSortedTransactions.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredAndSortedTransactions, currentPage]);
-
-  // Recent transactions summary (last 5 transactions)
-  const recentTransactions = useMemo(() => {
-    return filteredAndSortedTransactions.slice(0, 5);
-  }, [filteredAndSortedTransactions]);
 
   // Print view component
   const PrintView = () => (
@@ -308,11 +314,20 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
               <td className="p-2">{item.transactionType === 'sale' ? 'Satış' : 'Ödeme'}</td>
               <td className="p-2 text-right">{formatCurrency(item.amount, item.currency)}</td>
               <td className="p-2">
-                {item.transactionType === 'sale' && 'stockItemId' in item && item.stockItemId
-                  ? stockItemDisplayNames[item.stockItemId]
-                  : item.transactionType === 'payment'
-                  ? `Ödeme: ${item.method}`
-                  : 'Manuel İşlem'}
+                {item.transactionType === 'sale' && 'quantity' in item && 'unitPrice' in item && item.quantity && item.unitPrice && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Detay:</span>
+                    <span className="text-sm">
+                      {item.quantity} adet × {formatCurrency(item.unitPrice, item.currency)}
+                    </span>
+                  </div>
+                )}
+                {item.transactionType === 'payment' && ( // item.transactionType !== 'sale' yerine item.transactionType === 'payment' kullanıldı
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Ödeme Yöntemi:</span>
+                    <span className="text-sm">{item.method}</span>
+                  </div>
+                )}
               </td>
             </tr>
           ))}
@@ -367,7 +382,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   }, [initialCustomer, initialSales, initialPayments, user]);
 
   useEffect(() => {
-    const quantity = parseFloat(saleFormValues.quantitySold || '0');
+    const quantity = parseFloat(saleFormValues.quantity || '0');
     const price = parseFloat(saleFormValues.unitPrice || '0');
     if (saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none' && !isNaN(quantity) && !isNaN(price) && quantity > 0 && price >= 0) {
       setSaleFormValues(prev => ({ ...prev, amount: (quantity * price).toFixed(2) }));
@@ -376,7 +391,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
     } else {
        setSaleFormValues(prev => ({ ...prev, amount: ''})); // Clear amount if calculation is not possible
     }
-  }, [saleFormValues.quantitySold, saleFormValues.unitPrice, saleFormValues.stockItemId]);
+  }, [saleFormValues.quantity, saleFormValues.unitPrice, saleFormValues.stockItemId]);
 
   useEffect(() => {
     // Stok kalemi seçildiğinde birim fiyatını otomatik doldurma mantığını kaldırıyoruz
@@ -478,7 +493,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
       date: isValid(parseISO(sale.date)) ? parseISO(sale.date) : new Date(),
       currency: sale.currency,
       stockItemId: sale.stockItemId || undefined,
-      quantitySold: sale.quantitySold?.toString() || '',
+      quantity: sale.quantity?.toString() || '', // quantitySold yerine quantity
       unitPrice: sale.unitPrice?.toString() || '',
     });
     setShowSaleModal(true);
@@ -506,65 +521,31 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         return;
       }
 
-      // Determine stockItemId
-      const finalStockItemId = saleFormValues.stockItemId === 'none' ? null : (saleFormValues.stockItemId || null);
+      const quantity = saleFormValues.quantity ? parseFloat(saleFormValues.quantity) : undefined;
+      const unitPrice = saleFormValues.unitPrice ? parseFloat(saleFormValues.unitPrice) : undefined;
 
-      let finalQuantitySold: number | null = null;
-      let finalUnitPrice: number | null = null;
-
-      if (finalStockItemId) { // Only parse quantity and unit price if a stock item is selected
-        const quantity = parseFloat(saleFormValues.quantitySold || '0');
-        const unitPrice = parseFloat(saleFormValues.unitPrice || '0');
-
-        if (isNaN(quantity) || quantity <= 0) {
-          toast({
-            title: "Hata",
-            description: "Stok kalemi seçildiğinde lütfen geçerli bir miktar girin.",
-            variant: "destructive",
-          });
-          return;
-        }
-        if (isNaN(unitPrice) || unitPrice <= 0) {
-          toast({
-            title: "Hata",
-            description: "Stok kalemi seçildiğinde lütfen geçerli bir birim fiyat girin.",
-            variant: "destructive",
-          });
-          return;
-        }
-        finalQuantitySold = quantity;
-        finalUnitPrice = unitPrice;
-      } else {
-          // If no stock item selected, ensure quantity and unit price are null
-          if (saleFormValues.quantitySold && parseFloat(saleFormValues.quantitySold) > 0) {
-              toast({
-                  title: "Uyarı",
-                  description: "Stok kalemi seçmeden miktar giremezsiniz. Miktar sıfırlandı.",
-                  variant: "warning",
-              });
-          }
-          if (saleFormValues.unitPrice && parseFloat(saleFormValues.unitPrice) > 0) {
-              toast({
-                  title: "Uyarı",
-                  description: "Stok kalemi seçmeden birim fiyat giremezsiniz. Birim fiyat sıfırlandı.",
-                  variant: "warning",
-              });
-          }
-      }
-
-      const saleData = {
+      const saleData: Sale = {
+        id: editingSale?.id || Math.random().toString(36).substr(2, 9),
         customerId: customer.id,
-        amount,
+        amount: amount,
         date: formatISO(saleFormValues.date),
         currency: saleFormValues.currency,
-        stockItemId: finalStockItemId,
-        quantitySold: finalQuantitySold,
-        unitPrice: finalUnitPrice,
-        transactionType: 'sale' as const
+        stockItemId: saleFormValues.stockItemId === 'none' ? undefined : saleFormValues.stockItemId,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        totalPrice: quantity && unitPrice ? quantity * unitPrice : undefined,
+        category: 'satis',
+        tags: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        transactionType: 'sale',
+        description: saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none' ? 
+          `${quantity || ''} adet × ${unitPrice || ''} ${saleFormValues.currency} (${stockItemDisplayNames[saleFormValues.stockItemId] || ''})` : 
+          'Satış'
       };
 
       if (editingSale) {
-        const updatedSale = await storageUpdateSale(user.uid, { ...saleData, id: editingSale.id });
+        const updatedSale = await storageUpdateSale(user.uid, saleData);
         setSales(prev => prev.map(s => s.id === editingSale.id ? updatedSale : s));
         toast({
           title: "Başarılı",
@@ -575,19 +556,18 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         setSales(prev => [...prev, newSale]);
         toast({
           title: "Başarılı",
-          description: "Satış başarıyla eklendi.",
+          description: "Yeni satış başarıyla eklendi.",
         });
       }
 
       setShowSaleModal(false);
       setSaleFormValues(EMPTY_SALE_FORM_VALUES);
       setEditingSale(null);
-      await refreshCustomerData();
     } catch (error) {
-      console.error("Satış eklenirken hata:", error);
+      console.error('Satış eklenirken hata:', error);
       toast({
         title: "Hata",
-        description: "Satış eklenirken bir sorun oluştu. Lütfen tekrar deneyin.",
+        description: "Satış eklenirken bir sorun oluştu.",
         variant: "destructive",
       });
     }
@@ -626,8 +606,9 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
     setPaymentFormValues({
       amount: payment.amount.toString(),
       date: isValid(parseISO(payment.date)) ? parseISO(payment.date) : new Date(),
-      method: payment.method || '',
+      method: payment.paymentMethod, // paymentMethod kullanıldı
       currency: payment.currency,
+      referenceNumber: payment.referenceNumber || '', // referans numarası eklendi
     });
     setShowPaymentModal(true);
   }, []);
@@ -651,30 +632,28 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           description: "Lütfen geçerli bir ödeme tutarı girin.",
           variant: "destructive",
         });
-      return;
-    }
-
-      if (!paymentFormValues.method) {
-        toast({
-          title: "Hata",
-          description: "Lütfen bir ödeme yöntemi seçin.",
-          variant: "destructive",
-        });
         return;
       }
 
-      const paymentData = {
+      const paymentData: Payment = {
+        id: editingPayment?.id || Math.random().toString(36).substr(2, 9),
         customerId: customer.id,
-        amount,
+        amount: amount,
         date: formatISO(paymentFormValues.date),
-        method: paymentFormValues.method || 'cash',
         currency: paymentFormValues.currency,
-        transactionType: 'payment' as const,
-        description: ''
+        paymentMethod: paymentFormValues.method,
+        referenceNumber: paymentFormValues.referenceNumber || undefined,
+        category: 'odeme',
+        tags: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        transactionType: 'payment',
+        method: paymentFormValues.method,
+        description: `${paymentFormValues.method} ile ödeme`
       };
 
       if (editingPayment) {
-        const updatedPayment = await storageUpdatePayment(user.uid, { ...paymentData, id: editingPayment.id });
+        const updatedPayment = await storageUpdatePayment(user.uid, paymentData);
         setPayments(prev => prev.map(p => p.id === editingPayment.id ? updatedPayment : p));
         toast({
           title: "Başarılı",
@@ -685,19 +664,18 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         setPayments(prev => [...prev, newPayment]);
         toast({
           title: "Başarılı",
-          description: "Ödeme başarıyla eklendi.",
+          description: "Yeni ödeme başarıyla eklendi.",
         });
       }
 
       setShowPaymentModal(false);
       setPaymentFormValues(EMPTY_PAYMENT_FORM_VALUES);
       setEditingPayment(null);
-      await refreshCustomerData();
     } catch (error) {
-      console.error("Ödeme eklenirken hata:", error);
+      console.error('Ödeme eklenirken hata:', error);
       toast({
         title: "Hata",
-        description: "Ödeme eklenirken bir sorun oluştu. Lütfen tekrar deneyin.",
+        description: "Ödeme eklenirken bir sorun oluştu.",
         variant: "destructive",
       });
     }
@@ -752,112 +730,34 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   }, []);
 
   // Tek bir satış veya ödeme işleminin detaylarını gösterir
-  const renderTransactionDetail = (item: UnifiedTransaction) => {
+  const renderTransactionDetail = (item: UnifiedTransactionClient) => {
     const isSale = item.transactionType === 'sale';
-    const stockItemName = isSale && 'stockItemId' in item && item.stockItemId ? stockItemDisplayNames[item.stockItemId] : undefined;
-    const formattedDate = safeFormatDate(item.date, 'dd MMMM yyyy');
-    const formattedAmount = formatCurrency(item.amount, item.currency);
-
-      return (
-        <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            {isSale ? (
-              <ShoppingCart className="h-4 w-4 text-blue-500" />
-            ) : (
-              <DollarSign className="h-4 w-4 text-green-500" />
-            )}
-            <span className="font-medium">
-              {isSale ? 'Satış' : 'Ödeme'}
-            </span>
+    return (
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">Tarih:</span>
+          <span className="text-sm">{format(parseISO(item.date), 'dd.MM.yyyy')}</span>
         </div>
-          <span className="text-sm text-muted-foreground">{formattedDate}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">Tutar:</span>
+          <span className="text-sm font-medium">{formatCurrency(item.amount, item.currency)}</span>
         </div>
-        
-        <div className="space-y-1">
+        {isSale && 'quantity' in item && 'unitPrice' in item && item.quantity && item.unitPrice && (
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Tutar:</span>
-            <span className={cn(
-              "font-semibold",
-              isSale ? "text-blue-600" : "text-green-600"
-            )}>
-              {formattedAmount}
+            <span className="text-sm text-muted-foreground">Detay:</span>
+            <span className="text-sm">
+              {item.quantity} adet × {formatCurrency(item.unitPrice, item.currency)}
             </span>
           </div>
-
-          {isSale && stockItemName && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Ürün:</span>
-              <span className="text-sm">{stockItemName}</span>
-            </div>
-          )}
-
-          {isSale && 'quantitySold' in item && 'unitPrice' in item && item.quantitySold && item.unitPrice && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Detay:</span>
-              <span className="text-sm">
-                {item.quantitySold} adet × {formatCurrency(item.unitPrice, item.currency)}
-              </span>
-            </div>
-          )}
-
-          {!isSale && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Ödeme Yöntemi:</span>
-              <span className="text-sm">{item.method}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end space-x-2 pt-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (isSale) {
-                setEditingSale(item);
-                setSaleFormValues({
-                  amount: item.amount.toString(),
-                  date: parseISO(item.date),
-                  currency: item.currency,
-                  stockItemId: 'stockItemId' in item ? item.stockItemId || 'none' : 'none',
-                  quantitySold: 'quantitySold' in item ? item.quantitySold?.toString() || '' : '',
-                  unitPrice: 'unitPrice' in item ? item.unitPrice?.toString() || '' : '',
-                });
-                setShowSaleModal(true);
-    } else {
-                setEditingPayment(item);
-                setPaymentFormValues({
-                  amount: item.amount.toString(),
-                  date: parseISO(item.date),
-                  method: item.method,
-                  currency: item.currency,
-                });
-                setShowPaymentModal(true);
-              }
-            }}
-          >
-            <Edit3 className="h-4 w-4 mr-1" />
-            Düzenle
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-            onClick={() => {
-              if (isSale) {
-                setDeletingSaleId(item.id);
-              } else {
-                setDeletingPaymentId(item.id);
-              }
-            }}
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Sil
-          </Button>
-        </div>
-        </div>
-      );
+        )}
+        {item.transactionType === 'payment' && ( // item.method'a doğru erişim için type guard kullanıldı
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Ödeme Yöntemi:</span>
+            <span className="text-sm">{item.method}</span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleSaveNotes = useCallback(async () => {
@@ -1065,37 +965,19 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
     }
   }, [user, customer, toast]);
 
-  const exportToCSV = useCallback((transactions: UnifiedTransaction[], customerName: string) => {
-    const headers = ['Tarih', 'İşlem Tipi', 'Tutar', 'Para Birimi', 'Detay'];
-    const rows = transactions.map(item => {
-      const date = safeFormatDate(item.date, 'dd.MM.yyyy');
-      const type = item.transactionType === 'sale' ? 'Satış' : 'Ödeme';
-      const amount = item.amount.toString();
-      const currency = item.currency;
-      let detail = '';
-
-      if (item.transactionType === 'sale') {
-        const stockItemName = 'stockItemId' in item && item.stockItemId 
-          ? stockItemDisplayNames[item.stockItemId] 
-          : '';
-        const quantity = 'quantitySold' in item ? item.quantitySold : undefined;
-        const unitPrice = 'unitPrice' in item ? item.unitPrice : undefined;
-        
-        if (stockItemName && quantity && unitPrice) {
-          detail = `${stockItemName} - ${quantity} adet × ${unitPrice} ${currency}`;
-        } else {
-          detail = 'Manuel Satış';
-        }
-      } else {
-        detail = `Ödeme Yöntemi: ${item.method}`;
-      }
-
-      return [date, type, amount, currency, detail];
-    });
+  const exportToCSV = (transactions: UnifiedTransactionClient[], customerName: string) => {
+    const headers = ['Tarih', 'İşlem Tipi', 'Tutar', 'Para Birimi', 'Açıklama'];
+    const data = transactions.map(t => [
+      format(parseISO(t.date), 'dd.MM.yyyy'),
+      t.transactionType === 'sale' ? 'Satış' : 'Ödeme',
+      t.amount.toString(),
+      t.currency,
+      t.description
+    ]);
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.join(','))
+      ...data.map(row => row.join(','))
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1107,7 +989,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }, [stockItemDisplayNames]);
+  };
 
   // Aylık istatistikler için veri hazırlama
   const monthlyStats = useMemo(() => {
@@ -1157,7 +1039,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
   // Zengin metin editörü
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [StarterKit, Underline], // Underline eklentisini ekledim
     content: customer.notes || '',
     onUpdate: ({ editor }) => {
       setCustomer(prev => ({ ...prev, notes: editor.getHTML() }));
@@ -1231,16 +1113,20 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   // Satış ekleme
   const handleAddSale = async (values: SaleFormValues) => {
     try {
+      const amount = parseFloat(values.amount);
+      const quantity = values.quantity ? parseFloat(values.quantity) : 0;
+      const unitPrice = values.unitPrice ? parseFloat(values.unitPrice) : 0;
+
       const newSale: Sale = {
         id: Math.random().toString(36).substr(2, 9),
         customerId: customer.id,
-        amount: values.amount,
-        date: values.date,
+        amount: amount,
+        date: formatISO(values.date),
         currency: values.currency,
-        stockItemId: values.stockItemId,
-        quantity: values.quantitySold || 0,
-        unitPrice: values.unitPrice || 0,
-        totalPrice: (values.quantitySold || 0) * (values.unitPrice || 0),
+        stockItemId: values.stockItemId === 'none' ? undefined : values.stockItemId,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        totalPrice: quantity * unitPrice,
         category: 'satis',
         tags: [],
         createdAt: new Date().toISOString(),
@@ -1249,7 +1135,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
       };
 
       setSales(prevSales => [...prevSales, newSale]);
-      setShowAddSaleModal(false);
+      setShowSaleModal(false);
       toast({
         title: "Satış eklendi",
         description: "Yeni satış başarıyla eklendi.",
@@ -1258,7 +1144,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
       console.error('Satış eklenirken hata:', error);
       toast({
         title: "Hata",
-        description: "Satış eklenirken bir hata oluştu.",
+        description: "Satış eklenirken bir sorun oluştu.",
         variant: "destructive",
       });
     }
@@ -1267,22 +1153,26 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   // Ödeme ekleme
   const handleAddPayment = async (values: PaymentFormValues) => {
     try {
+      const amount = parseFloat(values.amount);
+
       const newPayment: Payment = {
         id: Math.random().toString(36).substr(2, 9),
         customerId: customer.id,
-        amount: values.amount,
-        date: values.date,
-        paymentMethod: values.method as 'nakit' | 'krediKarti' | 'havale' | 'diger',
+        amount: amount,
+        date: formatISO(values.date),
+        paymentMethod: values.method,
         currency: values.currency,
         category: 'odeme',
         tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        transactionType: 'payment'
+        method: values.method,
+        transactionType: 'payment',
+        description: `${values.method} ile ödeme`
       };
 
       setPayments(prevPayments => [...prevPayments, newPayment]);
-      setShowAddPaymentModal(false);
+      setShowPaymentModal(false);
       toast({
         title: "Ödeme eklendi",
         description: "Yeni ödeme başarıyla eklendi.",
@@ -1291,7 +1181,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
       console.error('Ödeme eklenirken hata:', error);
       toast({
         title: "Hata",
-        description: "Ödeme eklenirken bir hata oluştu.",
+        description: "Ödeme eklenirken bir sorun oluştu.",
         variant: "destructive",
       });
     }
@@ -1545,7 +1435,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
                                   setSales(prevSales =>
                                     prevSales.map(sale =>
                                       sale.id === transaction.id
-                                        ? { ...sale, category: value }
+                                        ? { ...sale, category: value as 'satis' } // Düzeltilmiş Kategori ataması
                                         : sale
                                     )
                                   );
@@ -1553,7 +1443,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
                                   setPayments(prevPayments =>
                                     prevPayments.map(payment =>
                                       payment.id === transaction.id
-                                        ? { ...payment, category: value }
+                                        ? { ...payment, category: value as 'odeme' } // Düzeltilmiş Kategori ataması
                                         : payment
                                     )
                                   );
@@ -1595,9 +1485,9 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
                                 {formatCurrency(transaction.amount, transaction.currency)}
                               </span>
                             </div>
-                            {transaction.transactionType === 'sale' && (
+                            {transaction.transactionType === 'sale' && transaction.stockItemId && (
                               <div className="text-sm text-muted-foreground">
-                                {stockItemDisplayNames[transaction.stockItemId]} - {transaction.quantity} adet
+                                {stockItemDisplayNames[transaction.stockItemId] || 'Bilinmeyen Ürün'} - {transaction.quantity} adet
                               </div>
                             )}
                             {transaction.transactionType === 'payment' && (
@@ -1822,7 +1712,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
                       onClick={() => editor?.chain().focus().toggleUnderline().run()}
                       className={editor?.isActive('underline') ? 'bg-muted' : ''}
                     >
-                      <Underline className="h-4 w-4" />
+                      <UnderlineIcon className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -2206,12 +2096,12 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
               {saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none' && (
                 <>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="quantitySold" className="text-right">Miktar</Label>
+                    <Label htmlFor="quantity" className="text-right">Miktar</Label>
                     <Input
-                      id="quantitySold"
+                      id="quantity"
                       type="number"
-                      value={saleFormValues.quantitySold}
-                      onChange={(e) => setSaleFormValues(prev => ({ ...prev, quantitySold: e.target.value }))}
+                      value={saleFormValues.quantity}
+                      onChange={(e) => setSaleFormValues(prev => ({ ...prev, quantity: e.target.value }))}
                       className="col-span-3"
                       step="0.01"
                       required
@@ -2305,12 +2195,20 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="paymentMethod" className="text-right">Ödeme Yöntemi</Label>
-              <Input
-                id="paymentMethod"
+              <Select
                 value={paymentFormValues.method}
-                onChange={(e) => setPaymentFormValues(prev => ({ ...prev, method: e.target.value }))}
-                className="col-span-3"
-              />
+                onValueChange={(value: 'nakit' | 'krediKarti' | 'havale' | 'diger') => setPaymentFormValues(prev => ({ ...prev, method: value }))}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Ödeme Yöntemi Seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nakit">Nakit</SelectItem>
+                  <SelectItem value="krediKarti">Kredi Kartı</SelectItem>
+                  <SelectItem value="havale">Havale</SelectItem>
+                  <SelectItem value="diger">Diğer</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

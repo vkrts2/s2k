@@ -14,7 +14,7 @@ export interface ContactHistoryItem {
   date: string; // ISO string format
   type: 'phone' | 'email' | 'meeting' | 'other';
   summary: string;
-  notes?: string; // İletişimle ilgili ek notlar
+  notes?: string;
 }
 
 // Yeni: Müşteri Görevi
@@ -39,7 +39,6 @@ export interface SupplierTask {
 
 export interface BaseEntity {
   id: string;
-  name: string;
   email?: string;
   phone?: string;
   address?: string;
@@ -50,11 +49,13 @@ export interface BaseEntity {
 }
 
 export interface Customer extends BaseEntity {
+  name: string;
   contactHistory?: ContactHistoryItem[]; // Yeni alan
   tasks?: CustomerTask[]; // Yeni alan
 }
 
 export interface Supplier extends BaseEntity {
+  name: string;
   contactHistory?: ContactHistoryItem[]; // Yeni alan
   tasks?: SupplierTask[]; // Yeni alan
 }
@@ -84,24 +85,57 @@ export interface Transaction {
   notes?: string;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Sale extends Transaction {
-  customerId: string;
   description?: string;
-  transactionType: 'sale';
-  stockItemId?: string; // Bu alanlar isteğe bağlı olmalı
-  quantity?: number; // Bu alanlar isteğe bağlı olmalı
-  unitPrice?: number; // Bu alanlar isteğe bağlı olmalı
-  totalPrice?: number; // Bu alanlar isteğe bağlı olmalı
 }
 
-export interface Payment extends Transaction {
+export interface SaleFormValues {
+  amount: string;
+  date: Date;
+  currency: Currency;
+  stockItemId: string;
+  quantity: string;
+  unitPrice: string;
+}
+
+export interface PaymentFormValues {
+  amount: string;
+  date: Date;
+  currency: Currency;
+  method: 'nakit' | 'krediKarti' | 'havale' | 'diger';
+  referenceNumber?: string;
+}
+
+export interface Sale extends BaseEntity {
+  customerId: string;
+  stockItemId?: string;
+  quantity?: number;
+  unitPrice?: number;
+  totalPrice?: number;
+  amount: number;
+  date: string;
+  currency: Currency;
+  category: 'satis';
+  tags: TransactionTag[];
+  transactionType: 'sale';
+  description?: string;
+}
+
+export interface Payment extends BaseEntity {
   customerId: string;
   paymentMethod: 'nakit' | 'krediKarti' | 'havale' | 'diger';
   referenceNumber?: string;
+  amount: number;
+  date: string;
+  currency: Currency;
+  category: 'odeme';
+  tags: TransactionTag[];
   transactionType: 'payment';
+  method: string;
+  description?: string;
 }
+
+export type UnifiedTransaction = (Sale & { transactionType: 'sale' }) | 
+                                (Payment & { transactionType: 'payment' });
 
 export interface Purchase extends Transaction {
   supplierId: string;
@@ -119,9 +153,6 @@ export interface PaymentToSupplier extends Transaction {
   referenceNumber?: string;
   transactionType: 'paymentToSupplier';
 }
-
-// Unified transaction type for combined lists
-export type UnifiedTransaction = Sale | Payment | Purchase | PaymentToSupplier;
 
 export type StockTransaction = {
   id: string;
