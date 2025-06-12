@@ -3,35 +3,40 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Customer } from "@/lib/types";
+import React from "react";
 
 interface EditCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (customer: Customer) => Promise<void>;
+  onSave: (customer: Customer) => Promise<void>;
   customer: Customer;
-  setCustomer: (customer: Customer) => void;
 }
 
 export function EditCustomerModal({
   isOpen,
   onClose,
-  onSubmit,
+  onSave,
   customer,
-  setCustomer
 }: EditCustomerModalProps) {
+  const [editedCustomer, setEditedCustomer] = React.useState<Customer>(customer);
+
+  React.useEffect(() => {
+    setEditedCustomer(customer);
+  }, [customer]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Müşteri Düzenle</DialogTitle>
         </DialogHeader>
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit(customer); }} className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); onSave(editedCustomer); }} className="space-y-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">Ad Soyad</Label>
             <Input
               id="name"
-              value={customer.name}
-              onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
+              value={editedCustomer.name}
+              onChange={(e) => setEditedCustomer({ ...editedCustomer, name: e.target.value })}
               className="col-span-3"
               required
             />
@@ -41,8 +46,8 @@ export function EditCustomerModal({
             <Input
               id="email"
               type="email"
-              value={customer.email || ''}
-              onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
+              value={editedCustomer.email || ''}
+              onChange={(e) => setEditedCustomer({ ...editedCustomer, email: e.target.value })}
               className="col-span-3"
             />
           </div>
@@ -51,8 +56,8 @@ export function EditCustomerModal({
             <Input
               id="phone"
               type="tel"
-              value={customer.phone || ''}
-              onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
+              value={editedCustomer.phone || ''}
+              onChange={(e) => setEditedCustomer({ ...editedCustomer, phone: e.target.value })}
               className="col-span-3"
             />
           </div>
@@ -60,8 +65,8 @@ export function EditCustomerModal({
             <Label htmlFor="address" className="text-right">Adres</Label>
             <Input
               id="address"
-              value={customer.address || ''}
-              onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
+              value={editedCustomer.address || ''}
+              onChange={(e) => setEditedCustomer({ ...editedCustomer, address: e.target.value })}
               className="col-span-3"
             />
           </div>
@@ -69,8 +74,8 @@ export function EditCustomerModal({
             <Label htmlFor="taxId" className="text-right">Vergi No</Label>
             <Input
               id="taxId"
-              value={customer.taxId || ''}
-              onChange={(e) => setCustomer({ ...customer, taxId: e.target.value })}
+              value={editedCustomer.taxId || ''}
+              onChange={(e) => setEditedCustomer({ ...editedCustomer, taxId: e.target.value })}
               className="col-span-3"
             />
           </div>
@@ -78,8 +83,8 @@ export function EditCustomerModal({
             <Label htmlFor="notes" className="text-right">Notlar</Label>
             <Input
               id="notes"
-              value={customer.notes || ''}
-              onChange={(e) => setCustomer({ ...customer, notes: e.target.value })}
+              value={editedCustomer.notes || ''}
+              onChange={(e) => setEditedCustomer({ ...editedCustomer, notes: e.target.value })}
               className="col-span-3"
             />
           </div>

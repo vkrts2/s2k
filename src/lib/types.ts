@@ -101,6 +101,7 @@ export interface SaleFormValues {
   stockItemId?: string;
   quantity: string;
   unitPrice: string;
+  description?: string;
 }
 
 export interface PurchaseFormValues {
@@ -118,6 +119,7 @@ export interface PaymentFormValues {
   currency: Currency;
   method: 'nakit' | 'krediKarti' | 'havale' | 'diger';
   referenceNumber?: string | null;
+  description?: string;
 }
 
 export interface PaymentToSupplierFormValues {
@@ -159,7 +161,6 @@ export interface Sale extends BaseEntity {
 
 export interface Payment extends BaseEntity {
   customerId: string;
-  paymentMethod: 'nakit' | 'krediKarti' | 'havale' | 'diger';
   referenceNumber?: string;
   amount: number;
   date: string;
@@ -167,7 +168,7 @@ export interface Payment extends BaseEntity {
   category: 'odeme';
   tags: TransactionTag[];
   transactionType: 'payment';
-  method: string;
+  method: 'nakit' | 'krediKarti' | 'havale' | 'diger';
   description?: string;
 }
 
