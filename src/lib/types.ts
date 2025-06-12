@@ -97,6 +97,15 @@ export interface SaleFormValues {
   unitPrice: string;
 }
 
+export interface PurchaseFormValues {
+  amount: string;
+  date: Date;
+  currency: Currency;
+  stockItemId?: string;
+  quantityPurchased?: string;
+  unitPrice?: string;
+}
+
 export interface PaymentFormValues {
   amount: string;
   date: Date;

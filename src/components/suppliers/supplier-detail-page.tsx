@@ -541,7 +541,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         stockItemId,
         quantityPurchased,
         unitPrice,
-        category: 'satis', // Kategori alış için 'alis' veya 'gider' olabilir, şu anlık 'satis' olarak kaldı
+        category: 'alis',
         tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
