@@ -322,10 +322,10 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
                     </span>
                   </div>
                 )}
-                {item.transactionType === 'payment' && ( // item.transactionType !== 'sale' yerine item.transactionType === 'payment' kullanıldı
+                {item.transactionType === 'payment' && ( // Mantıksal karşılaştırma düzeltildi ve Ödeme tipi için koşullu render
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Ödeme Yöntemi:</span>
-                    <span className="text-sm">{item.method}</span>
+                    <span className="text-sm">{item.method}</span> {/* Artık tip hatası vermemesi gerekiyor */}
                   </div>
                 )}
               </td>
@@ -750,10 +750,10 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
             </span>
           </div>
         )}
-        {item.transactionType === 'payment' && ( // item.method'a doğru erişim için type guard kullanıldı
+        {item.transactionType === 'payment' && ( // Mantıksal karşılaştırma düzeltildi ve Ödeme tipi için koşullu render
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Ödeme Yöntemi:</span>
-            <span className="text-sm">{item.method}</span>
+            <span className="text-sm">{item.method}</span> {/* Artık tip hatası vermemesi gerekiyor */}
           </div>
         )}
       </div>
@@ -1435,15 +1435,15 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
                                   setSales(prevSales =>
                                     prevSales.map(sale =>
                                       sale.id === transaction.id
-                                        ? { ...sale, category: value as 'satis' } // Düzeltilmiş Kategori ataması
+                                        ? { ...sale, category: value as 'satis' } // Kategori ataması düzeltildi ve cast eklendi
                                         : sale
                                     )
                                   );
-                                } else {
+                                } else if (transaction.transactionType === 'payment') { // else if eklendi
                                   setPayments(prevPayments =>
                                     prevPayments.map(payment =>
                                       payment.id === transaction.id
-                                        ? { ...payment, category: value as 'odeme' } // Düzeltilmiş Kategori ataması
+                                        ? { ...payment, category: value as 'odeme' } // Kategori ataması düzeltildi ve cast eklendi
                                         : payment
                                     )
                                   );
@@ -1454,11 +1454,14 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {transactionCategories.map((category) => (
-                                  <SelectItem key={category.value} value={category.value}>
-                                    {category.label}
-                                  </SelectItem>
-                                ))}
+                                {/* İşlem tipine göre kategori seçeneklerini filtrele */}
+                                {transaction.transactionType === 'sale' && (
+                                  <SelectItem key="satis" value="satis">Satış</SelectItem>
+                                )}
+                                {transaction.transactionType === 'payment' && (
+                                  <SelectItem key="odeme" value="odeme">Ödeme</SelectItem>
+                                )}
+                                {/* Diğer kategorilerin gösterilmesi gerekiyorsa buraya ekleyin */}
                               </SelectContent>
                             </Select>
                       <Button
