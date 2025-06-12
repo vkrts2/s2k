@@ -10,10 +10,11 @@ import {
   addPaymentToSupplier,
   updatePaymentToSupplier as storageUpdatePaymentToSupplier,
   deletePaymentToSupplier as storageDeletePaymentToSupplier,
-  getSupplierById,
   updateSupplier as storageUpdateSupplier,
+  getSupplierById,
   getStockItems,
-  getStockItemById
+  getStockItemById,
+  deleteSupplier as storageDeleteSupplier
 } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,7 +48,8 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose
+  DialogClose,
+  DialogTrigger
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -58,14 +60,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { PlusCircle, Trash2, DollarSign, ShoppingBag, Edit3, Pencil, CalendarIcon, FileText, Printer } from 'lucide-react';
+import { PlusCircle, Trash2, DollarSign, ShoppingCart, Edit3, Pencil, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline as UnderlineIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO, isValid, formatISO, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { SupplierForm } from './supplier-form';
 import Link from "next/link";
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -76,14 +77,21 @@ import { Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEditor } from '@tiptap/react';
 import { EditorContent } from '@tiptap/react';
-import { Badge } from '@/components/ui/badge';
-import { TransactionCategory, TransactionTag } from '@/lib/types';
+import { Badge } from "@/components/ui/badge";
+import { TransactionCategory, TransactionTag } from "@/lib/types";
+import Underline from '@tiptap/extension-underline';
+import { PurchaseModal } from "./purchase-modal";
+import { PaymentToSupplierModal } from "./payment-to-supplier-modal";
+import { EditSupplierModal } from "./edit-supplier-modal";
+import { DeleteConfirmationModal } from "../common/delete-confirmation-modal";
+import { ContactHistoryModal } from "./contact-history-modal";
+import { TaskModal } from "./task-modal";
 
 interface SupplierDetailPageClientProps {
   supplier: Supplier;
   initialPurchases: Purchase[];
   initialPaymentsToSupplier: PaymentToSupplier[];
-  user: any;
+  user: { uid: string } | null;
 }
 
 type PurchaseFormValues = {
@@ -94,26 +102,23 @@ type PurchaseFormValues = {
   quantityPurchased?: string;
   unitPrice?: string;
 };
+
 type PaymentToSupplierFormValues = {
   amount: string;
   date: Date;
   method: string;
   currency: Currency;
-  referenceNumber?: string;
+  referenceNumber?: string | null;
 };
 
-// Yeni: İletişim Geçmişi Form Değerleri
 type ContactHistoryFormValues = {
-  id?: string; // Edit için eklendi
   date: Date;
   type: 'phone' | 'email' | 'meeting' | 'other';
   summary: string;
   notes: string;
 };
 
-// Yeni: Görev Form Değerleri
 type SupplierTaskFormValues = {
-  id?: string; // Edit için eklendi
   description: string;
   dueDate?: Date;
   status: 'pending' | 'completed' | 'in-progress';
@@ -127,14 +132,15 @@ const EMPTY_PURCHASE_FORM_VALUES: PurchaseFormValues = {
   quantityPurchased: '',
   unitPrice: '',
 };
+
 const EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES: PaymentToSupplierFormValues = {
   amount: '',
   date: new Date(),
-  method: 'cash', // Default payment method
+  method: 'nakit',
   currency: 'TRY',
+  referenceNumber: null,
 };
 
-// Yeni: Boş İletişim Geçmişi Form Değerleri
 const EMPTY_CONTACT_HISTORY_FORM_VALUES: ContactHistoryFormValues = {
   date: new Date(),
   type: 'other',
@@ -142,30 +148,16 @@ const EMPTY_CONTACT_HISTORY_FORM_VALUES: ContactHistoryFormValues = {
   notes: '',
 };
 
-// Yeni: Boş Görev Form Değerleri
-const EMPTY_SUPPLIER_TASK_FORM_VALUES: SupplierTaskFormValues = {
+const EMPTY_TASK_FORM_VALUES: SupplierTaskFormValues = {
   description: '',
   dueDate: undefined,
   status: 'pending',
 };
 
-const formatCurrency = (amount: number, currency: Currency): string => {
-  if (typeof amount !== 'number' || isNaN(amount)) {
-      amount = 0;
-  }
-  if (!currency) {
-      currency = 'TRY';
-  }
-  try {
-      return amount.toLocaleString('tr-TR', { style: "currency", currency: currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  } catch(e) {
-      return `${amount.toFixed(2)} ${currency}`;
-  }
-};
-
-type UnifiedTransaction = (Purchase & { transactionType: 'purchase' }) | (PaymentToSupplier & { transactionType: 'paymentToSupplier', description: string });
+type UnifiedTransactionClient = AppUnifiedTransaction; 
 
 export function SupplierDetailPageClient({ supplier: initialSupplier, initialPurchases, initialPaymentsToSupplier, user }: SupplierDetailPageClientProps) {
+  const { toast } = useToast();
   const [supplier, setSupplier] = useState<Supplier>(initialSupplier);
   const [purchases, setPurchases] = useState<Purchase[]>(initialPurchases);
   const [paymentsToSupplier, setPaymentsToSupplier] = useState<PaymentToSupplier[]>(initialPaymentsToSupplier);
@@ -183,17 +175,15 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const [deletingPaymentToSupplierId, setDeletingPaymentToSupplierId] = useState<string | null>(null);
 
   const [showEditSupplierModal, setShowEditSupplierModal] = useState(false);
-  const [deletingSupplier, setDeletingSupplier] = useState<string | null>(null);
 
   const [notesContent, setNotesContent] = useState(initialSupplier.notes || '');
   const [showContactHistoryModal, setShowContactHistoryModal] = useState(false);
   const [contactHistoryFormValues, setContactHistoryFormValues] = useState<ContactHistoryFormValues>(EMPTY_CONTACT_HISTORY_FORM_VALUES);
   const [editingContactHistoryItem, setEditingContactHistoryItem] = useState<ContactHistoryItem | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [taskFormValues, setTaskFormValues] = useState<SupplierTaskFormValues>(EMPTY_SUPPLIER_TASK_FORM_VALUES);
+  const [taskFormValues, setTaskFormValues] = useState<SupplierTaskFormValues>(EMPTY_TASK_FORM_VALUES);
   const [editingTask, setEditingTask] = useState<SupplierTask | null>(null);
-
-  const { toast } = useToast();
+  const [deletingSupplier, setDeletingSupplier] = useState<string | null>(null);
 
   const [stockItemDisplayNames, setStockItemDisplayNames] = useState<Record<string, string>>({});
 
@@ -207,128 +197,213 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const itemsPerPage = 10;
   const [showPrintView, setShowPrintView] = useState(false);
 
-  // Notes Editor
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-    ],
-    content: notesContent,
-    onUpdate: ({ editor }) => {
-      setNotesContent(editor.getHTML());
-    },
-  }, [notesContent]); // notesContent değiştiğinde editörün yeniden yüklenmesi için
-
-  // Calculate balances
   const totalPurchases = useMemo(() => {
-    return purchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+    return purchases.reduce((sum: number, purchase: Purchase) => sum + purchase.amount, 0);
   }, [purchases]);
 
   const totalPayments = useMemo(() => {
-    return paymentsToSupplier.reduce((sum, payment) => sum + payment.amount, 0);
+    return paymentsToSupplier.reduce((sum: number, payment: PaymentToSupplier) => sum + payment.amount, 0);
   }, [paymentsToSupplier]);
 
   const balance = useMemo(() => {
     return totalPurchases - totalPayments;
   }, [totalPurchases, totalPayments]);
 
-  // Combine purchases and payments into a unified list
   const unifiedTransactions = useMemo(() => {
-    const purchasesWithType = purchases.map(purchase => ({ ...purchase, transactionType: 'purchase' as const }));
-    const paymentsWithType = paymentsToSupplier.map(payment => ({ ...payment, transactionType: 'paymentToSupplier' as const, description: payment.method }));
-    return [...purchasesWithType, ...paymentsWithType] as UnifiedTransaction[];
+    const all = [
+      ...purchases.map(p => ({ ...p, transactionType: 'purchase' as const })),
+      ...paymentsToSupplier.map(p => ({ ...p, transactionType: 'paymentToSupplier' as const }))
+    ];
+    return all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [purchases, paymentsToSupplier]);
 
-  // Filter transactions by date range
   const filteredAndSortedTransactions = useMemo(() => {
-    let filtered = unifiedTransactions;
-    
-    // Apply date range filter
-    if (dateRange?.from && dateRange?.to) {
-      filtered = filtered.filter(item => {
-        const itemDate = new Date(item.date);
-        return itemDate >= dateRange.from! && itemDate <= dateRange.to!;
-      });
-    }
-    
-    // Apply search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((item: UnifiedTransaction) => {
-        const amount = item.amount.toString();
-        const date = safeFormatDate(item.date, 'dd MMMM yyyy');
-        const stockItemName = item.transactionType === 'purchase' && 'stockItemId' in item && item.stockItemId 
-          ? stockItemDisplayNames[item.stockItemId] 
-          : '';
-        
-        return amount.includes(query) || 
-               date.toLowerCase().includes(query) || 
-               stockItemName.toLowerCase().includes(query) ||
-               (item.transactionType === 'paymentToSupplier' && item.description && item.description.toLowerCase().includes(query));
-      });
-    }
+    const all: (Purchase | PaymentToSupplier)[] = [
+      ...purchases.map((p: Purchase) => ({ ...p, transactionType: 'purchase' as const })),
+      ...paymentsToSupplier.map((p: PaymentToSupplier) => ({ ...p, transactionType: 'paymentToSupplier' as const }))
+    ];
 
-    // Apply sorting
-    return filtered.sort((a: UnifiedTransaction, b: UnifiedTransaction) => {
+    const filtered = all.filter(item => {
+      const itemDate = parseISO(item.date);
+      return (!dateRange?.from || itemDate >= dateRange.from) &&
+             (!dateRange?.to || itemDate <= dateRange.to);
+    });
+
+    const searched = searchQuery
+      ? filtered.filter(item => {
+          const searchLower = searchQuery.toLowerCase();
+          const description = (item.transactionType === 'purchase' && (item as Purchase).description) || 
+                              (item.transactionType === 'paymentToSupplier' && (item as PaymentToSupplier).description) || '';
+          return (
+            item.amount.toString().includes(searchLower) ||
+            description.toLowerCase().includes(searchLower) ||
+            format(parseISO(item.date), 'dd.MM.yyyy').includes(searchLower)
+          );
+        })
+      : filtered;
+
+    return searched.sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
-      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
     });
-  }, [unifiedTransactions, searchQuery, sortOrder, stockItemDisplayNames, dateRange]);
+  }, [purchases, paymentsToSupplier, dateRange, searchQuery, sortOrder]);
+
+  const recentTransactions = useMemo(() => {
+    return filteredAndSortedTransactions.slice(0, 5);
+  }, [filteredAndSortedTransactions]);
+
+  const totalPages = Math.ceil(filteredAndSortedTransactions.length / itemsPerPage);
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredAndSortedTransactions.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredAndSortedTransactions, currentPage]);
+
+  const PrintView = () => (
+    <div className="p-8 space-y-6">
+      <div className="text-center space-y-2">
+        <h1 className="text-2xl font-bold">{supplier.name}</h1>
+        <p className="text-sm text-muted-foreground">
+          {dateRange?.from && dateRange?.to
+            ? `${safeFormatDate(dateRange.from.toISOString(), 'dd.MM.yyyy')} - ${safeFormatDate(dateRange.to.toISOString(), 'dd.MM.yyyy')}`
+            : 'Tüm İşlemler'}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="p-4 border rounded-lg">
+          <div className="text-sm text-muted-foreground">Toplam Alış</div>
+          <div className="text-xl font-bold text-blue-600">{formatCurrency(totalPurchases, 'TRY')}</div>
+        </div>
+        <div className="p-4 border rounded-lg">
+          <div className="text-sm text-muted-foreground">Toplam Ödeme</div>
+          <div className="text-xl font-bold text-green-600">{formatCurrency(totalPayments, 'TRY')}</div>
+        </div>
+        <div className="p-4 border rounded-lg">
+          <div className="text-sm text-muted-foreground">Bakiye</div>
+          <div className={cn(
+            "text-xl font-bold",
+            balance > 0 ? "text-green-600" : "text-red-600"
+          )}>
+            {formatCurrency(balance, 'TRY')}
+          </div>
+        </div>
+      </div>
+
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left p-2">Tarih</th>
+            <th className="text-left p-2">İşlem</th>
+            <th className="text-right p-2">Tutar</th>
+            <th className="text-left p-2">Detay</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredAndSortedTransactions.map((item) => (
+            <TableRow key={`${item.transactionType}-${item.id}`} className="border-b">
+              <TableCell className="p-2">{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
+              <TableCell className="p-2">{item.transactionType === 'purchase' ? 'Alış' : 'Ödeme'}</TableCell>
+              <TableCell className="p-2 text-right">{formatCurrency(item.amount, item.currency)}</TableCell>
+              <TableCell className="p-2">
+                {item.transactionType === 'purchase' && 'quantityPurchased' in item && 'unitPrice' in item && item.quantityPurchased && item.unitPrice && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Detay:</span>
+                    <span className="text-sm">
+                      {item.quantityPurchased} adet × {formatCurrency(item.unitPrice, item.currency)}
+                    </span>
+                  </div>
+                )}
+                {item.transactionType === 'paymentToSupplier' && ( 
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Ödeme Yöntemi:</span>
+                    <span className="text-sm">{item.method}</span>
+                  </div>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  useEffect(() => {
+    const fetchDisplayNames = async () => {
+      const uniqueStockItemIds = new Set<string>();
+      purchases.forEach(purchase => {
+        if (purchase.stockItemId) uniqueStockItemIds.add(purchase.stockItemId);
+      });
+
+      const namesMap: Record<string, string> = {};
+      for (const stockItemId of Array.from(uniqueStockItemIds)) {
+        namesMap[stockItemId] = await getStockItemName(stockItemId);
+      }
+      setStockItemDisplayNames(namesMap);
+    };
+
+    fetchDisplayNames();
+  }, [purchases, paymentsToSupplier, getStockItemName]);
 
   useEffect(() => {
     setSupplier(initialSupplier);
     setPurchases(initialPurchases);
     setPaymentsToSupplier(initialPaymentsToSupplier);
-    if (typeof window !== "undefined" && user?.uid) {
-        getStockItems(user.uid).then(items => {
-          setAvailableStockItems(items);
-          const names: Record<string, string> = {};
-          items.forEach(item => {
-            names[item.id] = item.name;
-          });
-          setStockItemDisplayNames(names);
-        });
+    if (typeof window !== "undefined" && user) {
+      getStockItems(user.uid).then(items => setAvailableStockItems(items));
     }
-  }, [initialSupplier, initialPurchases, initialPaymentsToSupplier, user?.uid]);
+  }, [initialSupplier, initialPurchases, initialPaymentsToSupplier, user]);
 
   useEffect(() => {
-    const fetchDisplayNames = async () => {
-      if (!user?.uid) return;
-      const items = await getStockItems(user.uid);
-      const names: Record<string, string> = {};
-      items.forEach(item => {
-        names[item.id] = item.name;
-      });
-      setStockItemDisplayNames(names);
-    };
-    fetchDisplayNames();
-  }, [user?.uid]);
+    const quantity = parseFloat(purchaseFormValues.quantityPurchased || '0');
+    const price = parseFloat(purchaseFormValues.unitPrice || '0');
+    if (purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none' && !isNaN(quantity) && !isNaN(price) && quantity > 0 && price >= 0) {
+      setPurchaseFormValues(prev => ({ ...prev, amount: (quantity * price).toFixed(2) }));
+    } else if (!purchaseFormValues.stockItemId || purchaseFormValues.stockItemId === 'none') {
+      // Allow manual amount entry if no stock item is selected or unit price/qty is zero
+    } else {
+      setPurchaseFormValues(prev => ({ ...prev, amount: '' })); // Clear amount if calculation is not possible
+    }
+  }, [purchaseFormValues.quantityPurchased, purchaseFormValues.unitPrice, purchaseFormValues.stockItemId]);
+
+  useEffect(() => {
+    setPurchaseFormValues(prev => ({ ...prev, unitPrice: '', currency: 'TRY' }));
+  }, [purchaseFormValues.stockItemId]);
 
   const refreshSupplierData = useCallback(async () => {
-    if (!supplier?.id || !user?.uid) return;
+    if (!supplier?.id || !user) return;
     const freshSupplier = await getSupplierById(user.uid, supplier.id);
     if (freshSupplier) {
       setSupplier(freshSupplier);
       document.title = `${freshSupplier.name} | Tedarikçi Detayları | ERMAY`;
     }
-    if (typeof window !== "undefined" && user?.uid) {
+    if (typeof window !== "undefined" && user) {
       getStockItems(user.uid).then(items => setAvailableStockItems(items));
     }
-  }, [supplier?.id, user?.uid]);
+  }, [supplier?.id, user]);
 
-  const handleSupplierUpdate = useCallback(async (data: Supplier) => {
-    if (!user?.uid) {
-      toast({ title: "Hata", description: "Kullanıcı bilgisi eksik. Lütfen giriş yapın.", variant: "destructive" });
-      return;
-    }
+  const handleSupplierUpdate = useCallback(async (data: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'> | Supplier): Promise<void> => {
     try {
-      await storageUpdateSupplier(user.uid, data);
+      if (!user) {
+        console.error("handleSupplierUpdate: User is not logged in.");
+        toast({
+          title: "Hata",
+          description: "Tedarikçi bilgileri güncellenirken bir sorun oluştu: Kullanıcı girişi yapılmamış.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const supplierToUpdate: Supplier = 'id' in data && data.id
+        ? { ...data as Supplier, updatedAt: formatISO(new Date()) }
+        : { ...data, id: initialSupplier.id, createdAt: initialSupplier.createdAt, updatedAt: formatISO(new Date()) };
+
+      await storageUpdateSupplier(user.uid, supplierToUpdate);
       toast({
         title: "Tedarikçi Güncellendi",
-        description: `${data.name} tedarikçi bilgileri güncellendi.`,
+        description: `${supplierToUpdate.name} tedarikçi bilgileri güncellendi.`, 
       });
       setShowEditSupplierModal(false);
-      refreshSupplierData();
+      await refreshSupplierData();
     } catch (error) {
       console.error("Tedarikçi güncellenirken hata:", error);
       toast({
@@ -337,11 +412,43 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         variant: "destructive",
       });
     }
-  }, [toast, refreshSupplierData, user?.uid]);
+  }, [toast, refreshSupplierData, user, initialSupplier.id, initialSupplier.createdAt]);
+
+  const balances = useMemo(() => {
+    const newBalances: Record<Currency, number> = { USD: 0, TRY: 0 };
+    purchases.forEach(purchase => {
+      newBalances[purchase.currency] = (newBalances[purchase.currency] || 0) + purchase.amount;
+    });
+    paymentsToSupplier.forEach(payment => {
+      newBalances[payment.currency] = (newBalances[payment.currency] || 0) - payment.amount;
+    });
+    return newBalances;
+  }, [purchases, paymentsToSupplier]);
+
+  const formatCurrency = (amount: number, currency: Currency): string => {
+    if (typeof amount !== 'number' || isNaN(amount)) {
+      amount = 0;
+    }
+    try {
+      return amount.toLocaleString('tr-TR', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    } catch (e) {
+      console.error("Error formatting currency:", e);
+      return `${amount.toFixed(2)} ${currency}`;
+    }
+  };
 
   const handleOpenAddPurchaseModal = useCallback(() => {
     if (!supplier?.id) {
-      toast({ title: "Hata", description: "Tedarikçi bilgisi eksik. Lütfen sayfayı yenileyin.", variant: "destructive" });
+      toast({
+        title: "Hata",
+        description: "Tedarikçi bilgisi bulunamadı.",
+        variant: "destructive",
+      });
       return;
     }
     setEditingPurchase(null);
@@ -362,42 +469,41 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     setShowPurchaseModal(true);
   }, []);
 
-  const handlePurchaseFormSubmit = useCallback(async (e: React.FormEvent) => {
+  const handlePurchaseFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.uid || !supplier?.id) {
-      toast({ 
-        title: "Hata", 
-        description: "Kullanıcı veya tedarikçi bilgisi eksik. Lütfen sayfayı yenileyin.", 
-        variant: "destructive" 
+    if (!user || !supplier?.id) {
+      toast({
+        title: "Hata",
+        description: "Alış eklenirken bir sorun oluştu: Kullanıcı girişi yapılmamış veya tedarikçi bulunamadı.",
+        variant: "destructive",
       });
       return;
     }
 
     try {
-      const amountNumber = parseFloat(purchaseFormValues.amount);
-      if (isNaN(amountNumber) || amountNumber <= 0) {
-        toast({ 
-          title: "Hata", 
-          description: "Lütfen geçerli bir alım tutarı girin.", 
-          variant: "destructive" 
+      const amount = parseFloat(purchaseFormValues.amount);
+      if (isNaN(amount) || amount <= 0) {
+        toast({
+          title: "Hata",
+          description: "Lütfen geçerli bir alış tutarı girin.",
+          variant: "destructive",
         });
         return;
       }
 
-      let stockItemId: string | undefined = undefined;
-      let quantityPurchased: number | undefined = undefined;
-      let unitPrice: number | undefined = undefined;
+      let stockItemId: string | null = null;
+      let quantityPurchased: number | null = null;
+      let unitPrice: number | null = null;
       let description = 'Alış';
 
-      // Handle stock item related fields if a stock item is selected
       if (purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none') {
         stockItemId = purchaseFormValues.stockItemId;
         
         if (!purchaseFormValues.quantityPurchased || !purchaseFormValues.unitPrice) {
-          toast({ 
-            title: "Hata", 
-            description: "Stok ürünü seçildiğinde miktar ve birim fiyat zorunludur.", 
-            variant: "destructive" 
+          toast({
+            title: "Hata",
+            description: "Stok ürünü seçildiğinde miktar ve birim fiyat zorunludur.",
+            variant: "destructive",
           });
           return;
         }
@@ -406,19 +512,19 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         unitPrice = parseFloat(purchaseFormValues.unitPrice);
 
         if (isNaN(quantityPurchased) || quantityPurchased <= 0) {
-          toast({ 
-            title: "Hata", 
-            description: "Lütfen geçerli bir miktar girin.", 
-            variant: "destructive" 
+          toast({
+            title: "Hata",
+            description: "Lütfen geçerli bir miktar girin.",
+            variant: "destructive",
           });
           return;
         }
 
         if (isNaN(unitPrice) || unitPrice <= 0) {
-          toast({ 
-            title: "Hata", 
-            description: "Lütfen geçerli bir birim fiyat girin.", 
-            variant: "destructive" 
+          toast({
+            title: "Hata",
+            description: "Lütfen geçerli bir birim fiyat girin.",
+            variant: "destructive",
           });
           return;
         }
@@ -426,35 +532,31 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         description = `${quantityPurchased} adet × ${unitPrice} ${purchaseFormValues.currency} (${stockItemDisplayNames[stockItemId] || ''})`;
       }
 
-      const newPurchase: Omit<Purchase, 'id' | 'transactionType'> = {
+      const purchaseData: Purchase = {
+        id: editingPurchase?.id || Math.random().toString(36).substr(2, 9),
         supplierId: supplier.id,
-        amount: amountNumber,
-        date: purchaseFormValues.date.toISOString(),
+        amount: amount,
+        date: formatISO(purchaseFormValues.date),
         currency: purchaseFormValues.currency,
         stockItemId,
         quantityPurchased,
         unitPrice,
-        category: 'satis',
+        category: 'satis', // Kategori alış için 'alis' veya 'gider' olabilir, şu anlık 'satis' olarak kaldı
         tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        transactionType: 'purchase',
         description
       };
 
       if (editingPurchase) {
-        const updatedPurchase = await storageUpdatePurchase(user.uid, { ...editingPurchase, ...newPurchase, id: editingPurchase.id });
-        setPurchases(purchases.map(p => p.id === editingPurchase.id ? updatedPurchase : p));
-        toast({ 
-          title: "Alış Güncellendi", 
-          description: "Alış işlemi başarıyla güncellendi." 
-        });
+        await storageUpdatePurchase(user.uid, purchaseData);
+        setPurchases(prev => prev.map(p => p.id === editingPurchase.id ? purchaseData : p));
+        toast({ title: "Alış Güncellendi", description: "Alış işlemi başarıyla güncellendi." });
       } else {
-        const addedPurchase = await addPurchase(user.uid, newPurchase);
+        const addedPurchase = await addPurchase(user.uid, purchaseData);
         setPurchases(prev => [...prev, addedPurchase]);
-        toast({ 
-          title: "Alış Eklendi", 
-          description: "Yeni alış işlemi başarıyla eklendi." 
-        });
+        toast({ title: "Alış Eklendi", description: "Yeni alış işlemi başarıyla eklendi." });
       }
 
       setShowPurchaseModal(false);
@@ -469,25 +571,29 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         variant: "destructive",
       });
     }
-  }, [purchaseFormValues, supplier?.id, editingPurchase, purchases, refreshSupplierData, toast, user?.uid, stockItemDisplayNames]);
+  };
 
   const handleDeletePurchase = useCallback(async () => {
-    if (!deletingPurchaseId || !user?.uid) return;
+    if (!deletingPurchaseId || !user) return;
     try {
       await storageDeletePurchase(user.uid, deletingPurchaseId);
-      setPurchases(prev => prev.filter(p => p.id !== deletingPurchaseId).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      refreshSupplierData();
-      toast({ title: "Alış Silindi" });
+      setPurchases(prev => prev.filter(p => p.id !== deletingPurchaseId));
+      toast({ title: "Alış Silindi", description: "Alış başarıyla silindi." });
       setDeletingPurchaseId(null);
+      await refreshSupplierData();
     } catch (error) {
       console.error("Alış silinirken hata:", error);
       toast({ title: "Hata", description: "Alış silinirken bir sorun oluştu.", variant: "destructive" });
     }
-  }, [deletingPurchaseId, toast, refreshSupplierData, user?.uid]);
+  }, [deletingPurchaseId, toast, refreshSupplierData, user]);
 
   const handleOpenAddPaymentToSupplierModal = useCallback(() => {
     if (!supplier?.id) {
-      toast({ title: "Hata", description: "Tedarikçi bilgisi eksik. Lütfen sayfayı yenileyin.", variant: "destructive" });
+      toast({
+        title: "Hata",
+        description: "Tedarikçi bilgisi bulunamadı.",
+        variant: "destructive",
+      });
       return;
     }
     setEditingPaymentToSupplier(null);
@@ -500,23 +606,27 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     setPaymentToSupplierFormValues({
       amount: payment.amount.toString(),
       date: isValid(parseISO(payment.date)) ? parseISO(payment.date) : new Date(),
-      method: payment.method || null, // null olarak atandı
+      method: payment.method,
       currency: payment.currency,
-      referenceNumber: payment.referenceNumber || null, // null olarak atandı
+      referenceNumber: payment.referenceNumber || '',
     });
     setShowPaymentToSupplierModal(true);
   }, []);
 
-  const handlePaymentToSupplierFormSubmit = useCallback(async (e: React.FormEvent) => {
+  const handlePaymentToSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.uid || !supplier?.id) {
-      toast({ title: "Hata", description: "Kullanıcı veya tedarikçi bilgisi eksik. Lütfen giriş yapın.", variant: "destructive" });
+    if (!user || !supplier?.id) {
+      toast({
+        title: "Hata",
+        description: "Ödeme eklenirken bir sorun oluştu: Kullanıcı girişi yapılmamış veya tedarikçi bulunamadı.",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
-      const amountNumber = parseFloat(paymentToSupplierFormValues.amount);
-      if (isNaN(amountNumber) || amountNumber <= 0) {
+      const amount = parseFloat(paymentToSupplierFormValues.amount);
+      if (isNaN(amount) || amount <= 0) {
         toast({
           title: "Hata",
           description: "Lütfen geçerli bir ödeme tutarı girin.",
@@ -525,168 +635,277 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         return;
       }
 
-      const newPayment: Omit<PaymentToSupplier, 'id' | 'transactionType'> = {
-        supplierId: supplier.id!,
-        amount: amountNumber,
-        date: paymentToSupplierFormValues.date.toISOString(),
-        method: paymentToSupplierFormValues.method,
+      const paymentData: PaymentToSupplier = {
+        id: editingPaymentToSupplier?.id || Math.random().toString(36).substr(2, 9),
+        supplierId: supplier.id,
+        amount: amount,
+        date: formatISO(paymentToSupplierFormValues.date),
         currency: paymentToSupplierFormValues.currency,
-        referenceNumber: paymentToSupplierFormValues.referenceNumber || null,
+        method: paymentToSupplierFormValues.method,
+        referenceNumber: paymentToSupplierFormValues.referenceNumber || undefined,
         category: 'odeme',
         tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        transactionType: 'paymentToSupplier',
         description: `${paymentToSupplierFormValues.method} ile ödeme`
       };
 
       if (editingPaymentToSupplier) {
-        await storageUpdatePaymentToSupplier(user.uid, { ...editingPaymentToSupplier, ...newPayment, id: editingPaymentToSupplier.id });
-        setPaymentsToSupplier(paymentsToSupplier.map(p => p.id === editingPaymentToSupplier.id ? { ...p, ...newPayment, id: p.id } as PaymentToSupplier : p));
-        toast({ title: "Ödeme Güncellendi", description: "Ödeme işlemi başarıyla güncellendi." });
+        const updatedPayment = await storageUpdatePaymentToSupplier(user.uid, paymentData);
+        setPaymentsToSupplier(prev => prev.map(p => p.id === editingPaymentToSupplier.id ? updatedPayment : p));
+        toast({
+          title: "Başarılı",
+          description: "Ödeme başarıyla güncellendi.",
+        });
       } else {
-        const addedPayment = await addPaymentToSupplier(user.uid, newPayment);
-        setPaymentsToSupplier(prev => [...prev, addedPayment]);
-        toast({ title: "Ödeme Eklendi", description: "Yeni ödeme işlemi başarıyla eklendi." });
+        const newPayment = await addPaymentToSupplier(user.uid, paymentData);
+        setPaymentsToSupplier(prev => [...prev, newPayment]);
+        toast({
+          title: "Başarılı",
+          description: "Yeni ödeme başarıyla eklendi.",
+        });
       }
+
       setShowPaymentToSupplierModal(false);
       setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
       setEditingPaymentToSupplier(null);
+      await refreshSupplierData();
     } catch (error) {
-      console.error("Ödeme kaydedilirken hata:", error);
+      console.error('Ödeme eklenirken hata:', error);
       toast({
         title: "Hata",
-        description: "Ödeme işlemi kaydedilirken bir sorun oluştu.",
+        description: "Ödeme eklenirken bir sorun oluştu.",
         variant: "destructive",
       });
     }
-  }, [paymentToSupplierFormValues, supplier?.id, editingPaymentToSupplier, paymentsToSupplier, toast, user?.uid]);
+  };
 
   const handleDeletePaymentToSupplier = useCallback(async () => {
-    if (!deletingPaymentToSupplierId || !user?.uid) return;
+    if (!deletingPaymentToSupplierId || !user) return;
     try {
       await storageDeletePaymentToSupplier(user.uid, deletingPaymentToSupplierId);
-      setPaymentsToSupplier(prev => prev.filter(p => p.id !== deletingPaymentToSupplierId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      refreshSupplierData();
-      toast({ title: "Ödeme Silindi" });
+      setPaymentsToSupplier(prev => prev.filter(p => p.id !== deletingPaymentToSupplierId));
+      toast({ title: "Ödeme Silindi", description: "Ödeme başarıyla silindi." });
       setDeletingPaymentToSupplierId(null);
+      await refreshSupplierData();
     } catch (error) {
       console.error("Ödeme silinirken hata:", error);
       toast({ title: "Hata", description: "Ödeme silinirken bir sorun oluştu.", variant: "destructive" });
     }
-  }, [deletingPaymentToSupplierId, toast, refreshSupplierData, user?.uid]);
+  }, [deletingPaymentToSupplierId, toast, refreshSupplierData, user]);
 
   const safeFormatDate = (dateString: string, formatString: string = "d MMMM yyyy, HH:mm") => {
-    if (!dateString) return "-";
-    const date = parseISO(dateString);
-    return isValid(date) ? format(date, formatString, { locale: tr }) : "-";
-  };
-
-  const getStockItemName = (stockItemId?: string): string => {
-    if (!stockItemId) return "Bilinmiyor";
-    const item = availableStockItems.find(s => s.id === stockItemId);
-    return item ? item.name : "Bilinmiyor";
-  };
-
-  // Yeni fonksiyonlar: İletişim Geçmişi, Görevler, Notlar
-  const handleContactHistorySubmit = useCallback(async () => {
-    if (!user?.uid || !supplier?.id) {
-      toast({ title: "Hata", description: "Kullanıcı veya tedarikçi bilgisi eksik.", variant: "destructive" });
-      return;
-    }
-
-    const newContactHistory: Omit<ContactHistoryItem, 'id'> = {
-      date: contactHistoryFormValues.date.toISOString(),
-      type: contactHistoryFormValues.type,
-      summary: contactHistoryFormValues.summary,
-      notes: contactHistoryFormValues.notes,
-    };
-
+    if (!dateString) return "Tarih Yok";
     try {
-      if (editingContactHistoryItem) {
-        // Update existing contact history item
-        const updatedSupplier = { ...supplier, contactHistory: supplier.contactHistory?.map(item => 
-          item.id === editingContactHistoryItem.id ? { ...item, ...newContactHistory, id: item.id } : item
-        ) || [ { ...newContactHistory, id: editingContactHistoryItem.id || `ch-${Date.now()}` } as ContactHistoryItem ] };
-        await storageUpdateSupplier(user.uid, updatedSupplier);
-        setSupplier(updatedSupplier);
-        toast({ title: "İletişim Kaydı Güncellendi", description: "İletişim kaydı başarıyla güncellendi." });
-      } else {
-        // Add new contact history item
-        const newItem: ContactHistoryItem = { ...newContactHistory, id: `ch-${Date.now()}` };
-        const updatedSupplier = { ...supplier, contactHistory: [...(supplier.contactHistory || []), newItem] };
-        await storageUpdateSupplier(user.uid, updatedSupplier);
-        setSupplier(updatedSupplier);
-        toast({ title: "İletişim Kaydı Eklendi", description: "Yeni iletişim kaydı başarıyla eklendi." });
+      const date = parseISO(dateString);
+      if (isValid(date)) {
+        return format(date, formatString, { locale: tr });
       }
-      setShowContactHistoryModal(false);
-      setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+      return "Geçersiz Tarih";
     } catch (error) {
-      console.error("İletişim kaydı kaydedilirken hata:", error);
+      return "Tarih Format Hatası";
+    }
+  };
+
+  const getStockItemName = useCallback(async (stockItemId?: string): Promise<string> => {
+    if (!stockItemId || stockItemId === 'none' || !user) return "Manuel Giriş";
+    try {
+      const stockItem = await getStockItemById(user.uid, stockItemId);
+      return stockItem ? `${stockItem.name} (${stockItem.unit || 'Adet'})` : "Bilinmeyen Stok Kalemi";
+    } catch (error) {
+      console.error("Stok kalemi adı getirilirken hata:", error);
+      return "Hata Oluştu";
+    }
+  }, [user]);
+
+  const formatPriceForDisplay = useCallback((price?: Price): string => {
+    if (!price || typeof price.amount !== 'number' || !price.currency) return "-";
+    try {
+      return price.amount.toLocaleString('tr-TR', { style: "currency", currency: price.currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } catch (e) {
+      return `${price.amount.toFixed(2)} ${price.currency}`;
+    }
+  }, []);
+
+  const renderTransactionDetail = (item: UnifiedTransactionClient) => {
+    const isPurchase = item.transactionType === 'purchase';
+    return (
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">Tarih:</span>
+          <span className="text-sm">{format(parseISO(item.date), 'dd.MM.yyyy')}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">Tutar:</span>
+          <span className="text-sm font-medium">{formatCurrency(item.amount, item.currency)}</span>
+        </div>
+        {isPurchase && 'quantityPurchased' in item && 'unitPrice' in item && item.quantityPurchased && item.unitPrice && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Detay:</span>
+            <span className="text-sm">
+              {item.quantityPurchased} adet × {formatCurrency(item.unitPrice, item.currency)}
+            </span>
+          </div>
+        )}
+        {item.transactionType === 'paymentToSupplier' && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Ödeme Yöntemi:</span>
+            <span className="text-sm">{item.method}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const handleSaveNotes = useCallback(async () => {
+    if (!user || !supplier?.id) return;
+    try {
+      const updatedSupplier: Supplier = { ...supplier, notes: notesContent };
+      await storageUpdateSupplier(user.uid, updatedSupplier);
+      setSupplier(updatedSupplier);
+      toast({
+        title: "Notlar Güncellendi",
+        description: "Tedarikçi notları başarıyla kaydedildi.",
+      });
+    } catch (error) {
+      console.error("Notlar kaydedilirken hata:", error);
       toast({
         title: "Hata",
-        description: "İletişim kaydı kaydedilirken bir sorun oluştu.",
+        description: "Notlar kaydedilirken bir sorun oluştu.",
         variant: "destructive",
       });
     }
-  }, [contactHistoryFormValues, editingContactHistoryItem, supplier, user?.uid, toast]);
+  }, [user, supplier, notesContent, toast]);
+
+  const handleDeleteSupplier = useCallback(async () => {
+    if (!user || !deletingSupplier) return;
+    try {
+      await storageDeleteSupplier(user.uid, deletingSupplier);
+      toast({
+        title: "Tedarikçi Silindi",
+        description: "Tedarikçi başarıyla silindi.",
+      });
+      window.location.href = "/suppliers"; 
+    } catch (error) {
+      console.error("Tedarikçi silinirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "Tedarikçi silinirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingSupplier(null);
+    }
+  }, [user, deletingSupplier, toast]);
+
+  const handleContactHistorySubmit = useCallback(async () => {
+    if (!user || !supplier?.id) return;
+    try {
+      const newContactHistoryItem: ContactHistoryItem = {
+        id: crypto.randomUUID(),
+        date: formatISO(contactHistoryFormValues.date),
+        type: contactHistoryFormValues.type,
+        summary: contactHistoryFormValues.summary,
+        notes: contactHistoryFormValues.notes || undefined,
+      };
+
+      const updatedSupplier = {
+        ...supplier,
+        contactHistory: [...(supplier.contactHistory || []), newContactHistoryItem],
+      };
+
+      await storageUpdateSupplier(user.uid, updatedSupplier);
+      setSupplier(updatedSupplier);
+      setShowContactHistoryModal(false);
+      setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+      toast({
+        title: "Başarılı",
+        description: "İletişim geçmişi eklendi.",
+      });
+    } catch (error) {
+      console.error("İletişim geçmişi kaydedilirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "İletişim geçmişi kaydedilirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, supplier, contactHistoryFormValues, toast]);
+
+  const handleOpenAddContactHistoryModal = useCallback(() => {
+    setEditingContactHistoryItem(null);
+    setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+    setShowContactHistoryModal(true);
+  }, []);
 
   const handleOpenEditContactHistoryModal = useCallback((item: ContactHistoryItem) => {
     setEditingContactHistoryItem(item);
     setContactHistoryFormValues({
-      date: isValid(parseISO(item.date)) ? parseISO(item.date) : new Date(),
+      date: parseISO(item.date),
       type: item.type,
       summary: item.summary,
       notes: item.notes || '',
-      id: item.id, // ID'yi de kopyalıyoruz
     });
     setShowContactHistoryModal(true);
   }, []);
 
-  const handleDeleteContactHistory = useCallback(async (id: string) => {
-    if (!user?.uid || !supplier?.id) return;
+  const handleDeleteContactHistoryItem = useCallback(async (itemId: string) => {
+    if (!user || !supplier?.id) return;
     try {
-      const updatedContactHistory = supplier.contactHistory?.filter(item => item.id !== id);
-      const updatedSupplier = { ...supplier, contactHistory: updatedContactHistory };
+      const updatedContactHistory = (supplier.contactHistory || []).filter(item => item.id !== itemId);
+      const updatedSupplier: Supplier = { ...supplier, contactHistory: updatedContactHistory };
       await storageUpdateSupplier(user.uid, updatedSupplier);
       setSupplier(updatedSupplier);
-      toast({ title: "İletişim Kaydı Silindi", description: "İletişim kaydı başarıyla silindi." });
+      toast({
+        title: "İletişim Silindi",
+        description: "İletişim geçmişi kaydı başarıyla silindi.",
+      });
     } catch (error) {
-      console.error("İletişim kaydı silinirken hata:", error);
-      toast({ title: "Hata", description: "İletişim kaydı silinirken bir sorun oluştu.", variant: "destructive" });
+      console.error("İletişim geçmişi silinirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "İletişim geçmişi silinirken bir sorun oluştu.",
+        variant: "destructive",
+      });
     }
-  }, [supplier, user?.uid, toast]);
+  }, [user, supplier, toast]);
 
-  const handleTaskSubmit = useCallback(async () => {
-    if (!user?.uid || !supplier?.id) {
-      toast({ title: "Hata", description: "Kullanıcı veya tedarikçi bilgisi eksik.", variant: "destructive" });
-      return;
-    }
-
-    const newTask: Omit<SupplierTask, 'id' | 'createdAt' | 'updatedAt'> = {
-      description: taskFormValues.description,
-      dueDate: taskFormValues.dueDate?.toISOString(),
-      status: taskFormValues.status,
-    };
-
+  const handleTaskFormSubmit = useCallback(async () => {
+    if (!user || !supplier?.id) return;
     try {
+      const taskToSave = {
+        ...taskFormValues,
+        dueDate: taskFormValues.dueDate ? formatISO(taskFormValues.dueDate, { representation: 'date' }) : undefined,
+        id: editingTask?.id || crypto.randomUUID(),
+        createdAt: editingTask?.createdAt || formatISO(new Date()),
+        updatedAt: formatISO(new Date()),
+      };
+
+      let updatedTasks: SupplierTask[];
+
       if (editingTask) {
-        // Update existing task
-        const updatedSupplier = { ...supplier, tasks: supplier.tasks?.map(task => 
-          task.id === editingTask.id ? { ...task, ...newTask, id: task.id, updatedAt: new Date().toISOString() } : task
-        ) || [ { ...newTask, id: editingTask.id || `task-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as SupplierTask ] };
-        await storageUpdateSupplier(user.uid, updatedSupplier);
-        setSupplier(updatedSupplier);
-        toast({ title: "Görev Güncellendi", description: "Görev başarıyla güncellendi." });
+        updatedTasks = (supplier.tasks || []).map(task =>
+          task.id === editingTask.id ? (taskToSave as SupplierTask) : task
+        );
+        toast({
+          title: "Görev Güncellendi",
+          description: "Görev başarıyla güncellendi.",
+        });
       } else {
-        // Add new task
-        const newItem: SupplierTask = { ...newTask, id: `task-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-        const updatedSupplier = { ...supplier, tasks: [...(supplier.tasks || []), newItem] };
-        await storageUpdateSupplier(user.uid, updatedSupplier);
-        setSupplier(updatedSupplier);
-        toast({ title: "Görev Eklendi", description: "Yeni görev başarıyla eklendi." });
+        updatedTasks = [...(supplier.tasks || []), (taskToSave as SupplierTask)];
+        toast({
+          title: "Görev Eklendi",
+          description: "Yeni görev başarıyla eklendi.",
+        });
       }
+
+      const updatedSupplier: Supplier = { ...supplier, tasks: updatedTasks };
+      await storageUpdateSupplier(user.uid, updatedSupplier);
+      setSupplier(updatedSupplier);
       setShowTaskModal(false);
-      setTaskFormValues(EMPTY_SUPPLIER_TASK_FORM_VALUES);
+      setEditingTask(null);
+      setTaskFormValues(EMPTY_TASK_FORM_VALUES);
     } catch (error) {
       console.error("Görev kaydedilirken hata:", error);
       toast({
@@ -695,403 +914,452 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         variant: "destructive",
       });
     }
-  }, [taskFormValues, editingTask, supplier, user?.uid, toast]);
+  }, [user, supplier, taskFormValues, editingTask, toast]);
+
+  const handleOpenAddTaskModal = useCallback(() => {
+    setEditingTask(null);
+    setTaskFormValues(EMPTY_TASK_FORM_VALUES);
+    setShowTaskModal(true);
+  }, []);
 
   const handleOpenEditTaskModal = useCallback((task: SupplierTask) => {
     setEditingTask(task);
     setTaskFormValues({
       description: task.description,
-      dueDate: task.dueDate ? (isValid(parseISO(task.dueDate)) ? parseISO(task.dueDate) : undefined) : undefined,
+      dueDate: task.dueDate ? parseISO(task.dueDate) : undefined,
       status: task.status,
-      id: task.id, // ID'yi de kopyalıyoruz
     });
     setShowTaskModal(true);
   }, []);
 
-  const handleDeleteTask = useCallback(async (id: string) => {
-    if (!user?.uid || !supplier?.id) return;
+  const handleDeleteTask = useCallback(async (taskId: string) => {
+    if (!user || !supplier?.id) return;
     try {
-      const updatedTasks = supplier.tasks?.filter(task => task.id !== id);
-      const updatedSupplier = { ...supplier, tasks: updatedTasks };
+      const updatedTasks = (supplier.tasks || []).filter(task => task.id !== taskId);
+      const updatedSupplier: Supplier = { ...supplier, tasks: updatedTasks };
       await storageUpdateSupplier(user.uid, updatedSupplier);
       setSupplier(updatedSupplier);
-      toast({ title: "Görev Silindi", description: "Görev başarıyla silindi." });
+      toast({
+        title: "Görev Silindi",
+        description: "Görev başarıyla silindi.",
+      });
     } catch (error) {
       console.error("Görev silinirken hata:", error);
-      toast({ title: "Hata", description: "Görev silinirken bir sorun oluştu.", variant: "destructive" });
+      toast({
+        title: "Hata",
+        description: "Görev silinirken bir sorun oluştu.",
+        variant: "destructive",
+      });
     }
-  }, [supplier, user?.uid, toast]);
+  }, [user, supplier, toast]);
 
-  const handleSaveNotes = useCallback(async () => {
-    if (!user?.uid || !supplier?.id || !editor) return;
-    try {
-      const updatedSupplier = { ...supplier, notes: editor.getHTML() };
-      await storageUpdateSupplier(user.uid, updatedSupplier);
-      setSupplier(updatedSupplier);
-      toast({ title: "Notlar Kaydedildi", description: "Notlar başarıyla kaydedildi." });
-    } catch (error) {
-      console.error("Notlar kaydedilirken hata:", error);
-      toast({ title: "Hata", description: "Notlar kaydedilirken bir sorun oluştu.", variant: "destructive" });
-    }
-  }, [editor, supplier, user?.uid, toast]);
+  const exportToCSV = (transactions: UnifiedTransactionClient[], supplierName: string) => {
+    const headers = ['Tarih', 'İşlem Tipi', 'Tutar', 'Para Birimi', 'Açıklama'];
+    const data = transactions.map(t => [
+      format(parseISO(t.date), 'dd.MM.yyyy'),
+      t.transactionType === 'purchase' ? 'Alış' : 'Ödeme', // İşlem tipi adı
+      t.amount.toString(),
+      t.currency,
+      t.description
+    ]);
 
-  const handleDeleteSupplier = useCallback(async () => {
-    if (!user?.uid || !supplier?.id) {
-      toast({ title: "Hata", description: "Kullanıcı veya tedarikçi bilgisi eksik.", variant: "destructive" });
-      return;
-    }
-    try {
-      // await deleteSupplier(user.uid, supplier.id);
-      // Redirect to supplier list or show success message
-      toast({ title: "Tedarikçi Silindi", description: `${supplier.name} başarıyla silindi.` });
-      // Optionally redirect: router.push('/suppliers');
-    } catch (error) {
-      console.error("Tedarikçi silinirken hata:", error);
-      toast({ title: "Hata", description: "Tedarikçi silinirken bir sorun oluştu.", variant: "destructive" });
-    }
-  }, [supplier, user?.uid, toast]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => row.join(','))
+    ].join('\n');
 
-  const PrintView = () => (
-    <div className="fixed inset-0 bg-white p-8 overflow-auto print:block hidden">
-      <h1 className="text-3xl font-bold mb-4">Tedarikçi Detayları: {supplier.name}</h1>
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold mb-2">Genel Bilgiler</h2>
-        <p><strong>E-posta:</strong> {supplier.email || '-'}</p>
-        <p><strong>Telefon:</strong> {supplier.phone || '-'}</p>
-        <p><strong>Adres:</strong> {supplier.address || '-'}</p>
-        <p><strong>Vergi No:</strong> {supplier.taxId || '-'}</p>
-        <p><strong>Oluşturulma Tarihi:</strong> {safeFormatDate(supplier.createdAt, 'dd MMMM yyyy')}</p>
-      </div>
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${supplierName}_islemler_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold mb-2">Finansal Özet</h2>
-        <p><strong>Toplam Alışlar:</strong> {formatCurrency(totalPurchases, 'TRY')}</p>
-        <p><strong>Toplam Ödemeler:</strong> {formatCurrency(totalPayments, 'TRY')}</p>
-        <p><strong>Bakiye:</strong> {formatCurrency(balance, 'TRY')}</p>
-      </div>
+  const monthlyStats = useMemo(() => {
+    const months = eachMonthOfInterval({
+      start: dateRange?.from || addDays(new Date(), -180),
+      end: dateRange?.to || new Date(),
+    });
 
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold mb-2">İşlem Geçmişi</h2>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tarih</TableHead>
-              <TableHead>İşlem Tipi</TableHead>
-              <TableHead>Miktar</TableHead>
-              <TableHead>Stok Kalemi/Açıklama</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {unifiedTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{safeFormatDate(item.date)}</TableCell>
-                <TableCell>{item.transactionType === 'purchase' ? 'Alış' : 'Ödeme'}</TableCell>
-                <TableCell>{item.transactionType === 'purchase' ? '+' : '-'}{formatCurrency(item.amount, item.currency)}</TableCell>
-                <TableCell>
-                  {item.transactionType === 'purchase' && 'stockItemId' in item && item.stockItemId && getStockItemName(item.stockItemId)}
-                  {item.transactionType === 'paymentToSupplier' && item.description}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+    return months.map(month => {
+      const monthStart = startOfMonth(month);
+      const monthEnd = endOfMonth(month);
+      
+      const monthPurchases = purchases.filter(purchase => {
+        const purchaseDate = new Date(purchase.date);
+        return purchaseDate >= monthStart && purchaseDate <= monthEnd;
+      });
 
-      {supplier.contactHistory && supplier.contactHistory.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-2">İletişim Geçmişi</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tarih</TableHead>
-                <TableHead>Tip</TableHead>
-                <TableHead>Özet</TableHead>
-                <TableHead>Notlar</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {supplier.contactHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>{safeFormatDate(item.date)}</TableCell>
-                  <TableCell>{item.type}</TableCell>
-                  <TableCell>{item.summary}</TableCell>
-                  <TableCell className="whitespace-pre-wrap">{item.notes}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      const monthPaymentsToSupplier = paymentsToSupplier.filter(payment => {
+        const paymentDate = new Date(payment.date);
+        return paymentDate >= monthStart && paymentDate <= monthEnd;
+      });
 
-      {supplier.tasks && supplier.tasks.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-2">Görevler</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Açıklama</TableHead>
-                <TableHead>Son Tarih</TableHead>
-                <TableHead>Durum</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {supplier.tasks.sort((a, b) => {
-                  if (a.status === 'completed' && b.status !== 'completed') return 1;
-                  if (b.status === 'completed' && a.status !== 'completed') return -1;
-                  if (a.dueDate && b.dueDate) {
-                      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-                  }
-                  return 0;
-              }).map((task) => (
-                <TableRow key={task.id}>
-                  <TableCell className={`${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>{task.description}</TableCell>
-                  <TableCell>{task.dueDate ? safeFormatDate(task.dueDate, 'dd MMMM yyyy') : '-'}</TableCell>
-                  <TableCell>
-                    <Badge variant={task.status === 'completed' ? 'default' : task.status === 'in-progress' ? 'secondary' : 'outline'}>
-                      {task.status === 'pending' ? 'Bekliyor' : task.status === 'completed' ? 'Tamamlandı' : 'Devam Ediyor'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      const totalPurchases = monthPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+      const totalPaymentsToSupplier = monthPaymentsToSupplier.reduce((sum, payment) => sum + payment.amount, 0);
 
-      {supplier.notes && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-2">Notlar</h2>
-          <div dangerouslySetInnerHTML={{ __html: supplier.notes }} />
-        </div>
-      )}
-    </div>
-  );
+      return {
+        month: format(month, 'MMM yyyy', { locale: tr }),
+        alışlar: totalPurchases,
+        ödemeler: totalPaymentsToSupplier,
+      };
+    });
+  }, [purchases, paymentsToSupplier, dateRange]);
+
+  const transactionTypeDistribution = useMemo(() => {
+    const total = filteredAndSortedTransactions.length;
+    if (total === 0) return [];
+
+    const purchasesCount = filteredAndSortedTransactions.filter(t => t.transactionType === 'purchase').length;
+    const paymentsCount = filteredAndSortedTransactions.filter(t => t.transactionType === 'paymentToSupplier').length;
+
+    return [
+      { name: 'Alışlar', value: purchasesCount, percentage: (purchasesCount / total) * 100 },
+      { name: 'Ödemeler', value: paymentsCount, percentage: (paymentsCount / total) * 100 },
+    ];
+  }, [filteredAndSortedTransactions]);
+
+  const editor = useEditor({
+    extensions: [StarterKit, Underline],
+    content: supplier.notes || '',
+    onUpdate: ({ editor }) => {
+      setSupplier(prev => ({ ...prev, notes: editor.getHTML() }));
+    },
+  });
+
+  const transactionCategories: { value: TransactionCategory; label: string }[] = [
+    { value: 'satis', label: 'Satış' },
+    { value: 'odeme', label: 'Ödeme' },
+    { value: 'iade', label: 'İade' },
+    { value: 'indirim', label: 'İndirim' },
+    { value: 'komisyon', label: 'Komisyon' },
+    { value: 'diger', label: 'Diğer' },
+  ];
+
+  const tagColors = [
+    'bg-blue-100 text-blue-800',
+    'bg-green-100 text-green-800',
+    'bg-yellow-100 text-yellow-800',
+    'bg-red-100 text-red-800',
+    'bg-purple-100 text-purple-800',
+    'bg-pink-100 text-pink-800',
+  ];
+
+  const handleAddTag = (transactionId: string, tagName: string) => {
+    const newTag: TransactionTag = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: tagName,
+      color: tagColors[Math.floor(Math.random() * tagColors.length)],
+    };
+
+    setPurchases(prevPurchases => 
+      prevPurchases.map(purchase => 
+        purchase.id === transactionId 
+          ? { ...purchase, tags: [...purchase.tags, newTag] }
+          : purchase
+      )
+    );
+
+    setPaymentsToSupplier(prevPayments => 
+      prevPayments.map(payment => 
+        payment.id === transactionId 
+          ? { ...payment, tags: [...payment.tags, newTag] }
+          : payment
+      )
+    );
+  };
+
+  const handleRemoveTag = (transactionId: string, tagId: string) => {
+    setPurchases(prevPurchases => 
+      prevPurchases.map(purchase => 
+        purchase.id === transactionId 
+          ? { ...purchase, tags: purchase.tags.filter(tag => tag.id !== tagId) }
+          : purchase
+      )
+    );
+
+    setPaymentsToSupplier(prevPayments => 
+      prevPayments.map(payment => 
+        payment.id === transactionId 
+          ? { ...payment, tags: payment.tags.filter(tag => tag.id !== tagId) }
+          : payment
+      )
+    );
+  };
 
   if (!supplier) {
     return <div className="text-center py-8">Tedarikçi bulunamadı.</div>;
   }
 
+  if (showPrintView) {
+    return (
+      <div className="print:block hidden">
+        <PrintView />
+      </div>
+    );
+  }
+
   return (
-    <>
-      {showPrintView && <PrintView />}
+    <div className="container mx-auto py-8">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-3xl font-bold">{supplier.name} Detayları</CardTitle>
+          <div className="flex items-center space-x-2">
+            <Button onClick={handleOpenAddPurchaseModal} disabled={!supplier?.id} className="flex items-center space-x-2">
+              <PlusCircle className="h-4 w-4" />
+              <span>Alış Ekle</span>
+            </Button>
+            <Button onClick={handleOpenAddPaymentToSupplierModal} disabled={!supplier?.id} className="flex items-center space-x-2">
+              <DollarSign className="h-4 w-4" />
+              <span>Ödeme Yap</span>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/suppliers/${supplier.id}/statement`} target="_blank">
+                <FileText className="mr-2 h-4 w-4" /> Ekstre Görüntüle
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card className="text-center">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold">Toplam Alışlar</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-extrabold text-blue-600">{formatCurrency(totalPurchases, 'TRY')}</p>
+              </CardContent>
+            </Card>
+            <Card className="text-center">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold">Toplam Ödemeler</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-extrabold text-green-600">{formatCurrency(totalPayments, 'TRY')}</p>
+              </CardContent>
+            </Card>
+            <Card className="text-center">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold">Bakiye</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className={`text-3xl font-extrabold ${balance >= 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(balance, 'TRY')}</p>
+              </CardContent>
+            </Card>
+          </div>
 
-      {!showPrintView && (
-        <div className="container mx-auto py-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-3xl font-bold">{supplier.name} Detayları</CardTitle>
-              <div className="flex items-center space-x-2">
-                <Button onClick={handleOpenAddPurchaseModal} disabled={!supplier?.id} className="flex items-center space-x-2">
-                  <PlusCircle className="h-4 w-4" />
-                  <span>Alış Ekle</span>
-                </Button>
-                <Button onClick={handleOpenAddPaymentToSupplierModal} disabled={!supplier?.id} className="flex items-center space-x-2">
-                  <DollarSign className="h-4 w-4" />
-                  <span>Ödeme Yap</span>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href={`/suppliers/${supplier.id}/statement`} target="_blank">
-                    <FileText className="mr-2 h-4 w-4" /> Ekstre Görüntüle
-                  </Link>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Card className="text-center">
-                  <CardHeader>
-                    <CardTitle className="text-2xl font-bold">Toplam Alışlar</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-extrabold text-blue-600">{formatCurrency(totalPurchases, 'TRY')}</p>
-                  </CardContent>
-                </Card>
-                <Card className="text-center">
-                  <CardHeader>
-                    <CardTitle className="text-2xl font-bold">Toplam Ödemeler</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-extrabold text-green-600">{formatCurrency(totalPayments, 'TRY')}</p>
-                  </CardContent>
-                </Card>
-                <Card className="text-center">
-                  <CardHeader>
-                    <CardTitle className="text-2xl font-bold">Bakiye</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className={`text-3xl font-extrabold ${balance >= 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(balance, 'TRY')}</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Tabs defaultValue="transactions" className="w-full mt-8">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="transactions">İşlemler</TabsTrigger>
-                  <TabsTrigger value="contact-history">İletişim Geçmişi</TabsTrigger>
-                  <TabsTrigger value="tasks">Görevler</TabsTrigger>
-                  <TabsTrigger value="notes">Notlar</TabsTrigger>
-                </TabsList>
-                <TabsContent value="transactions">
-                  <Card className="mt-4">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-2xl font-bold">Tedarikçi İşlem Geçmişi</CardTitle>
-                      <div className="flex items-center space-x-2">
-                        <Input
-                          placeholder="İşlem ara..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="max-w-sm"
-                        />
-                        <Select onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)} value={sortOrder}>
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Sıralama" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="desc">En Yeniye Göre</SelectItem>
-                            <SelectItem value="asc">En Eskiye Göre</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              id="date"
-                              variant={"outline"}
-                              className={cn(
-                                "w-[300px] justify-start text-left font-normal",
-                                !dateRange?.from && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {dateRange?.from ? (
-                                dateRange.to ? (
-                                  <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>
-                                ) : (
-                                  format(dateRange.from, "LLL dd, y")
-                                )
-                              ) : (
-                                <span>Tarih Aralığı Seç</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              initialFocus
-                              mode="range"
-                              defaultMonth={dateRange?.from}
-                              selected={dateRange}
-                              onSelect={setDateRange}
-                              numberOfMonths={2}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <Button onClick={() => setShowPrintView(true)} variant="outline" className="flex items-center space-x-2">
-                          <Printer className="h-4 w-4" />
-                          <span>Yazdır</span>
-                        </Button>
-                      </div>
-                      <div className="rounded-md border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Tarih</TableHead>
-                              <TableHead>İşlem Tipi</TableHead>
-                              <TableHead>Kategori</TableHead>
-                              <TableHead>Açıklama</TableHead>
-                              <TableHead>Tutar</TableHead>
-                              <TableHead>Eylemler</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {paginatedTransactions.length > 0 ? (
-                              paginatedTransactions.map((item) => (
-                                <TableRow key={item.id}>
-                                  <TableCell className="font-medium">{safeFormatDate(item.date)}</TableCell>
-                                  <TableCell>
-                                    <Badge variant={item.transactionType === 'purchase' ? "secondary" : "default"}>
-                                      {item.transactionType === 'purchase' ? "Alış" : "Ödeme"}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>{item.category}</TableCell>
-                                  <TableCell>
-                                    {item.transactionType === 'purchase' && 'stockItemId' in item && item.stockItemId ? getStockItemName(item.stockItemId) : item.description}
-                                  </TableCell>
-                                  <TableCell className={`${item.transactionType === 'purchase' ? "text-red-600" : "text-green-600"}`}>
-                                    {item.transactionType === 'purchase' ? "+" : "-"}{formatCurrency(item.amount, item.currency)}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center space-x-2">
-                                      {item.transactionType === 'purchase' ? (
-                                        <Button variant="outline" size="sm" onClick={() => handleOpenEditPurchaseModal(item as Purchase)}>
-                                          <Pencil className="h-4 w-4" />
-                                        </Button>
-                                      ) : (
-                                        <Button variant="outline" size="sm" onClick={() => handleOpenEditPaymentToSupplierModal(item as PaymentToSupplier)}>
-                                          <Pencil className="h-4 w-4" />
-                                        </Button>
-                                      )}
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                          <Button variant="destructive" size="sm" onClick={() => item.transactionType === 'purchase' ? setDeletingPurchaseId(item.id) : setDeletingPaymentToSupplierId(item.id)}>
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>İşlemi Silmek İstediğinizden Emin Misiniz?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              Bu işlem geri alınamaz. Bu işlemi kalıcı olarak silecek ve sunucularımızdan verileri kaldıracaktır.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel>İptal</AlertDialogCancel>
-                                            <AlertDialogAction onClick={item.transactionType === 'purchase' ? handleDeletePurchase : handleDeletePaymentToSupplier}>Sil</AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))
+          <Tabs defaultValue="transactions" className="w-full mt-8">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="transactions">İşlemler</TabsTrigger>
+              <TabsTrigger value="contact-history">İletişim Geçmişi</TabsTrigger>
+              <TabsTrigger value="tasks">Görevler</TabsTrigger>
+              <TabsTrigger value="notes">Notlar</TabsTrigger>
+            </TabsList>
+            <TabsContent value="transactions">
+              <Card className="mt-4">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-2xl font-bold">Tedarikçi İşlem Geçmişi</CardTitle>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      placeholder="İşlem ara..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="max-w-sm"
+                    />
+                    <Select onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)} value={sortOrder}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Sıralama" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="desc">En Yeniye Göre</SelectItem>
+                        <SelectItem value="asc">En Eskiye Göre</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          id="date"
+                          variant={"outline"}
+                          className={cn(
+                            "w-[300px] justify-start text-left font-normal",
+                            !dateRange?.from && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dateRange?.from ? (
+                            dateRange.to ? (
+                              <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>
                             ) : (
-                              <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">Hiç işlem bulunamadı.</TableCell>
-                              </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                      <div className="flex items-center justify-between space-x-2 py-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                          disabled={currentPage === 1}
-                        >
-                          Önceki
+                              format(dateRange.from, "LLL dd, y")
+                            )
+                          ) : (
+                            <span>Tarih Aralığı Seç</span>
+                          )}
                         </Button>
-                        <span className="text-sm text-muted-foreground">
-                          Sayfa {currentPage} / {totalPages}
-                        </span>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          initialFocus
+                          mode="range"
+                          defaultMonth={dateRange?.from}
+                          selected={dateRange}
+                          onSelect={setDateRange}
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Button onClick={() => setShowPrintView(true)} variant="outline" className="flex items-center space-x-2">
+                      <Printer className="h-4 w-4" />
+                      <span>Yazdır</span>
+                    </Button>
+                  </div>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tarih</TableHead>
+                          <TableHead>İşlem Tipi</TableHead>
+                          <TableHead>Kategori</TableHead>
+                          <TableHead>Açıklama</TableHead>
+                          <TableHead>Tutar</TableHead>
+                          <TableHead>Eylemler</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedTransactions.length > 0 ? (
+                          paginatedTransactions.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell className="font-medium">{safeFormatDate(item.date)}</TableCell>
+                              <TableCell>
+                                <Badge variant={item.transactionType === 'purchase' ? "secondary" : "default"}>
+                                  {item.transactionType === 'purchase' ? "Alış" : "Ödeme"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{item.category}</TableCell>
+                              <TableCell>
+                                {item.transactionType === 'purchase' && 'stockItemId' in item && item.stockItemId ? getStockItemName(item.stockItemId) : item.description}
+                              </TableCell>
+                              <TableCell className={`${item.transactionType === 'purchase' ? "text-red-600" : "text-green-600"}`}>
+                                {item.transactionType === 'purchase' ? "+" : "-"}{formatCurrency(item.amount, item.currency)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  {item.transactionType === 'purchase' ? (
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditPurchaseModal(item as Purchase)}>
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  ) : (
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditPaymentToSupplierModal(item as PaymentToSupplier)}>
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="destructive" size="sm" onClick={() => item.transactionType === 'purchase' ? setDeletingPurchaseId(item.id) : setDeletingPaymentToSupplierId(item.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>İşlemi Silmek İstediğinizden Emin Misiniz?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Bu işlem geri alınamaz. Bu işlemi kalıcı olarak silecek ve sunucularımızdan verileri kaldıracaktır.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>İptal</AlertDialogCancel>
+                                        <AlertDialogAction onClick={item.transactionType === 'purchase' ? handleDeletePurchase : handleDeletePaymentToSupplier}>Sil</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center">
+                              Hiç işlem bulunamadı.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {totalPages > 1 && (
+                    <div className="flex justify-center space-x-2 mt-4">
+                      <Button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        variant="outline"
+                      >
+                        Önceki
+                      </Button>
+                      {[...Array(totalPages)].map((_, index) => (
                         <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                          disabled={currentPage === totalPages}
+                          key={index + 1}
+                          onClick={() => setCurrentPage(index + 1)}
+                          variant={currentPage === index + 1 ? "default" : "outline"}
                         >
-                          Sonraki
+                          {index + 1}
                         </Button>
-                      </div>
+                      ))}
+                      <Button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        variant="outline"
+                      >
+                        Sonraki
+                      </Button>
+                    </div>
+                  )}
+
+                  <Card className="mt-8">
+                    <CardHeader>
+                      <CardTitle className="text-2xl font-bold">Aylık İşlem İstatistikleri</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={monthlyStats}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis />
+                          <Tooltip formatter={(value: number) => formatCurrency(value, 'TRY')} />
+                          <Bar dataKey="alışlar" fill="#8884d8" />
+                          <Bar dataKey="ödemeler" fill="#82ca9d" />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </CardContent>
                   </Card>
+
+                  <Card className="mt-8">
+                    <CardHeader>
+                      <CardTitle className="text-2xl font-bold">İşlem Türü Dağılımı</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="list-disc pl-5">
+                        {transactionTypeDistribution.map((item, index) => (
+                          <li key={index} className="text-lg">
+                            {item.name}: <span className="font-bold">{item.value}</span> işlem ({(item.percentage || 0).toFixed(2)}%)
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+
                 </TabsContent>
                 <TabsContent value="contact-history">
-                  {/* İletişim Geçmişi İçeriği */}
                   <Card className="mt-4">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-2xl font-bold">İletişim Geçmişi</CardTitle>
-                      <Button onClick={() => setShowContactHistoryModal(true)} className="flex items-center space-x-2">
+                      <Button onClick={handleOpenAddContactHistoryModal} className="flex items-center space-x-2">
                         <PlusCircle className="h-4 w-4" />
-                        <span>Yeni Ekle</span>
+                        <span>İletişim Ekle</span>
                       </Button>
                     </CardHeader>
                     <CardContent>
@@ -1100,61 +1368,62 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                           <TableHeader>
                             <TableRow>
                               <TableHead>Tarih</TableHead>
-                              <TableHead>Tip</TableHead>
+                              <TableHead>Tür</TableHead>
                               <TableHead>Özet</TableHead>
                               <TableHead>Notlar</TableHead>
-                              <TableHead>İşlemler</TableHead>
+                              <TableHead>Eylemler</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {supplier.contactHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((item) => (
+                            {supplier.contactHistory.map((item) => (
                               <TableRow key={item.id}>
-                                <TableCell>{safeFormatDate(item.date)}</TableCell>
+                                <TableCell className="font-medium">{safeFormatDate(item.date, 'dd.MM.yyyy HH:mm')}</TableCell>
                                 <TableCell>{item.type}</TableCell>
                                 <TableCell>{item.summary}</TableCell>
-                                <TableCell className="whitespace-pre-wrap">{item.notes}</TableCell>
+                                <TableCell>{item.notes}</TableCell>
                                 <TableCell>
-                                  <Button variant="ghost" size="sm" onClick={() => handleOpenEditContactHistoryModal(item)} className="mr-2">
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>İletişim Kaydını Silmek İstediğinize Emin Misiniz?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Bu işlem geri alınamaz. Bu iletişim kaydını kalıcı olarak silmek istediğinizden emin misiniz?
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>İptal</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteContactHistory(item.id)}>Sil</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                                  <div className="flex items-center space-x-2">
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditContactHistoryModal(item)}>
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="destructive" size="sm" onClick={() => handleDeleteContactHistoryItem(item.id)}>
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>İletişim Kaydını Silmek İstediğinizden Emin Misiniz?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Bu işlem geri alınamaz. Bu iletişim geçmişi kaydını kalıcı olarak silecek ve sunucularımızdan verileri kaldıracaktır.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>İptal</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDeleteContactHistoryItem(item.id)}>Sil</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
                       ) : (
-                        <p className="text-center text-muted-foreground">Henüz bir iletişim geçmişi kaydı bulunmamaktadır.</p>
+                        <p>Henüz iletişim geçmişi yok.</p>
                       )}
                     </CardContent>
                   </Card>
                 </TabsContent>
                 <TabsContent value="tasks">
-                  {/* Görevler İçeriği */}
                   <Card className="mt-4">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-2xl font-bold">Görevler</CardTitle>
-                      <Button onClick={() => setShowTaskModal(true)} className="flex items-center space-x-2">
+                      <Button onClick={handleOpenAddTaskModal} className="flex items-center space-x-2">
                         <PlusCircle className="h-4 w-4" />
-                        <span>Yeni Görev Ekle</span>
+                        <span>Görev Ekle</span>
                       </Button>
                     </CardHeader>
                     <CardContent>
@@ -1165,88 +1434,105 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                               <TableHead>Açıklama</TableHead>
                               <TableHead>Son Tarih</TableHead>
                               <TableHead>Durum</TableHead>
-                              <TableHead>İşlemler</TableHead>
+                              <TableHead>Eylemler</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {supplier.tasks.sort((a, b) => {
-                                // Tamamlanmış görevleri sona, tamamlanmamışları son tarihe göre sırala
-                                if (a.status === 'completed' && b.status !== 'completed') return 1;
-                                if (b.status === 'completed' && a.status !== 'completed') return -1;
-                                if (a.dueDate && b.dueDate) {
-                                    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-                                }
-                                return 0;
-                            }).map((task) => (
+                            {supplier.tasks.map((task) => (
                               <TableRow key={task.id}>
-                                <TableCell className={`${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>{task.description}</TableCell>
-                                <TableCell>{task.dueDate ? safeFormatDate(task.dueDate, 'dd MMMM yyyy') : '-'}</TableCell>
+                                <TableCell className="font-medium">{task.description}</TableCell>
+                                <TableCell>{task.dueDate ? safeFormatDate(task.dueDate, 'dd.MM.yyyy') : 'Belirtilmemiş'}</TableCell>
                                 <TableCell>
                                   <Badge variant={task.status === 'completed' ? 'default' : task.status === 'in-progress' ? 'secondary' : 'outline'}>
                                     {task.status === 'pending' ? 'Bekliyor' : task.status === 'completed' ? 'Tamamlandı' : 'Devam Ediyor'}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <Button variant="ghost" size="sm" onClick={() => handleOpenEditTaskModal(task)} className="mr-2">
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Görevi Silmek İstediğinize Emin Misiniz?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Bu işlem geri alınamaz. Bu görevi kalıcı olarak silmek istediğinizden emin misiniz?
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>İptal</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>Sil</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                                  <div className="flex items-center space-x-2">
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditTaskModal(task)}>
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="destructive" size="sm" onClick={() => handleDeleteTask(task.id)}>
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Görevi Silmek İstediğinizden Emin Misiniz?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Bu işlem geri alınamaz. Bu görevi kalıcı olarak silecek ve sunucularımızdan verileri kaldıracaktır.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>İptal</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDeleteTask(task.id)}>Sil</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
                       ) : (
-                        <p className="text-center text-muted-foreground">Henüz bir görev bulunmamaktadır.</p>
+                        <p>Henüz görev yok.</p>
                       )}
                     </CardContent>
                   </Card>
                 </TabsContent>
                 <TabsContent value="notes">
-                  {/* Notlar İçeriği */}
                   <Card className="mt-4">
-                    <CardHeader className="flex flex-row items-center justify-between space-y=0 pb-2">
+                    <CardHeader>
                       <CardTitle className="text-2xl font-bold">Notlar</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <EditorContent editor={editor} />
-                      <Button onClick={handleSaveNotes} className="mt-4">Notları Kaydet</Button>
+                      <div className="border rounded-md p-2 min-h-[150px] mb-4">
+                        <EditorContent editor={editor} className="prose max-w-none" />
+                      </div>
+                      <div className="flex space-x-1 mb-2">
+                        <Button onClick={() => editor?.chain().focus().toggleBold().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleBold()}>
+                          <Bold className="h-4 w-4" />
+                        </Button>
+                        <Button onClick={() => editor?.chain().focus().toggleItalic().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleItalic()}>
+                          <Italic className="h-4 w-4" />
+                        </Button>
+                        <Button onClick={() => editor?.chain().focus().toggleUnderline().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleUnderline()}>
+                          <UnderlineIcon className="h-4 w-4" />
+                        </Button>
+                        <Button onClick={() => editor?.chain().focus().toggleStrike().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleStrike()}>
+                          <Strikethrough className="h-4 w-4" />
+                        </Button>
+                        <Button onClick={() => editor?.chain().focus().toggleBulletList().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleBulletList()}>
+                          <List className="h-4 w-4" />
+                        </Button>
+                        <Button onClick={() => editor?.chain().focus().toggleOrderedList().run()} variant="outline" size="sm" disabled={!editor || !editor.can().toggleOrderedList()}>
+                          <ListOrdered className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Button onClick={handleSaveNotes} className="w-full">Notları Kaydet</Button>
                     </CardContent>
                   </Card>
                 </TabsContent>
               </Tabs>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowEditSupplierModal(true)}>
+                <Pencil className="mr-2 h-4 w-4" /> Tedarikçi Düzenle
+              </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="flex items-center space-x-2">
-                    <Trash2 className="h-4 w-4" />
-                    <span>Tedarikçiyi Sil</span>
+                  <Button variant="destructive" onClick={() => setDeletingSupplier(supplier.id)}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Tedarikçiyi Sil
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Tedarikçiyi Silmek İstediğinize Emin Misiniz?</AlertDialogTitle>
+                    <AlertDialogTitle>Tedarikçiyi Silmek İstediğinizden Emin Misiniz?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Bu işlem geri alınamaz. "{supplier.name}" adlı tedarikçiyi ve tüm ilişkili alış/ödeme verilerini kalıcı olarak silmek istediğinizden emin misiniz?
+                      Bu işlem geri alınamaz. Bu tedarikçiyi kalıcı olarak silecek ve tüm ilişkili verileri (alışlar, ödemeler, iletişim geçmişi, görevler) sunucularımızdan kaldıracaktır.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -1257,383 +1543,58 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
               </AlertDialog>
             </CardFooter>
           </Card>
-        </div>
-      )}
+        </CardContent>
+      </Card>
 
-      {/* Purchase Modal */}
-      <Dialog open={showPurchaseModal} onOpenChange={setShowPurchaseModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingPurchase ? 'Alış İşlemini Düzenle' : 'Yeni Alış Ekle'}</DialogTitle>
-            <DialogDescription>
-              Tedarikçiye ait {editingPurchase ? 'alış işlemini düzenleyin' : 'yeni bir alış işlemi ekleyin'}.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); handlePurchaseFormSubmit(e); }}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="purchaseAmount" className="text-right">Tutar</Label>
-                <Input
-                  id="purchaseAmount"
-                  type="number"
-                  value={purchaseFormValues.amount}
-                  onChange={(e) => setPurchaseFormValues(prev => ({ ...prev, amount: e.target.value }))}
-                  className="col-span-3"
-                  required
-                  step="0.01"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="purchaseCurrency" className="text-right">Para Birimi</Label>
-                <Select
-                  value={purchaseFormValues.currency}
-                  onValueChange={(value: Currency) => setPurchaseFormValues(prev => ({ ...prev, currency: value }))}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Para Birimi Seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TRY">TRY</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="purchaseDate" className="text-right">Tarih</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="purchaseDate"
-                      variant={"outline"}
-                      className={cn("w-full justify-start text-left font-normal", !isValid(purchaseFormValues.date) && "text-muted-foreground")}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {isValid(purchaseFormValues.date) ? format(purchaseFormValues.date, "PPP", {locale: tr}) : <span>Tarih seçin</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={purchaseFormValues.date}
-                      onSelect={(date) => setPurchaseFormValues(prev => ({ ...prev, date: date || new Date() }))}
-                      initialFocus
-                      locale={tr}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="stockItem" className="text-right">Stok Kalemi</Label>
-                <Select
-                  value={purchaseFormValues.stockItemId || 'none'}
-                  onValueChange={(value: string) => setPurchaseFormValues(prev => ({ ...prev, stockItemId: value === 'none' ? undefined : value }))}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Stok Kalemi Seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Manuel Giriş</SelectItem>
-                    {availableStockItems.map(item => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.unit})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none' && (
-                <>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="quantityPurchased" className="text-right">Miktar</Label>
-                    <Input
-                      id="quantityPurchased"
-                      type="number"
-                      value={purchaseFormValues.quantityPurchased}
-                      onChange={(e) => setPurchaseFormValues(prev => ({ ...prev, quantityPurchased: e.target.value }))}
-                      className="col-span-3"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="unitPrice" className="text-right">Birim Fiyat</Label>
-                    <Input
-                      id="unitPrice"
-                      type="number"
-                      value={purchaseFormValues.unitPrice}
-                      onChange={(e) => setPurchaseFormValues(prev => ({ ...prev, unitPrice: e.target.value }))}
-                      className="col-span-3"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">İptal</Button>
-              </DialogClose>
-              <Button type="submit">{editingPurchase ? "Kaydet" : "Ekle"}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <PurchaseModal
+        isOpen={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
+        onSubmit={handlePurchaseFormSubmit}
+        formValues={purchaseFormValues}
+        setFormValues={setPurchaseFormValues}
+        availableStockItems={availableStockItems}
+        stockItemDisplayNames={stockItemDisplayNames}
+      />
 
-      {/* Payment To Supplier Modal */}
-      <Dialog open={showPaymentToSupplierModal} onOpenChange={setShowPaymentToSupplierModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingPaymentToSupplier ? 'Ödeme İşlemini Düzenle' : 'Yeni Ödeme Yap'}</DialogTitle>
-            <DialogDescription>
-              Tedarikçiye ait {editingPaymentToSupplier ? 'ödeme işlemini düzenleyin' : 'yeni bir ödeme işlemi ekleyin'}.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); handlePaymentToSupplierFormSubmit(e); }}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="paymentAmount" className="text-right">Miktar</Label>
-                <Input
-                  id="paymentAmount"
-                  type="number"
-                  value={paymentToSupplierFormValues.amount}
-                  onChange={(e) => setPaymentToSupplierFormValues({ ...paymentToSupplierFormValues, amount: e.target.value })}
-                  className="col-span-3"
-                  required
-                  step="0.01"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="paymentDate" className="text-right">Tarih</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "col-span-3 justify-start text-left font-normal",
-                        !paymentToSupplierFormValues.date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {paymentToSupplierFormValues.date ? format(paymentToSupplierFormValues.date, "dd MMMM yyyy", { locale: tr }) : <span>Tarih Seç</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={paymentToSupplierFormValues.date}
-                      onSelect={(date) => setPaymentToSupplierFormValues({ ...paymentToSupplierFormValues, date: date || new Date() })}
-                      initialFocus
-                      locale={tr}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="paymentMethod" className="text-right">Ödeme Yöntemi</Label>
-                <Input
-                  id="paymentMethod"
-                  value={paymentToSupplierFormValues.method}
-                  onChange={(e) => setPaymentToSupplierFormValues({ ...paymentToSupplierFormValues, method: e.target.value })}
-                  className="col-span-3"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="paymentCurrency" className="text-right">Para Birimi</Label>
-                <Select
-                  value={paymentToSupplierFormValues.currency}
-                  onValueChange={(value: Currency) => setPaymentToSupplierFormValues({ ...paymentToSupplierFormValues, currency: value })}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Para Birimi Seç" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TRY">TRY</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">İptal</Button>
-              </DialogClose>
-              <Button type="submit">{editingPaymentToSupplier ? 'Kaydet' : 'Ekle'}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <PaymentToSupplierModal
+        isOpen={showPaymentToSupplierModal}
+        onClose={() => setShowPaymentToSupplierModal(false)}
+        onSubmit={handlePaymentToSupplierSubmit}
+        formValues={paymentToSupplierFormValues}
+        setFormValues={setPaymentToSupplierFormValues}
+      />
 
-      {/* Contact History Modal */}
-      <Dialog open={showContactHistoryModal} onOpenChange={setShowContactHistoryModal}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{editingContactHistoryItem ? 'İletişim Geçmişini Düzenle' : 'Yeni İletişim Kaydı Ekle'}</DialogTitle>
-            <DialogDescription>
-              Tedarikçiye ait {editingContactHistoryItem ? 'iletişim kaydını düzenleyin' : 'yeni bir iletişim kaydı ekleyin'}.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); handleContactHistorySubmit(); }}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="contactDate" className="text-right">Tarih</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "col-span-3 justify-start text-left font-normal",
-                        !contactHistoryFormValues.date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {contactHistoryFormValues.date ? format(contactHistoryFormValues.date, "dd MMMM yyyy", { locale: tr }) : <span>Tarih Seç</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={contactHistoryFormValues.date}
-                      onSelect={(date) => setContactHistoryFormValues({ ...contactHistoryFormValues, date: date || new Date() })}
-                      initialFocus
-                      locale={tr}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="contactType" className="text-right">Tip</Label>
-                <Select
-                  value={contactHistoryFormValues.type}
-                  onValueChange={(value: 'phone' | 'email' | 'meeting' | 'other') => setContactHistoryFormValues({ ...contactHistoryFormValues, type: value })}
-                >
-                  <SelectTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      {contactHistoryFormValues.type}
-                    </Button>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="phone">Telefon</SelectItem>
-                    <SelectItem value="email">E-posta</SelectItem>
-                    <SelectItem value="meeting">Toplantı</SelectItem>
-                    <SelectItem value="other">Diğer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="summary" className="text-right">Özet</Label>
-                <Input
-                  id="summary"
-                  value={contactHistoryFormValues.summary}
-                  onChange={(e) => setContactHistoryFormValues({ ...contactHistoryFormValues, summary: e.target.value })}
-                  className="col-span-3"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="notes" className="text-right">Notlar</Label>
-                <Textarea
-                  id="notes"
-                  value={contactHistoryFormValues.notes}
-                  onChange={(e) => setContactHistoryFormValues({ ...contactHistoryFormValues, notes: e.target.value })}
-                  className="col-span-3"
-                  rows={5}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">İptal</Button>
-              </DialogClose>
-              <Button type="submit">{editingContactHistoryItem ? 'Kaydet' : 'Ekle'}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EditSupplierModal
+        isOpen={showEditSupplierModal}
+        onClose={() => setShowEditSupplierModal(false)}
+        onSubmit={handleSupplierUpdate}
+        supplier={supplier}
+        setSupplier={setSupplier}
+      />
 
-      {/* Task Modal */}
-      <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{editingTask ? 'Görevi Düzenle' : 'Yeni Görev Ekle'}</DialogTitle>
-            <DialogDescription>
-              Tedarikçiye ait {editingTask ? 'görevi düzenleyin' : 'yeni bir görev ekleyin'}.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); handleTaskSubmit(); }}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="taskDescription" className="text-right">Açıklama</Label>
-                <Textarea
-                  id="taskDescription"
-                  value={taskFormValues.description}
-                  onChange={(e) => setTaskFormValues({ ...taskFormValues, description: e.target.value })}
-                  className="col-span-3"
-                  required
-                  rows={3}
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="taskDueDate" className="text-right">Son Tarih</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "col-span-3 justify-start text-left font-normal",
-                        !taskFormValues.dueDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {taskFormValues.dueDate ? format(taskFormValues.dueDate, "dd MMMM yyyy", { locale: tr }) : <span>Tarih Seç (Opsiyonel)</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={taskFormValues.dueDate}
-                      onSelect={(date) => setTaskFormValues({ ...taskFormValues, dueDate: date || undefined })}
-                      initialFocus
-                      locale={tr}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="taskStatus" className="text-right">Durum</Label>
-                <Select
-                  value={taskFormValues.status}
-                  onValueChange={(value: 'pending' | 'completed' | 'in-progress') => setTaskFormValues({ ...taskFormValues, status: value })}
-                >
-                  <SelectTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      {taskFormValues.status === 'pending' ? 'Bekliyor' : taskFormValues.status === 'completed' ? 'Tamamlandı' : 'Devam Ediyor'}
-                    </Button>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Bekliyor</SelectItem>
-                    <SelectItem value="in-progress">Devam Ediyor</SelectItem>
-                    <SelectItem value="completed">Tamamlandı</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">İptal</Button>
-              </DialogClose>
-              <Button type="submit">{editingTask ? 'Kaydet' : 'Ekle'}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+      <DeleteConfirmationModal
+        isOpen={!!deletingSupplier}
+        onClose={() => setDeletingSupplier(null)}
+        onConfirm={handleDeleteSupplier}
+        title="Tedarikçiyi Sil"
+        description="Bu tedarikçiyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+      />
+
+      <ContactHistoryModal
+        isOpen={showContactHistoryModal}
+        onClose={() => setShowContactHistoryModal(false)}
+        onSubmit={handleContactHistorySubmit}
+        formValues={contactHistoryFormValues}
+        setFormValues={setContactHistoryFormValues}
+      />
+
+      <TaskModal
+        isOpen={showTaskModal}
+        onClose={() => setShowTaskModal(false)}
+        onSubmit={handleTaskFormSubmit}
+        formValues={taskFormValues}
+        setFormValues={setTaskFormValues}
+      />
+    </div>
   );
 }
