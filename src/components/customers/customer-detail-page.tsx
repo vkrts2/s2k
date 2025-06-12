@@ -506,14 +506,20 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         return;
       }
 
-      const quantity = parseFloat(saleFormValues.quantitySold || '0');
-      const unitPrice = parseFloat(saleFormValues.unitPrice || '0');
+      // Determine stockItemId
+      const finalStockItemId = saleFormValues.stockItemId === 'none' ? null : (saleFormValues.stockItemId || null);
 
-      if (saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none') {
+      let finalQuantitySold: number | null = null;
+      let finalUnitPrice: number | null = null;
+
+      if (finalStockItemId) { // Only parse quantity and unit price if a stock item is selected
+        const quantity = parseFloat(saleFormValues.quantitySold || '0');
+        const unitPrice = parseFloat(saleFormValues.unitPrice || '0');
+
         if (isNaN(quantity) || quantity <= 0) {
           toast({
             title: "Hata",
-            description: "Lütfen geçerli bir miktar girin.",
+            description: "Stok kalemi seçildiğinde lütfen geçerli bir miktar girin.",
             variant: "destructive",
           });
           return;
@@ -521,11 +527,29 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         if (isNaN(unitPrice) || unitPrice <= 0) {
           toast({
             title: "Hata",
-            description: "Lütfen geçerli bir birim fiyat girin.",
+            description: "Stok kalemi seçildiğinde lütfen geçerli bir birim fiyat girin.",
             variant: "destructive",
           });
           return;
         }
+        finalQuantitySold = quantity;
+        finalUnitPrice = unitPrice;
+      } else {
+          // If no stock item selected, ensure quantity and unit price are null
+          if (saleFormValues.quantitySold && parseFloat(saleFormValues.quantitySold) > 0) {
+              toast({
+                  title: "Uyarı",
+                  description: "Stok kalemi seçmeden miktar giremezsiniz. Miktar sıfırlandı.",
+                  variant: "warning",
+              });
+          }
+          if (saleFormValues.unitPrice && parseFloat(saleFormValues.unitPrice) > 0) {
+              toast({
+                  title: "Uyarı",
+                  description: "Stok kalemi seçmeden birim fiyat giremezsiniz. Birim fiyat sıfırlandı.",
+                  variant: "warning",
+              });
+          }
       }
 
       const saleData = {
@@ -533,9 +557,9 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         amount,
         date: formatISO(saleFormValues.date),
         currency: saleFormValues.currency,
-        stockItemId: saleFormValues.stockItemId === 'none' ? null : (saleFormValues.stockItemId || null), // Eğer boşsa null olarak ayarla
-        quantitySold: quantity > 0 ? quantity : null, // Eğer 0 veya NaN ise null olarak ayarla
-        unitPrice: unitPrice > 0 ? unitPrice : null, // Eğer 0 veya NaN ise null olarak ayarla
+        stockItemId: finalStockItemId,
+        quantitySold: finalQuantitySold,
+        unitPrice: finalUnitPrice,
         transactionType: 'sale' as const
       };
 
