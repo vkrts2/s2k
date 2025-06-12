@@ -1230,51 +1230,25 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           <form onSubmit={(e) => { e.preventDefault(); handlePurchaseFormSubmit(); }}>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="purchaseAmount" className="text-right">Miktar</Label>
+                <Label htmlFor="purchaseAmount" className="text-right">Tutar</Label>
                 <Input
                   id="purchaseAmount"
                   type="number"
                   value={purchaseFormValues.amount}
-                  onChange={(e) => setPurchaseFormValues({ ...purchaseFormValues, amount: e.target.value })}
+                  onChange={(e) => setPurchaseFormValues(prev => ({ ...prev, amount: e.target.value }))}
                   className="col-span-3"
                   required
                   step="0.01"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="purchaseDate" className="text-right">Tarih</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "col-span-3 justify-start text-left font-normal",
-                        !purchaseFormValues.date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {purchaseFormValues.date ? format(purchaseFormValues.date, "dd MMMM yyyy", { locale: tr }) : <span>Tarih Seç</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={purchaseFormValues.date}
-                      onSelect={(date) => setPurchaseFormValues({ ...purchaseFormValues, date: date || new Date() })}
-                      initialFocus
-                      locale={tr}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="purchaseCurrency" className="text-right">Para Birimi</Label>
                 <Select
                   value={purchaseFormValues.currency}
-                  onValueChange={(value: Currency) => setPurchaseFormValues({ ...purchaseFormValues, currency: value })}
+                  onValueChange={(value: Currency) => setPurchaseFormValues(prev => ({ ...prev, currency: value }))}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Para Birimi Seç" />
+                    <SelectValue placeholder="Para Birimi Seçin" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="TRY">TRY</SelectItem>
@@ -1283,18 +1257,44 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="purchaseDate" className="text-right">Tarih</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="purchaseDate"
+                      variant={"outline"}
+                      className={cn("w-full justify-start text-left font-normal", !isValid(purchaseFormValues.date) && "text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {isValid(purchaseFormValues.date) ? format(purchaseFormValues.date, "PPP", {locale: tr}) : <span>Tarih seçin</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={purchaseFormValues.date}
+                      onSelect={(date) => setPurchaseFormValues(prev => ({ ...prev, date: date || new Date() }))}
+                      initialFocus
+                      locale={tr}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="stockItem" className="text-right">Stok Kalemi</Label>
                 <Select
                   value={purchaseFormValues.stockItemId || 'none'}
-                  onValueChange={(value) => setPurchaseFormValues(prev => ({ ...prev, stockItemId: value === 'none' ? undefined : value }))}
+                  onValueChange={(value: string) => setPurchaseFormValues(prev => ({ ...prev, stockItemId: value === 'none' ? undefined : value }))}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Stok Kalemi Seç (Opsiyonel)" />
+                    <SelectValue placeholder="Stok Kalemi Seçin" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Yok</SelectItem>
+                    <SelectItem value="none">Manuel Giriş</SelectItem>
                     {availableStockItems.map(item => (
-                      <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} ({item.unit})
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1314,7 +1314,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                     />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="unitPrice" className="text-right">Birim Fiyatı</Label>
+                    <Label htmlFor="unitPrice" className="text-right">Birim Fiyat</Label>
                     <Input
                       id="unitPrice"
                       type="number"
@@ -1332,7 +1332,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
               <DialogClose asChild>
                 <Button type="button" variant="outline">İptal</Button>
               </DialogClose>
-              <Button type="submit">{editingPurchase ? 'Kaydet' : 'Ekle'}</Button>
+              <Button type="submit">{editingPurchase ? "Kaydet" : "Ekle"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -2107,108 +2107,114 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
               {editingSale ? "Mevcut satış bilgilerini düzenleyin." : "Yeni bir satış kaydı oluşturun."}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="saleAmount" className="text-right">Tutar</Label>
-              <Input
-                id="saleAmount"
-                type="number"
-                value={saleFormValues.amount}
-                onChange={(e) => setSaleFormValues(prev => ({ ...prev, amount: e.target.value }))}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="saleCurrency" className="text-right">Para Birimi</Label>
-              <Select
-                value={saleFormValues.currency}
-                onValueChange={(value: Currency) => setSaleFormValues(prev => ({ ...prev, currency: value }))}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Para Birimi Seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TRY">TRY</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="saleDate" className="text-right">Tarih</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                          <Button
-                    variant={"outline"}
-                    className={cn(
-                      "col-span-3 justify-start text-left font-normal",
-                      !saleFormValues.date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {saleFormValues.date ? format(saleFormValues.date, "PPP", { locale: tr }) : <span>Tarih Seç</span>}
-                          </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={saleFormValues.date}
-                    onSelect={(date) => date && setSaleFormValues(prev => ({ ...prev, date }))}
-                    initialFocus
-                    locale={tr}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="stockItem" className="text-right">Stok Kalemi</Label>
-              <Select
-                value={saleFormValues.stockItemId || 'none'}
-                onValueChange={(value: string) => setSaleFormValues(prev => ({ ...prev, stockItemId: value === 'none' ? undefined : value }))}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Stok Kalemi Seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Manuel Giriş</SelectItem>
-                  {availableStockItems.map(item => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name} ({item.unit})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none' && (
+          <form onSubmit={handleSaleSubmit}>
+            <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="quantitySold" className="text-right">Miktar</Label>
+                <Label htmlFor="saleAmount" className="text-right">Tutar</Label>
                 <Input
-                  id="quantitySold"
+                  id="saleAmount"
                   type="number"
-                  value={saleFormValues.quantitySold}
-                  onChange={(e) => setSaleFormValues(prev => ({ ...prev, quantitySold: e.target.value }))}
+                  value={saleFormValues.amount}
+                  onChange={(e) => setSaleFormValues(prev => ({ ...prev, amount: e.target.value }))}
                   className="col-span-3"
+                  required
+                  step="0.01"
                 />
               </div>
-            )}
-            {saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none' && (
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="unitPrice" className="text-right">Birim Fiyat</Label>
-                <Input
-                  id="unitPrice"
-                  type="number"
-                  value={saleFormValues.unitPrice}
-                  onChange={(e) => setSaleFormValues(prev => ({ ...prev, unitPrice: e.target.value }))}
-                  className="col-span-3"
-                />
+                <Label htmlFor="saleCurrency" className="text-right">Para Birimi</Label>
+                <Select
+                  value={saleFormValues.currency}
+                  onValueChange={(value: Currency) => setSaleFormValues(prev => ({ ...prev, currency: value }))}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Para Birimi Seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TRY">TRY</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">İptal</Button>
-            </DialogClose>
-            <Button onClick={handleSaleSubmit}>Kaydet</Button>
-          </DialogFooter>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="saleDate" className="text-right">Tarih</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="saleDate"
+                      variant={"outline"}
+                      className={cn("w-full justify-start text-left font-normal", !isValid(saleFormValues.date) && "text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {isValid(saleFormValues.date) ? format(saleFormValues.date, "PPP", {locale: tr}) : <span>Tarih seçin</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={saleFormValues.date}
+                      onSelect={(date) => setSaleFormValues(prev => ({ ...prev, date: date || new Date() }))}
+                      initialFocus
+                      locale={tr}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="stockItem" className="text-right">Stok Kalemi</Label>
+                <Select
+                  value={saleFormValues.stockItemId || 'none'}
+                  onValueChange={(value: string) => setSaleFormValues(prev => ({ ...prev, stockItemId: value === 'none' ? undefined : value }))}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Stok Kalemi Seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Manuel Giriş</SelectItem>
+                    {availableStockItems.map(item => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} ({item.unit})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none' && (
+                <>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="quantitySold" className="text-right">Miktar</Label>
+                    <Input
+                      id="quantitySold"
+                      type="number"
+                      value={saleFormValues.quantitySold}
+                      onChange={(e) => setSaleFormValues(prev => ({ ...prev, quantitySold: e.target.value }))}
+                      className="col-span-3"
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="unitPrice" className="text-right">Birim Fiyat</Label>
+                    <Input
+                      id="unitPrice"
+                      type="number"
+                      value={saleFormValues.unitPrice}
+                      onChange={(e) => setSaleFormValues(prev => ({ ...prev, unitPrice: e.target.value }))}
+                      className="col-span-3"
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">İptal</Button>
+              </DialogClose>
+              <Button type="submit">{editingSale ? "Kaydet" : "Ekle"}</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
