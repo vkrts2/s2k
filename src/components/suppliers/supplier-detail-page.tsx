@@ -99,6 +99,7 @@ type PaymentToSupplierFormValues = {
   date: Date;
   method: string;
   currency: Currency;
+  referenceNumber?: string;
 };
 
 // Yeni: İletişim Geçmişi Form Değerleri
@@ -361,7 +362,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     setShowPurchaseModal(true);
   }, []);
 
-  const handlePurchaseFormSubmit = useCallback(async () => {
+  const handlePurchaseFormSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!user?.uid || !supplier?.id) {
       toast({ 
         title: "Hata", 
@@ -382,11 +384,28 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         return;
       }
 
-      const unitPriceNumber = parseFloat(purchaseFormValues.unitPrice || '0');
-      const quantityNumber = parseFloat(purchaseFormValues.quantityPurchased || '0');
+      let stockItemId: string | undefined = undefined;
+      let quantityPurchased: number | undefined = undefined;
+      let unitPrice: number | undefined = undefined;
+      let description = 'Alış';
 
+      // Handle stock item related fields if a stock item is selected
       if (purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none') {
-        if (isNaN(quantityNumber) || quantityNumber <= 0) {
+        stockItemId = purchaseFormValues.stockItemId;
+        
+        if (!purchaseFormValues.quantityPurchased || !purchaseFormValues.unitPrice) {
+          toast({ 
+            title: "Hata", 
+            description: "Stok ürünü seçildiğinde miktar ve birim fiyat zorunludur.", 
+            variant: "destructive" 
+          });
+          return;
+        }
+
+        quantityPurchased = parseFloat(purchaseFormValues.quantityPurchased);
+        unitPrice = parseFloat(purchaseFormValues.unitPrice);
+
+        if (isNaN(quantityPurchased) || quantityPurchased <= 0) {
           toast({ 
             title: "Hata", 
             description: "Lütfen geçerli bir miktar girin.", 
@@ -394,7 +413,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           });
           return;
         }
-        if (isNaN(unitPriceNumber) || unitPriceNumber <= 0) {
+
+        if (isNaN(unitPrice) || unitPrice <= 0) {
           toast({ 
             title: "Hata", 
             description: "Lütfen geçerli bir birim fiyat girin.", 
@@ -402,31 +422,34 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           });
           return;
         }
+
+        description = `${quantityPurchased} adet × ${unitPrice} ${purchaseFormValues.currency} (${stockItemDisplayNames[stockItemId] || ''})`;
       }
 
-      const newPurchase: Omit<Purchase, 'id' | 'transactionType' | 'description'> & { description?: string } = {
+      const newPurchase: Omit<Purchase, 'id' | 'transactionType'> = {
         supplierId: supplier.id,
         amount: amountNumber,
         date: purchaseFormValues.date.toISOString(),
         currency: purchaseFormValues.currency,
-        stockItemId: purchaseFormValues.stockItemId === 'none' ? null : (purchaseFormValues.stockItemId || null),
-        quantityPurchased: quantityNumber > 0 ? quantityNumber : null,
-        unitPrice: unitPriceNumber > 0 ? unitPriceNumber : null,
-        category: 'diger',
+        stockItemId,
+        quantityPurchased,
+        unitPrice,
+        category: 'satis',
         tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        description
       };
 
       if (editingPurchase) {
-        await storageUpdatePurchase(user.uid, { ...editingPurchase, ...newPurchase, id: editingPurchase.id });
-        setPurchases(purchases.map(p => p.id === editingPurchase.id ? { ...p, ...newPurchase, id: p.id } as Purchase : p));
+        const updatedPurchase = await storageUpdatePurchase(user.uid, { ...editingPurchase, ...newPurchase, id: editingPurchase.id });
+        setPurchases(purchases.map(p => p.id === editingPurchase.id ? updatedPurchase : p));
         toast({ 
           title: "Alış Güncellendi", 
           description: "Alış işlemi başarıyla güncellendi." 
         });
       } else {
-        const addedPurchase = await addPurchase(user.uid, newPurchase as Omit<Purchase, 'id' | 'transactionType'>);
+        const addedPurchase = await addPurchase(user.uid, newPurchase);
         setPurchases(prev => [...prev, addedPurchase]);
         toast({ 
           title: "Alış Eklendi", 
@@ -446,7 +469,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         variant: "destructive",
       });
     }
-  }, [purchaseFormValues, supplier?.id, editingPurchase, purchases, refreshSupplierData, toast, user?.uid]);
+  }, [purchaseFormValues, supplier?.id, editingPurchase, purchases, refreshSupplierData, toast, user?.uid, stockItemDisplayNames]);
 
   const handleDeletePurchase = useCallback(async () => {
     if (!deletingPurchaseId || !user?.uid) return;
@@ -477,34 +500,45 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     setPaymentToSupplierFormValues({
       amount: payment.amount.toString(),
       date: isValid(parseISO(payment.date)) ? parseISO(payment.date) : new Date(),
-      method: payment.method || '', // method null/undefined olabilir
+      method: payment.method || null, // null olarak atandı
       currency: payment.currency,
+      referenceNumber: payment.referenceNumber || null, // null olarak atandı
     });
     setShowPaymentToSupplierModal(true);
   }, []);
 
-  const handlePaymentToSupplierFormSubmit = useCallback(async () => {
-    if (!user?.uid) {
-      toast({ title: "Hata", description: "Kullanıcı bilgisi eksik. Lütfen giriş yapın.", variant: "destructive" });
+  const handlePaymentToSupplierFormSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.uid || !supplier?.id) {
+      toast({ title: "Hata", description: "Kullanıcı veya tedarikçi bilgisi eksik. Lütfen giriş yapın.", variant: "destructive" });
       return;
     }
 
-    const amountNumber = parseFloat(paymentToSupplierFormValues.amount);
-
-    const newPayment: Omit<PaymentToSupplier, 'id' | 'transactionType'> = {
-      supplierId: supplier.id!,
-      amount: amountNumber,
-      date: paymentToSupplierFormValues.date.toISOString(),
-      method: paymentToSupplierFormValues.method,
-      currency: paymentToSupplierFormValues.currency,
-      category: 'odeme', // Varsayılan değer
-      tags: [], // Varsayılan değer
-      createdAt: new Date().toISOString(), // Varsayılan değer
-      updatedAt: new Date().toISOString(), // Varsayılan değer
-      description: paymentToSupplierFormValues.method, // description ekledik
-    };
-
     try {
+      const amountNumber = parseFloat(paymentToSupplierFormValues.amount);
+      if (isNaN(amountNumber) || amountNumber <= 0) {
+        toast({
+          title: "Hata",
+          description: "Lütfen geçerli bir ödeme tutarı girin.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const newPayment: Omit<PaymentToSupplier, 'id' | 'transactionType'> = {
+        supplierId: supplier.id!,
+        amount: amountNumber,
+        date: paymentToSupplierFormValues.date.toISOString(),
+        method: paymentToSupplierFormValues.method,
+        currency: paymentToSupplierFormValues.currency,
+        referenceNumber: paymentToSupplierFormValues.referenceNumber || null,
+        category: 'odeme',
+        tags: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        description: `${paymentToSupplierFormValues.method} ile ödeme`
+      };
+
       if (editingPaymentToSupplier) {
         await storageUpdatePaymentToSupplier(user.uid, { ...editingPaymentToSupplier, ...newPayment, id: editingPaymentToSupplier.id });
         setPaymentsToSupplier(paymentsToSupplier.map(p => p.id === editingPaymentToSupplier.id ? { ...p, ...newPayment, id: p.id } as PaymentToSupplier : p));
@@ -514,8 +548,9 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         setPaymentsToSupplier(prev => [...prev, addedPayment]);
         toast({ title: "Ödeme Eklendi", description: "Yeni ödeme işlemi başarıyla eklendi." });
       }
-      refreshSupplierData();
       setShowPaymentToSupplierModal(false);
+      setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
+      setEditingPaymentToSupplier(null);
     } catch (error) {
       console.error("Ödeme kaydedilirken hata:", error);
       toast({
@@ -524,13 +559,13 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         variant: "destructive",
       });
     }
-  }, [paymentToSupplierFormValues, supplier?.id, editingPaymentToSupplier, paymentsToSupplier, refreshSupplierData, toast, user?.uid]);
+  }, [paymentToSupplierFormValues, supplier?.id, editingPaymentToSupplier, paymentsToSupplier, toast, user?.uid]);
 
   const handleDeletePaymentToSupplier = useCallback(async () => {
     if (!deletingPaymentToSupplierId || !user?.uid) return;
     try {
       await storageDeletePaymentToSupplier(user.uid, deletingPaymentToSupplierId);
-      setPaymentsToSupplier(prev => prev.filter(p => p.id !== deletingPaymentToSupplierId).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setPaymentsToSupplier(prev => prev.filter(p => p.id !== deletingPaymentToSupplierId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       refreshSupplierData();
       toast({ title: "Ödeme Silindi" });
       setDeletingPaymentToSupplierId(null);
@@ -901,20 +936,21 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-2xl font-bold">Tedarikçi İşlem Geçmişi</CardTitle>
                       <div className="flex items-center space-x-2">
-                        <Button onClick={() => setShowPrintView(true)} variant="outline" className="flex items-center space-x-2">
-                          <Printer className="h-4 w-4" />
-                          <span>Yazdır</span>
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap items-center gap-4 mb-4">
                         <Input
                           placeholder="İşlem ara..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           className="max-w-sm"
                         />
+                        <Select onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)} value={sortOrder}>
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Sıralama" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="desc">En Yeniye Göre</SelectItem>
+                            <SelectItem value="asc">En Eskiye Göre</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
@@ -948,95 +984,101 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                             />
                           </PopoverContent>
                         </Popover>
-                        <Select value={sortOrder} onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)}>
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Sıralama" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="desc">En Yeniye Göre</SelectItem>
-                            <SelectItem value="asc">En Eskiye Göre</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Button onClick={() => setShowPrintView(true)} variant="outline" className="flex items-center space-x-2">
+                          <Printer className="h-4 w-4" />
+                          <span>Yazdır</span>
+                        </Button>
                       </div>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Tarih</TableHead>
-                            <TableHead>İşlem Tipi</TableHead>
-                            <TableHead>Miktar</TableHead>
-                            <TableHead>Stok Kalemi/Açıklama</TableHead>
-                            <TableHead>İşlemler</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredAndSortedTransactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, index) => (
-                            <TableRow key={item.id}>
-                              <TableCell className="font-medium">{safeFormatDate(item.date)}</TableCell>
-                              <TableCell>
-                                <Badge variant={item.transactionType === 'purchase' ? 'default' : 'secondary'}>
-                                  {item.transactionType === 'purchase' ? 'Alış' : 'Ödeme'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className={item.transactionType === 'purchase' ? 'text-red-600' : 'text-green-600'}>
-                                {item.transactionType === 'purchase' ? '+' : '-'}{formatCurrency(item.amount, item.currency)}
-                              </TableCell>
-                              <TableCell>
-                                {item.transactionType === 'purchase' && 'stockItemId' in item && item.stockItemId && getStockItemName(item.stockItemId)}
-                                {item.transactionType === 'paymentToSupplier' && item.description}
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => item.transactionType === 'purchase' ? handleOpenEditPurchaseModal(item as Purchase) : handleOpenEditPaymentToSupplierModal(item as PaymentToSupplier)}
-                                  className="mr-2"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-red-500 hover:text-red-700"
-                                      onClick={() => item.transactionType === 'purchase' ? setDeletingPurchaseId(item.id) : setDeletingPaymentToSupplierId(item.id)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>İşlemi Silmek İstediğinize Emin Misiniz?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Bu işlem geri alınamaz. Bu işlemi kalıcı olarak silmek istediğinizden emin misiniz?
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel onClick={() => { setDeletingPurchaseId(null); setDeletingPaymentToSupplierId(null); }}>İptal</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => item.transactionType === 'purchase' ? handleDeletePurchase() : handleDeletePaymentToSupplier()}>Sil</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </TableCell>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Tarih</TableHead>
+                              <TableHead>İşlem Tipi</TableHead>
+                              <TableHead>Kategori</TableHead>
+                              <TableHead>Açıklama</TableHead>
+                              <TableHead>Tutar</TableHead>
+                              <TableHead>Eylemler</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                      <div className="flex justify-between items-center mt-4">
+                          </TableHeader>
+                          <TableBody>
+                            {paginatedTransactions.length > 0 ? (
+                              paginatedTransactions.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell className="font-medium">{safeFormatDate(item.date)}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={item.transactionType === 'purchase' ? "secondary" : "default"}>
+                                      {item.transactionType === 'purchase' ? "Alış" : "Ödeme"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>{item.category}</TableCell>
+                                  <TableCell>
+                                    {item.transactionType === 'purchase' && 'stockItemId' in item && item.stockItemId ? getStockItemName(item.stockItemId) : item.description}
+                                  </TableCell>
+                                  <TableCell className={`${item.transactionType === 'purchase' ? "text-red-600" : "text-green-600"}`}>
+                                    {item.transactionType === 'purchase' ? "+" : "-"}{formatCurrency(item.amount, item.currency)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center space-x-2">
+                                      {item.transactionType === 'purchase' ? (
+                                        <Button variant="outline" size="sm" onClick={() => handleOpenEditPurchaseModal(item as Purchase)}>
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      ) : (
+                                        <Button variant="outline" size="sm" onClick={() => handleOpenEditPaymentToSupplierModal(item as PaymentToSupplier)}>
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button variant="destructive" size="sm" onClick={() => item.transactionType === 'purchase' ? setDeletingPurchaseId(item.id) : setDeletingPaymentToSupplierId(item.id)}>
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>İşlemi Silmek İstediğinizden Emin Misiniz?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              Bu işlem geri alınamaz. Bu işlemi kalıcı olarak silecek ve sunucularımızdan verileri kaldıracaktır.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>İptal</AlertDialogCancel>
+                                            <AlertDialogAction onClick={item.transactionType === 'purchase' ? handleDeletePurchase : handleDeletePaymentToSupplier}>Sil</AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              <TableRow>
+                                <TableCell colSpan={6} className="h-24 text-center">Hiç işlem bulunamadı.</TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      <div className="flex items-center justify-between space-x-2 py-4">
                         <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                           disabled={currentPage === 1}
-                          variant="outline"
                         >
-                          Önceki Sayfa
+                          Önceki
                         </Button>
-                        <span>Sayfa {currentPage} / {Math.ceil(filteredAndSortedTransactions.length / itemsPerPage)}</span>
+                        <span className="text-sm text-muted-foreground">
+                          Sayfa {currentPage} / {totalPages}
+                        </span>
                         <Button
-                          onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredAndSortedTransactions.length / itemsPerPage), prev + 1))}
-                          disabled={currentPage * itemsPerPage >= filteredAndSortedTransactions.length}
                           variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
                         >
-                          Sonraki Sayfa
+                          Sonraki
                         </Button>
                       </div>
                     </CardContent>
@@ -1227,7 +1269,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
               Tedarikçiye ait {editingPurchase ? 'alış işlemini düzenleyin' : 'yeni bir alış işlemi ekleyin'}.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); handlePurchaseFormSubmit(); }}>
+          <form onSubmit={(e) => { e.preventDefault(); handlePurchaseFormSubmit(e); }}>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="purchaseAmount" className="text-right">Tutar</Label>
@@ -1347,7 +1389,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
               Tedarikçiye ait {editingPaymentToSupplier ? 'ödeme işlemini düzenleyin' : 'yeni bir ödeme işlemi ekleyin'}.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); handlePaymentToSupplierFormSubmit(); }}>
+          <form onSubmit={(e) => { e.preventDefault(); handlePaymentToSupplierFormSubmit(e); }}>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="paymentAmount" className="text-right">Miktar</Label>

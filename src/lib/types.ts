@@ -92,7 +92,7 @@ export interface SaleFormValues {
   amount: string;
   date: Date;
   currency: Currency;
-  stockItemId: string;
+  stockItemId?: string;
   quantity: string;
   unitPrice: string;
 }
@@ -102,15 +102,15 @@ export interface PaymentFormValues {
   date: Date;
   currency: Currency;
   method: 'nakit' | 'krediKarti' | 'havale' | 'diger';
-  referenceNumber?: string;
+  referenceNumber?: string | null;
 }
 
 export interface Sale extends BaseEntity {
   customerId: string;
-  stockItemId?: string;
-  quantity?: number;
-  unitPrice?: number;
-  totalPrice?: number;
+  stockItemId?: string | null;
+  quantity?: number | null;
+  unitPrice?: number | null;
+  totalPrice?: number | null;
   amount: number;
   date: string;
   currency: Currency;
@@ -141,9 +141,9 @@ export interface Purchase extends Transaction {
   supplierId: string;
   description?: string;
   transactionType: 'purchase';
-  stockItemId?: string;
-  quantityPurchased?: number;
-  unitPrice?: number;
+  stockItemId?: string | null;
+  quantityPurchased?: number | null;
+  unitPrice?: number | null;
 }
 
 export interface PaymentToSupplier extends Transaction {
@@ -261,3 +261,11 @@ export interface Quotation {
   createdAt: string; // ISO string format
   updatedAt: string; // ISO string format
 }
+
+type PaymentToSupplierFormValues = {
+  amount: string;
+  date: Date;
+  method: string | null; // null da olabilir
+  currency: Currency;
+  referenceNumber?: string | null; // null da olabilir
+};

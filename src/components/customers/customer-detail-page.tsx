@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Customer, Sale, Payment, Currency, UnifiedTransaction as AppUnifiedTransaction, StockItem, Price, ContactHistoryItem, CustomerTask } from '@/lib/types';
+import type { Customer, Sale, Payment, Currency, UnifiedTransaction as AppUnifiedTransaction, StockItem, Price, ContactHistoryItem, CustomerTask, SaleFormValues, PaymentFormValues } from '@/lib/types';
 import {
   addSale,
   updateSale as storageUpdateSale,
@@ -81,31 +81,19 @@ import { EditorContent } from '@tiptap/react';
 import { Badge } from "@/components/ui/badge";
 import { TransactionCategory, TransactionTag } from "@/lib/types";
 import Underline from '@tiptap/extension-underline';
+import { SaleModal } from "./sale-modal";
+import { PaymentModal } from "./payment-modal";
+import { EditCustomerModal } from "./edit-customer-modal";
+import { DeleteConfirmationModal } from "../common/delete-confirmation-modal";
+import { ContactHistoryModal } from "./contact-history-modal";
 
 interface CustomerDetailPageClientProps {
   customer: Customer;
   initialSales: Sale[];
   initialPayments: Payment[];
-  user: any;
+  user: { uid: string } | null;
 }
 
-type SaleFormValues = {
-  amount: string;
-  date: Date;
-  currency: Currency;
-  stockItemId?: string;
-  quantity?: string; // quantitySold yerine quantity
-  unitPrice?: string; // Bu birim fiyatı, amount hesaplandıktan sonra da saklanacak.
-};
-type PaymentFormValues = {
-  amount: string;
-  date: Date;
-  method: 'nakit' | 'krediKarti' | 'havale' | 'diger'; // string yerine belirli tipler
-  currency: Currency;
-  referenceNumber?: string; // Ekledim
-};
-
-// Yeni: İletişim Geçmişi Form Değerleri
 type ContactHistoryFormValues = {
   date: Date;
   type: 'phone' | 'email' | 'meeting' | 'other';
@@ -113,7 +101,6 @@ type ContactHistoryFormValues = {
   notes: string;
 };
 
-// Yeni: Görev Form Değerleri
 type TaskFormValues = {
   description: string;
   dueDate?: Date;
@@ -124,19 +111,18 @@ const EMPTY_SALE_FORM_VALUES: SaleFormValues = {
   amount: '',
   date: new Date(),
   currency: 'TRY',
-  stockItemId: 'none', // undefined yerine 'none' olarak ayarlandı
+  stockItemId: 'none',
   quantity: '',
   unitPrice: '',
 };
 const EMPTY_PAYMENT_FORM_VALUES: PaymentFormValues = {
   amount: '',
   date: new Date(),
-  method: 'nakit', // Default payment method
+  method: 'nakit',
   currency: 'TRY',
   referenceNumber: '',
 };
 
-// Yeni: Boş İletişim Geçmişi Form Değerleri
 const EMPTY_CONTACT_HISTORY_FORM_VALUES: ContactHistoryFormValues = {
   date: new Date(),
   type: 'other',
@@ -144,7 +130,6 @@ const EMPTY_CONTACT_HISTORY_FORM_VALUES: ContactHistoryFormValues = {
   notes: '',
 };
 
-// Yeni: Boş Görev Form Değerleri
 const EMPTY_TASK_FORM_VALUES: TaskFormValues = {
   description: '',
   dueDate: undefined,
@@ -154,6 +139,7 @@ const EMPTY_TASK_FORM_VALUES: TaskFormValues = {
 type UnifiedTransactionClient = AppUnifiedTransaction; // AppUnifiedTransaction olarak güncellendi
 
 export function CustomerDetailPageClient({ customer: initialCustomer, initialSales, initialPayments, user }: CustomerDetailPageClientProps) {
+  const { toast } = useToast();
   const [customer, setCustomer] = useState<Customer>(initialCustomer);
   const [sales, setSales] = useState<Sale[]>(initialSales);
   const [payments, setPayments] = useState<Payment[]>(initialPayments);
@@ -180,8 +166,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   const [taskFormValues, setTaskFormValues] = useState<TaskFormValues>(EMPTY_TASK_FORM_VALUES);
   const [editingTask, setEditingTask] = useState<CustomerTask | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<string | null>(null);
-
-  const { toast } = useToast();
 
   const [stockItemDisplayNames, setStockItemDisplayNames] = useState<Record<string, string>>({});
 
@@ -521,8 +505,60 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         return;
       }
 
-      const quantity = saleFormValues.quantity ? parseFloat(saleFormValues.quantity) : undefined;
-      const unitPrice = saleFormValues.unitPrice ? parseFloat(saleFormValues.unitPrice) : undefined;
+      let stockItemId: string | null = null;
+      let quantity: number | null = null;
+      let unitPrice: number | null = null;
+      let totalPrice: number | null = null;
+      let description = 'Satış';
+
+      // Validate stock item related fields if a stock item is selected
+      if (saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none') {
+        stockItemId = saleFormValues.stockItemId;
+        
+        if (!saleFormValues.quantity || !saleFormValues.unitPrice) {
+          toast({
+            title: "Hata",
+            description: "Stok ürünü seçildiğinde miktar ve birim fiyat zorunludur.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        quantity = parseFloat(saleFormValues.quantity);
+        unitPrice = parseFloat(saleFormValues.unitPrice);
+
+        if (isNaN(quantity) || quantity <= 0) {
+          toast({
+            title: "Hata",
+            description: "Lütfen geçerli bir miktar girin.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (isNaN(unitPrice) || unitPrice <= 0) {
+          toast({
+            title: "Hata",
+            description: "Lütfen geçerli bir birim fiyat girin.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Check if there's enough stock
+        const stockItem = await getStockItemById(user.uid, stockItemId);
+        if (!stockItem || stockItem.currentStock < quantity) {
+          toast({
+            title: "Hata",
+            description: "Yetersiz stok miktarı.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        totalPrice = quantity * unitPrice;
+        description = `${quantity} adet × ${unitPrice} ${saleFormValues.currency} (${stockItemDisplayNames[stockItemId] || ''})`;
+      }
 
       const saleData: Sale = {
         id: editingSale?.id || Math.random().toString(36).substr(2, 9),
@@ -530,44 +566,43 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         amount: amount,
         date: formatISO(saleFormValues.date),
         currency: saleFormValues.currency,
-        stockItemId: saleFormValues.stockItemId === 'none' ? undefined : saleFormValues.stockItemId,
-        quantity: quantity,
-        unitPrice: unitPrice,
-        totalPrice: quantity && unitPrice ? quantity * unitPrice : undefined,
+        stockItemId,
+        quantity,
+        unitPrice,
+        totalPrice,
         category: 'satis',
         tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         transactionType: 'sale',
-        description: saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none' ? 
-          `${quantity || ''} adet × ${unitPrice || ''} ${saleFormValues.currency} (${stockItemDisplayNames[saleFormValues.stockItemId] || ''})` : 
-          'Satış'
+        description
       };
 
       if (editingSale) {
-        const updatedSale = await storageUpdateSale(user.uid, saleData);
-        setSales(prev => prev.map(s => s.id === editingSale.id ? updatedSale : s));
-        toast({
-          title: "Başarılı",
-          description: "Satış başarıyla güncellendi.",
+        await storageUpdateSale(user.uid, saleData);
+        setSales(prev => prev.map(s => s.id === editingSale.id ? saleData : s));
+        toast({ 
+          title: "Satış Güncellendi", 
+          description: "Satış işlemi başarıyla güncellendi." 
         });
       } else {
-        const newSale = await addSale(user.uid, saleData);
-        setSales(prev => [...prev, newSale]);
-        toast({
-          title: "Başarılı",
-          description: "Yeni satış başarıyla eklendi.",
+        const addedSale = await addSale(user.uid, saleData);
+        setSales(prev => [...prev, addedSale]);
+        toast({ 
+          title: "Satış Eklendi", 
+          description: "Yeni satış işlemi başarıyla eklendi." 
         });
       }
 
       setShowSaleModal(false);
       setSaleFormValues(EMPTY_SALE_FORM_VALUES);
       setEditingSale(null);
+      await refreshCustomerData();
     } catch (error) {
-      console.error('Satış eklenirken hata:', error);
+      console.error("Satış kaydedilirken hata:", error);
       toast({
         title: "Hata",
-        description: "Satış eklenirken bir sorun oluştu.",
+        description: "Satış işlemi kaydedilirken bir sorun oluştu. Lütfen tekrar deneyin.",
         variant: "destructive",
       });
     }
@@ -802,48 +837,47 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
     }
   }, [user, deletingCustomer, toast]);
 
-  const handleContactHistoryFormSubmit = useCallback(async () => {
-    if (!user || !customer?.id) return;
+  const handleContactHistorySubmit = useCallback(async () => {
+    if (!user) {
+      toast({
+        title: "Hata",
+        description: "Kullanıcı oturumu bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      const itemToSave = {
-        ...contactHistoryFormValues,
+      const newContactHistoryItem: ContactHistoryItem = {
+        id: crypto.randomUUID(),
         date: formatISO(contactHistoryFormValues.date),
-        id: editingContactHistoryItem?.id || crypto.randomUUID(),
+        type: contactHistoryFormValues.type,
+        summary: contactHistoryFormValues.summary,
+        notes: contactHistoryFormValues.notes || undefined,
       };
 
-      let updatedContactHistory: ContactHistoryItem[];
+      const updatedCustomer = {
+        ...customer,
+        contactHistory: [...(customer.contactHistory || []), newContactHistoryItem],
+      };
 
-      if (editingContactHistoryItem) {
-        updatedContactHistory = (customer.contactHistory || []).map(item =>
-          item.id === editingContactHistoryItem.id ? (itemToSave as ContactHistoryItem) : item
-        );
-        toast({
-          title: "İletişim Güncellendi",
-          description: "İletişim geçmişi kaydı başarıyla güncellendi.",
-        });
-      } else {
-        updatedContactHistory = [...(customer.contactHistory || []), (itemToSave as ContactHistoryItem)];
-        toast({
-          title: "İletişim Eklendi",
-          description: "Yeni iletişim geçmişi kaydı başarıyla eklendi.",
-        });
-      }
-
-      const updatedCustomer: Customer = { ...customer, contactHistory: updatedContactHistory };
       await storageUpdateCustomer(user.uid, updatedCustomer);
       setCustomer(updatedCustomer);
       setShowContactHistoryModal(false);
-      setEditingContactHistoryItem(null);
       setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+      toast({
+        title: "Başarılı",
+        description: "İletişim geçmişi eklendi.",
+      });
     } catch (error) {
-      console.error("İletişim geçmişi kaydedilirken hata:", error);
+      console.error("Error adding contact history:", error);
       toast({
         title: "Hata",
-        description: "İletişim geçmişi kaydedilirken bir sorun oluştu.",
+        description: "İletişim geçmişi eklenirken bir hata oluştu.",
         variant: "destructive",
       });
     }
-  }, [user, customer, contactHistoryFormValues, editingContactHistoryItem, toast]);
+  }, [user, customer, contactHistoryFormValues, toast]);
 
   const handleOpenAddContactHistoryModal = useCallback(() => {
     setEditingContactHistoryItem(null);
@@ -1187,1106 +1221,131 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
     }
   };
 
+  const handleEditCustomerSubmit = useCallback(async (updatedCustomer: Customer) => {
+    if (!user) {
+      toast({
+        title: "Hata",
+        description: "Kullanıcı oturumu bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await storageUpdateCustomer(user.uid, updatedCustomer);
+      setCustomer(updatedCustomer);
+      setShowEditCustomerModal(false);
+      toast({
+        title: "Başarılı",
+        description: "Müşteri bilgileri güncellendi.",
+      });
+    } catch (error) {
+      console.error("Error updating customer:", error);
+      toast({
+        title: "Hata",
+        description: "Müşteri bilgileri güncellenirken bir hata oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, toast]);
+
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{customer.name} Detayları</h1>
-        <div className="flex items-center space-x-2">
-          <Button onClick={() => setShowEditCustomerModal(true)} variant="outline">
-            <Pencil className="mr-2 h-4 w-4" /> Düzenle
-          </Button>
-          <Button onClick={() => setDeletingCustomer(customer.id)} variant="destructive">
-            <Trash2 className="mr-2 h-4 w-4" /> Sil
-          </Button>
-          <Button asChild variant="outline">
-            <Link href={`/customers/${customer.id}/statement`} target="_blank">
-              <FileText className="mr-2 h-4 w-4" /> Ekstre Görüntüle
-            </Link>
-          </Button>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="text-center">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold">Toplam Satış</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-extrabold text-blue-600">{formatCurrency(totalSales, 'TRY')}</p>
-          </CardContent>
-        </Card>
-        <Card className="text-center">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold">Toplam Ödeme</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-extrabold text-green-600">{formatCurrency(totalPayments, 'TRY')}</p>
-          </CardContent>
-        </Card>
-        <Card className="text-center">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold">Bakiye</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-3xl font-extrabold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(balance, 'TRY')}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="transactions" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="transactions">İşlemler</TabsTrigger>
-          <TabsTrigger value="statistics">İstatistikler</TabsTrigger>
-          <TabsTrigger value="notes">Notlar</TabsTrigger>
-          <TabsTrigger value="contact">İletişim Geçmişi</TabsTrigger>
-          <TabsTrigger value="tasks">Görevler</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="transactions" className="space-y-4">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="container mx-auto py-6">
       <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Toplam Satış</CardTitle>
+        <CardHeader>
+          <CardTitle>{customer.name}</CardTitle>
         </CardHeader>
         <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(totalSales, 'TRY')}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Toplam Ödeme</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {formatCurrency(totalPayments, 'TRY')}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Bakiye</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={cn(
-                  "text-2xl font-bold",
-                  balance > 0 ? "text-red-600" : "text-green-600"
-                )}>
-                  {formatCurrency(balance, 'TRY')}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Transactions Summary */}
-          {recentTransactions.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Son İşlemler</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {recentTransactions.map((item) => (
-                    <div
-                      key={`${item.transactionType}-${item.id}`}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50"
-                    >
-                      <div className="flex items-center space-x-2">
-                        {item.transactionType === 'sale' ? (
-                          <ShoppingCart className="h-4 w-4 text-blue-500" />
-                        ) : (
-                          <DollarSign className="h-4 w-4 text-green-500" />
-                        )}
-                        <span className="text-sm">
-                          {safeFormatDate(item.date, 'dd MMM yyyy')}
-                        </span>
-                      </div>
-                      <span className={cn(
-                        "font-medium",
-                        item.transactionType === 'sale' ? "text-blue-600" : "text-green-600"
-                      )}>
-                        {formatCurrency(item.amount, item.currency)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">İşlemler</h2>
-            <div className="space-x-2">
-                      <Button
-                variant="outline"
-                onClick={() => setShowPrintView(true)}
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Yazdır
-                      </Button>
-              <Button
-                variant="outline"
-                onClick={() => exportToCSV(filteredAndSortedTransactions, customer.name)}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                CSV İndir
-              </Button>
-              <Button onClick={() => {
-                setEditingSale(null);
-                setSaleFormValues(EMPTY_SALE_FORM_VALUES);
-                setShowSaleModal(true);
-              }}>
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Satış Ekle
-              </Button>
-              <Button onClick={() => {
-                setEditingPayment(null);
-                setPaymentFormValues(EMPTY_PAYMENT_FORM_VALUES);
-                setShowPaymentModal(true);
-              }}>
-                <DollarSign className="h-4 w-4 mr-2" />
-                Ödeme Ekle
-              </Button>
-            </div>
-          </div>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {/* Search, Date Range, and Sort Controls */}
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="İşlem ara..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="max-w-sm"
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-[240px] justify-start text-left font-normal",
-                            !dateRange && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateRange?.from ? (
-                            dateRange.to ? (
-                              <>
-                                {format(dateRange.from, "dd.MM.yyyy")} -{" "}
-                                {format(dateRange.to, "dd.MM.yyyy")}
-                              </>
-                            ) : (
-                              format(dateRange.from, "dd.MM.yyyy")
-                            )
-                          ) : (
-                            <span>Tarih Aralığı Seç</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          initialFocus
-                          mode="range"
-                          defaultMonth={dateRange?.from}
-                          selected={dateRange}
-                          onSelect={setDateRange}
-                          numberOfMonths={2}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <Select
-                      value={sortOrder}
-                      onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)}
-                    >
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Sıralama" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="desc">En Yeni</SelectItem>
-                        <SelectItem value="asc">En Eski</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {paginatedTransactions.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {searchQuery || dateRange ? 'Arama kriterlerine uygun işlem bulunamadı.' : 'Henüz hiç işlem bulunmuyor.'}
-                  </div>
-                ) : (
-                  <>
-                    {paginatedTransactions.map((transaction) => (
-                      <Card key={transaction.id}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium">
-                            {transaction.transactionType === 'sale' ? 'Satış' : 'Ödeme'}
-                          </CardTitle>
-                          <div className="flex items-center space-x-2">
-                            <Select
-                              value={transaction.category}
-                              onValueChange={(value: TransactionCategory) => {
-                                if (transaction.transactionType === 'sale') {
-                                  setSales(prevSales =>
-                                    prevSales.map(sale =>
-                                      sale.id === transaction.id
-                                        ? { ...sale, category: value as 'satis' } // Kategori ataması düzeltildi ve cast eklendi
-                                        : sale
-                                    )
-                                  );
-                                } else if (transaction.transactionType === 'payment') { // else if eklendi
-                                  setPayments(prevPayments =>
-                                    prevPayments.map(payment =>
-                                      payment.id === transaction.id
-                                        ? { ...payment, category: value as 'odeme' } // Kategori ataması düzeltildi ve cast eklendi
-                                        : payment
-                                    )
-                                  );
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="w-[120px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {/* İşlem tipine göre kategori seçeneklerini filtrele */}
-                                {transaction.transactionType === 'sale' && (
-                                  <SelectItem key="satis" value="satis">Satış</SelectItem>
-                                )}
-                                {transaction.transactionType === 'payment' && (
-                                  <SelectItem key="odeme" value="odeme">Ödeme</SelectItem>
-                                )}
-                                {/* Diğer kategorilerin gösterilmesi gerekiyorsa buraya ekleyin */}
-                              </SelectContent>
-                            </Select>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                              onClick={() => {
-                                const tagName = prompt('Etiket adı:');
-                                if (tagName) {
-                                  handleAddTag(transaction.id, tagName);
-                                }
-                              }}
-                            >
-                              <PlusCircle className="h-4 w-4" />
-                      </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">
-                                {safeFormatDate(transaction.date, 'dd MMMM yyyy')}
-                              </span>
-                              <span className="text-sm font-medium">
-                                {formatCurrency(transaction.amount, transaction.currency)}
-                              </span>
-                            </div>
-                            {transaction.transactionType === 'sale' && transaction.stockItemId && (
-                              <div className="text-sm text-muted-foreground">
-                                {stockItemDisplayNames[transaction.stockItemId] || 'Bilinmeyen Ürün'} - {transaction.quantity} adet
-                              </div>
-                            )}
-                            {transaction.transactionType === 'payment' && (
-                              <div className="text-sm text-muted-foreground">
-                                {transaction.paymentMethod === 'nakit' && 'Nakit'}
-                                {transaction.paymentMethod === 'krediKarti' && 'Kredi Kartı'}
-                                {transaction.paymentMethod === 'havale' && 'Havale'}
-                                {transaction.paymentMethod === 'diger' && 'Diğer'}
-                                {transaction.referenceNumber && ` - ${transaction.referenceNumber}`}
-                              </div>
-                            )}
-                            {transaction.tags && transaction.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {transaction.tags.map((tag) => (
-                                  <Badge
-                                    key={tag.id}
-                                    variant="secondary"
-                                    className={tag.color}
-                                  >
-                                    {tag.name}
-                                    <button
-                                      className="ml-1 hover:text-destructive"
-                                      onClick={() => handleRemoveTag(transaction.id, tag.id)}
-                                    >
-                                      ×
-                                    </button>
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+          <Tabs defaultValue="sales">
+            <TabsList>
+              <TabsTrigger value="sales">Satışlar</TabsTrigger>
+              <TabsTrigger value="payments">Ödemeler</TabsTrigger>
+              <TabsTrigger value="contact-history">İletişim Geçmişi</TabsTrigger>
+            </TabsList>
+            <TabsContent value="sales">
+              <div className="flex justify-end mb-4">
+                <Button onClick={() => {
+                  setEditingSale(null);
+                  setSaleFormValues(EMPTY_SALE_FORM_VALUES);
+                  setShowSaleModal(true);
+                }}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Satış Ekle
+                </Button>
+              </div>
+              {/* Sales table */}
+            </TabsContent>
+            <TabsContent value="payments">
+              <div className="flex justify-end mb-4">
+                <Button onClick={() => {
+                  setEditingPayment(null);
+                  setPaymentFormValues(EMPTY_PAYMENT_FORM_VALUES);
+                  setShowPaymentModal(true);
+                }}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Ödeme Ekle
+                </Button>
+              </div>
+              {/* Payments table */}
+            </TabsContent>
+            <TabsContent value="contact-history">
+              <div className="flex justify-end mb-4">
+                <Button onClick={() => {
+                  setEditingContactHistoryItem(null);
+                  setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+                  setShowContactHistoryModal(true);
+                }}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  İletişim Ekle
+                </Button>
+              </div>
+              {/* Contact history table */}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
-                    ))}
 
-                    {/* Pagination Controls */}
-                    {totalPages > 1 && (
-                      <div className="flex justify-center items-center space-x-2 mt-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                          disabled={currentPage === 1}
-                        >
-                          Önceki
-                        </Button>
-                        <span className="text-sm">
-                          Sayfa {currentPage} / {totalPages}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                          disabled={currentPage === totalPages}
-                        >
-                          Sonraki
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+      <SaleModal
+        isOpen={showSaleModal}
+        onClose={() => setShowSaleModal(false)}
+        onSubmit={handleSaleSubmit}
+        formValues={saleFormValues}
+        setFormValues={setSaleFormValues}
+        availableStockItems={availableStockItems}
+        stockItemDisplayNames={stockItemDisplayNames}
+      />
 
-        <TabsContent value="statistics" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Aylık İşlem Grafiği */}
-      <Card>
-              <CardHeader>
-                <CardTitle>Aylık İşlemler</CardTitle>
-                <CardDescription>
-                  {dateRange?.from && dateRange?.to
-                    ? `${safeFormatDate(dateRange.from.toISOString(), 'dd.MM.yyyy')} - ${safeFormatDate(dateRange.to.toISOString(), 'dd.MM.yyyy')}`
-                    : 'Son 6 Ay'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyStats}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip
-                        formatter={(value: number) => formatCurrency(value, 'TRY')}
-                        labelFormatter={(label) => `${label}`}
-                      />
-                      <Bar dataKey="satışlar" fill="#3b82f6" name="Satışlar" />
-                      <Bar dataKey="ödemeler" fill="#22c55e" name="Ödemeler" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSubmit={handlePaymentSubmit}
+        formValues={paymentFormValues}
+        setFormValues={setPaymentFormValues}
+      />
 
-            {/* İşlem Dağılımı */}
-            <Card>
-              <CardHeader>
-                <CardTitle>İşlem Dağılımı</CardTitle>
-                <CardDescription>Toplam {filteredAndSortedTransactions.length} işlem</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {transactionTypeDistribution.map((item) => (
-                    <div key={item.name} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">{item.name}</span>
-                        <span className="text-sm text-muted-foreground">
-                          {item.value} işlem ({item.percentage.toFixed(1)}%)
-                        </span>
-                      </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={cn(
-                            "h-full rounded-full",
-                            item.name === 'Satışlar' ? "bg-blue-500" : "bg-green-500"
-                          )}
-                          style={{ width: `${item.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+      <EditCustomerModal
+        isOpen={showEditCustomerModal}
+        onClose={() => setShowEditCustomerModal(false)}
+        onSubmit={handleEditCustomerSubmit}
+        customer={customer}
+        setCustomer={setCustomer}
+      />
 
-            {/* Ortalama İşlem Tutarları */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Ortalama İşlem Tutarları</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Ortalama Satış Tutarı</span>
-                    <span className="text-sm font-bold text-blue-600">
-                      {formatCurrency(
-                        sales.length > 0
-                          ? sales.reduce((sum, sale) => sum + sale.amount, 0) / sales.length
-                          : 0,
-                        'TRY'
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Ortalama Ödeme Tutarı</span>
-                    <span className="text-sm font-bold text-green-600">
-                      {formatCurrency(
-                        payments.length > 0
-                          ? payments.reduce((sum, payment) => sum + payment.amount, 0) / payments.length
-                          : 0,
-                        'TRY'
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      <DeleteConfirmationModal
+        isOpen={!!deletingCustomer}
+        onClose={() => setDeletingCustomer(null)}
+        onConfirm={handleDeleteCustomer}
+        title="Müşteriyi Sil"
+        description="Bu müşteriyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+      />
 
-            {/* İşlem Sıklığı */}
-            <Card>
-              <CardHeader>
-                <CardTitle>İşlem Sıklığı</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Aylık Ortalama İşlem</span>
-                    <span className="text-sm font-bold">
-                      {monthlyStats.length > 0
-                        ? (filteredAndSortedTransactions.length / monthlyStats.length).toFixed(1)
-                        : 0}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Son İşlem Tarihi</span>
-                    <span className="text-sm text-muted-foreground">
-                      {filteredAndSortedTransactions.length > 0
-                        ? safeFormatDate(filteredAndSortedTransactions[0].date, 'dd MMMM yyyy')
-                        : '-'}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="notes" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Müşteri Notları</CardTitle>
-              <CardDescription>
-                Müşteri ile ilgili önemli notları buraya ekleyebilirsiniz.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="border rounded-lg">
-                  <div className="border-b p-2 flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => editor?.chain().focus().toggleBold().run()}
-                      className={editor?.isActive('bold') ? 'bg-muted' : ''}
-                    >
-                      <Bold className="h-4 w-4" />
-          </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => editor?.chain().focus().toggleItalic().run()}
-                      className={editor?.isActive('italic') ? 'bg-muted' : ''}
-                    >
-                      <Italic className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => editor?.chain().focus().toggleUnderline().run()}
-                      className={editor?.isActive('underline') ? 'bg-muted' : ''}
-                    >
-                      <UnderlineIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => editor?.chain().focus().toggleStrike().run()}
-                      className={editor?.isActive('strike') ? 'bg-muted' : ''}
-                    >
-                      <Strikethrough className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => editor?.chain().focus().toggleBulletList().run()}
-                      className={editor?.isActive('bulletList') ? 'bg-muted' : ''}
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-                      className={editor?.isActive('orderedList') ? 'bg-muted' : ''}
-                    >
-                      <ListOrdered className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="p-4 min-h-[200px] prose prose-sm max-w-none">
-                    <EditorContent editor={editor} />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="contact" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>İletişim Geçmişi</CardTitle>
-              <CardDescription>Müşteriyle yapılan tüm iletişimleri takip edin.</CardDescription>
-        </CardHeader>
-        <CardContent>
-              <div className="rounded-md border mb-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tarih</TableHead>
-                      <TableHead>Tip</TableHead>
-                      <TableHead>Özet</TableHead>
-                      <TableHead>Notlar</TableHead>
-                      <TableHead className="text-right">İşlemler</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                    {customer.contactHistory && customer.contactHistory.length > 0 ? (
-                      customer.contactHistory.sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()).map(item => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{safeFormatDate(item.date, 'dd.MM.yyyy HH:mm')}</TableCell>
-                          <TableCell className="capitalize">{item.type}</TableCell>
-                          <TableCell>{item.summary}</TableCell>
-                          <TableCell>{item.notes || '-'}</TableCell>
-                    <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleOpenEditContactHistoryModal(item)}>
-                                <Pencil className="h-4 w-4" />
-                      </Button>
-                              <Button variant="destructive" size="sm" onClick={() => handleDeleteContactHistoryItem(item.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                            </div>
-                    </TableCell>
-                  </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                          Henüz iletişim geçmişi kaydı bulunmamaktadır.
-                        </TableCell>
-                      </TableRow>
-                    )}
-              </TableBody>
-            </Table>
-              </div>
-              <Button onClick={handleOpenAddContactHistoryModal}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Yeni İletişim Ekle
-              </Button>
-        </CardContent>
-      </Card>
-        </TabsContent>
-
-        <TabsContent value="tasks" className="space-y-4">
-      <Card>
-            <CardHeader>
-              <CardTitle>Görevler</CardTitle>
-              <CardDescription>Bu müşteriyle ilgili yapılacak görevleri yönetin.</CardDescription>
-        </CardHeader>
-        <CardContent>
-              <div className="rounded-md border mb-4">
-                <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Açıklama</TableHead>
-                      <TableHead>Son Tarih</TableHead>
-                      <TableHead>Durum</TableHead>
-                      <TableHead>Oluşturulma Tarihi</TableHead>
-                      <TableHead className="text-right">İşlemler</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                    {customer.tasks && customer.tasks.length > 0 ? (
-                      customer.tasks.sort((a, b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime()).map(task => (
-                        <TableRow key={task.id}>
-                          <TableCell className="font-medium">{task.description}</TableCell>
-                          <TableCell>{task.dueDate ? safeFormatDate(task.dueDate, 'dd.MM.yyyy') : '-'}</TableCell>
-                          <TableCell className="capitalize">{task.status === 'pending' ? 'Beklemede' : task.status === 'completed' ? 'Tamamlandı' : 'Devam Ediyor'}</TableCell>
-                          <TableCell>{safeFormatDate(task.createdAt, 'dd.MM.yyyy HH:mm')}</TableCell>
-                    <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleOpenEditTaskModal(task)}>
-                                <Pencil className="h-4 w-4" />
-                          </Button>
-                              <Button variant="destructive" size="sm" onClick={() => handleDeleteTask(task.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                          Henüz görev kaydı bulunmamaktadır.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              <Button onClick={handleOpenAddTaskModal}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Yeni Görev Ekle
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* İletişim Geçmişi Ekle/Düzenle Modalı */}
-      <Dialog open={showContactHistoryModal} onOpenChange={setShowContactHistoryModal}>
-        <DialogContent className="sm:max-w-[425px]">
-                          <DialogHeader>
-            <DialogTitle>{editingContactHistoryItem ? "İletişim Geçmişini Düzenle" : "Yeni İletişim Ekle"}</DialogTitle>
-            <DialogDescription>
-              {editingContactHistoryItem ? "Mevcut iletişim kaydını düzenleyin." : "Müşteriyle yeni bir iletişim kaydı oluşturun."}
-            </DialogDescription>
-                          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="contactDate" className="text-right">Tarih</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                          <Button
-                    variant={"outline"}
-                    className={cn(
-                      "col-span-3 justify-start text-left font-normal",
-                      !contactHistoryFormValues.date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {contactHistoryFormValues.date ? format(contactHistoryFormValues.date, "PPP", { locale: tr }) : <span>Tarih Seç</span>}
-                          </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={contactHistoryFormValues.date}
-                    onSelect={(date) => date && setContactHistoryFormValues(prev => ({ ...prev, date }))}
-                    initialFocus
-                    locale={tr}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="contactType" className="text-right">Tip</Label>
-              <Select
-                value={contactHistoryFormValues.type}
-                onValueChange={(value: 'phone' | 'email' | 'meeting' | 'other') => setContactHistoryFormValues(prev => ({ ...prev, type: value }))}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="İletişim Tipi Seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="phone">Telefon</SelectItem>
-                  <SelectItem value="email">E-posta</SelectItem>
-                  <SelectItem value="meeting">Toplantı</SelectItem>
-                  <SelectItem value="other">Diğer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="contactSummary" className="text-right">Özet</Label>
-              <Input
-                id="contactSummary"
-                value={contactHistoryFormValues.summary}
-                onChange={(e) => setContactHistoryFormValues(prev => ({ ...prev, summary: e.target.value }))}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="contactNotes" className="text-right">Notlar</Label>
-              <Textarea
-                id="contactNotes"
-                value={contactHistoryFormValues.notes}
-                onChange={(e) => setContactHistoryFormValues(prev => ({ ...prev, notes: e.target.value }))}
-                className="col-span-3"
-                rows={4}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">İptal</Button>
-            </DialogClose>
-            <Button onClick={handleContactHistoryFormSubmit}>Kaydet</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Görev Ekle/Düzenle Modalı */}
-      <Dialog open={showTaskModal} onOpenChange={setShowTaskModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingTask ? "Görevi Düzenle" : "Yeni Görev Ekle"}</DialogTitle>
-            <DialogDescription>
-              {editingTask ? "Mevcut görevi düzenleyin." : "Yeni bir görev kaydı oluşturun."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="taskDescription" className="text-right">Açıklama</Label>
-              <Input
-                id="taskDescription"
-                value={taskFormValues.description}
-                onChange={(e) => setTaskFormValues(prev => ({ ...prev, description: e.target.value }))}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="taskDueDate" className="text-right">Son Tarih</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                          <Button
-                    variant={"outline"}
-                    className={cn(
-                      "col-span-3 justify-start text-left font-normal",
-                      !taskFormValues.dueDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {taskFormValues.dueDate ? format(taskFormValues.dueDate, "PPP", { locale: tr }) : <span>Tarih Seç</span>}
-                          </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={taskFormValues.dueDate}
-                    onSelect={(date) => setTaskFormValues(prev => ({ ...prev, dueDate: date || undefined }))}
-                    initialFocus
-                    locale={tr}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="taskStatus" className="text-right">Durum</Label>
-              <Select
-                value={taskFormValues.status}
-                onValueChange={(value: 'pending' | 'completed' | 'in-progress') => setTaskFormValues(prev => ({ ...prev, status: value }))}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Durum Seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Beklemede</SelectItem>
-                  <SelectItem value="in-progress">Devam Ediyor</SelectItem>
-                  <SelectItem value="completed">Tamamlandı</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">İptal</Button>
-            </DialogClose>
-            <Button onClick={handleTaskFormSubmit}>Kaydet</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Satış Ekle/Düzenle Modalı */}
-      <Dialog open={showSaleModal} onOpenChange={setShowSaleModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingSale ? "Satışı Düzenle" : "Satış Ekle"}</DialogTitle>
-            <DialogDescription>
-              {editingSale ? "Mevcut satış bilgilerini düzenleyin." : "Yeni bir satış kaydı oluşturun."}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSaleSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="saleAmount" className="text-right">Tutar</Label>
-                <Input
-                  id="saleAmount"
-                  type="number"
-                  value={saleFormValues.amount}
-                  onChange={(e) => setSaleFormValues(prev => ({ ...prev, amount: e.target.value }))}
-                  className="col-span-3"
-                  required
-                  step="0.01"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="saleCurrency" className="text-right">Para Birimi</Label>
-                <Select
-                  value={saleFormValues.currency}
-                  onValueChange={(value: Currency) => setSaleFormValues(prev => ({ ...prev, currency: value }))}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Para Birimi Seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TRY">TRY</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="saleDate" className="text-right">Tarih</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="saleDate"
-                      variant={"outline"}
-                      className={cn("w-full justify-start text-left font-normal", !isValid(saleFormValues.date) && "text-muted-foreground")}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {isValid(saleFormValues.date) ? format(saleFormValues.date, "PPP", {locale: tr}) : <span>Tarih seçin</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={saleFormValues.date}
-                      onSelect={(date) => setSaleFormValues(prev => ({ ...prev, date: date || new Date() }))}
-                      initialFocus
-                      locale={tr}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="stockItem" className="text-right">Stok Kalemi</Label>
-                <Select
-                  value={saleFormValues.stockItemId || 'none'}
-                  onValueChange={(value: string) => setSaleFormValues(prev => ({ ...prev, stockItemId: value === 'none' ? undefined : value }))}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Stok Kalemi Seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Manuel Giriş</SelectItem>
-                    {availableStockItems.map(item => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.unit})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none' && (
-                <>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="quantity" className="text-right">Miktar</Label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      value={saleFormValues.quantity}
-                      onChange={(e) => setSaleFormValues(prev => ({ ...prev, quantity: e.target.value }))}
-                      className="col-span-3"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="unitPrice" className="text-right">Birim Fiyat</Label>
-                    <Input
-                      id="unitPrice"
-                      type="number"
-                      value={saleFormValues.unitPrice}
-                      onChange={(e) => setSaleFormValues(prev => ({ ...prev, unitPrice: e.target.value }))}
-                      className="col-span-3"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">İptal</Button>
-              </DialogClose>
-              <Button type="submit">{editingSale ? "Kaydet" : "Ekle"}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Ödeme Ekle/Düzenle Modalı */}
-      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingPayment ? "Ödemeyi Düzenle" : "Ödeme Ekle"}</DialogTitle>
-            <DialogDescription>
-              {editingPayment ? "Mevcut ödeme bilgilerini düzenleyin." : "Yeni bir ödeme kaydı oluşturun."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="paymentAmount" className="text-right">Tutar</Label>
-              <Input
-                id="paymentAmount"
-                type="number"
-                value={paymentFormValues.amount}
-                onChange={(e) => setPaymentFormValues(prev => ({ ...prev, amount: e.target.value }))}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="paymentCurrency" className="text-right">Para Birimi</Label>
-              <Select
-                value={paymentFormValues.currency}
-                onValueChange={(value: Currency) => setPaymentFormValues(prev => ({ ...prev, currency: value }))}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Para Birimi Seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TRY">TRY</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="paymentDate" className="text-right">Tarih</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "col-span-3 justify-start text-left font-normal",
-                      !paymentFormValues.date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {paymentFormValues.date ? format(paymentFormValues.date, "PPP", { locale: tr }) : <span>Tarih Seç</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={paymentFormValues.date}
-                    onSelect={(date) => date && setPaymentFormValues(prev => ({ ...prev, date }))}
-                    initialFocus
-                    locale={tr}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="paymentMethod" className="text-right">Ödeme Yöntemi</Label>
-              <Select
-                value={paymentFormValues.method}
-                onValueChange={(value: 'nakit' | 'krediKarti' | 'havale' | 'diger') => setPaymentFormValues(prev => ({ ...prev, method: value }))}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Ödeme Yöntemi Seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nakit">Nakit</SelectItem>
-                  <SelectItem value="krediKarti">Kredi Kartı</SelectItem>
-                  <SelectItem value="havale">Havale</SelectItem>
-                  <SelectItem value="diger">Diğer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">İptal</Button>
-            </DialogClose>
-            <Button onClick={handlePaymentSubmit}>Kaydet</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Müşteri Düzenleme Modalı */}
-      <Dialog open={showEditCustomerModal} onOpenChange={setShowEditCustomerModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Müşteriyi Düzenle</DialogTitle>
-            <DialogDescription>
-              Müşteri bilgilerini burada düzenleyin.
-            </DialogDescription>
-          </DialogHeader>
-          <CustomerForm
-            initialData={customer}
-            onSubmit={handleCustomerUpdate}
-            onCancel={() => setShowEditCustomerModal(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Satış Silme Onay Modalı */}
-      <AlertDialog open={!!deletingSaleId} onOpenChange={(open) => !open && setDeletingSaleId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Satışı Sil?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu satış kaydını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteSale}>Sil</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Ödeme Silme Onay Modalı */}
-      <AlertDialog open={!!deletingPaymentId} onOpenChange={(open) => !open && setDeletingPaymentId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Ödemeyi Sil?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu ödeme kaydını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePayment}>Sil</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Müşteri Silme Onay Modalı */}
-      <AlertDialog open={!!deletingCustomer} onOpenChange={(open) => !open && setDeletingCustomer(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Müşteriyi Sil?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu müşteriyi ve tüm ilişkili verilerini (satışlar, ödemeler, notlar, iletişim geçmişi, görevler) silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteCustomer}>Sil</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ContactHistoryModal
+        isOpen={showContactHistoryModal}
+        onClose={() => setShowContactHistoryModal(false)}
+        onSubmit={handleContactHistorySubmit}
+        formValues={contactHistoryFormValues}
+        setFormValues={setContactHistoryFormValues}
+      />
     </div>
   );
 }
