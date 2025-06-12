@@ -122,7 +122,7 @@ const EMPTY_SALE_FORM_VALUES: SaleFormValues = {
   amount: '',
   date: new Date(),
   currency: 'TRY',
-  stockItemId: undefined,
+  stockItemId: 'none', // undefined yerine 'none' olarak ayarlandı
   quantitySold: '',
   unitPrice: '',
 };
@@ -533,9 +533,9 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         amount,
         date: formatISO(saleFormValues.date),
         currency: saleFormValues.currency,
-        stockItemId: saleFormValues.stockItemId === 'none' ? undefined : saleFormValues.stockItemId,
-        quantitySold: quantity || undefined,
-        unitPrice: unitPrice || undefined,
+        stockItemId: saleFormValues.stockItemId === 'none' ? null : (saleFormValues.stockItemId || null), // Eğer boşsa null olarak ayarla
+        quantitySold: quantity > 0 ? quantity : null, // Eğer 0 veya NaN ise null olarak ayarla
+        unitPrice: unitPrice > 0 ? unitPrice : null, // Eğer 0 veya NaN ise null olarak ayarla
         transactionType: 'sale' as const
       };
 
