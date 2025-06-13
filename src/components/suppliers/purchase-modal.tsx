@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,8 +37,13 @@ export function PurchaseModal({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Alış Ekle</DialogTitle>
+          <DialogDescription>Yeni bir alış işlemi ekleyin veya mevcut bir alışı düzenleyin.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          console.log("Purchase form submitted!");
+          onSubmit(e);
+        }} className="space-y-4">
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="amount">Tutar</Label>
@@ -150,7 +155,7 @@ export function PurchaseModal({
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button type="submit">Kaydet</Button>
+            <Button type="submit" onClick={() => console.log("Kaydet button clicked (Purchase Modal)!")}>Kaydet</Button>
           </div>
         </form>
       </DialogContent>

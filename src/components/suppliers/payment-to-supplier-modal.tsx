@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,8 +32,13 @@ export function PaymentToSupplierModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Ödeme Ekle</DialogTitle>
+          <DialogDescription>Yeni bir ödeme işlemi ekleyin veya mevcut bir ödemeyi düzenleyin.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          console.log("Payment to Supplier form submitted!");
+          onSubmit(e);
+        }} className="space-y-4">
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="amount">Tutar</Label>
@@ -117,7 +122,9 @@ export function PaymentToSupplierModal({
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button type="submit">Kaydet</Button>
+            <Button type="submit" onClick={() => console.log("Kaydet button clicked (Payment to Supplier Modal)!")}>
+              Kaydet
+            </Button>
           </div>
         </form>
       </DialogContent>
