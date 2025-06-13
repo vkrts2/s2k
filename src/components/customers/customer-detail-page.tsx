@@ -427,8 +427,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         return;
       }
 
-      const sale: Sale = {
-        id: editingSale?.id || crypto.randomUUID(),
+      // For new sales, Firestore generates the ID. For existing sales, we use the existing ID.
+      const saleToSave: Omit<Sale, 'id' | 'transactionType'> = {
         customerId: customer.id,
         amount,
         date: formatISO(values.date),
@@ -439,21 +439,27 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         unitPrice: values.unitPrice ? parseFloat(values.unitPrice) : undefined,
         category: 'satis',
         tags: [],
-        transactionType: 'sale',
-        createdAt: editingSale?.createdAt || formatISO(new Date()),
-        updatedAt: formatISO(new Date()),
       };
 
       if (editingSale) {
-        await storageUpdateSale(user.uid, sale);
-        setSales(sales.map(s => s.id === sale.id ? sale : s));
+        // Existing sale: prepare the full Sale object for update
+        const updatedSale: Sale = {
+          ...saleToSave,
+          id: editingSale.id, // Preserve the original ID
+          transactionType: 'sale',
+          createdAt: editingSale.createdAt, // Preserve original creation date
+          updatedAt: formatISO(new Date()), // Update last updated date
+        };
+        await storageUpdateSale(user.uid, updatedSale);
+        setSales(sales.map(s => s.id === updatedSale.id ? updatedSale : s));
         toast({
           title: "Satış güncellendi",
           description: "Satış başarıyla güncellendi.",
         });
       } else {
-        await addSale(user.uid, sale);
-        setSales([...sales, sale]);
+        // New sale: Firestore will assign an ID. Use the returned object.
+        const newSale = await addSale(user.uid, saleToSave);
+        setSales(prevSales => [...prevSales, newSale]);
         toast({
           title: "Satış eklendi",
           description: "Yeni satış başarıyla eklendi.",
@@ -468,51 +474,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
       toast({
         title: "Hata",
         description: "Satış kaydedilirken bir hata oluştu.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleAddSale = async (values: SaleFormValues) => {
-    try {
-      const now = new Date().toISOString();
-
-      const saleToSave: Omit<Sale, 'id' | 'transactionType'> = {
-        customerId: customer.id,
-        amount: parseFloat(values.amount),
-        date: formatISO(values.date, { representation: 'date' }),
-        currency: values.currency,
-        ...(values.stockItemId && { stockItemId: values.stockItemId }),
-        ...(values.description && { description: values.description }),
-        category: 'satis',
-        tags: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      if (editingSale) {
-        await storageUpdateSale(user!.uid, { ...saleToSave, id: editingSale.id, transactionType: 'sale' });
-        setSales(sales.map(s => s.id === editingSale.id ? { ...saleToSave, id: editingSale.id, transactionType: 'sale' } as Sale : s));
-        toast({
-          title: "Satış Güncellendi",
-          description: "Satış başarıyla güncellendi.",
-        });
-      } else {
-        const newSale = await addSale(user!.uid, saleToSave);
-        setSales(prev => [...prev, newSale]);
-        toast({
-          title: "Satış Eklendi",
-          description: "Satış başarıyla eklendi.",
-        });
-      }
-      setShowSaleModal(false);
-      setEditingSale(null);
-      setSaleFormValues(EMPTY_SALE_FORM_VALUES);
-    } catch (error) {
-      console.error("Satış eklenirken/güncellenirken hata oluştu:", error);
-      toast({
-        title: "Hata",
-        description: `Satış işlemi sırasında bir hata oluştu: ${error instanceof Error ? error.message : String(error)}`,
         variant: "destructive",
       });
     }
@@ -1134,10 +1095,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           <Button variant="outline" onClick={() => window.open(`/customers/${customer.id}/extract`, '_blank')}>
             <Receipt className="h-4 w-4 mr-2" />
             Ekstre Görüntüle
-          </Button>
-          <Button variant="outline" onClick={() => setShowPrintView(true)}>
-            <Printer className="h-4 w-4 mr-2" />
-            Yazdır
           </Button>
           <Button variant="outline" onClick={() => setShowEditCustomerModal(true)}>
             <Edit3 className="h-4 w-4 mr-2" />

@@ -188,7 +188,7 @@ export default function CustomerExtractPage() {
                   <TableHead className="text-right">Tutar</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="customer-extract-table">
                 {[...sales, ...payments]
                   .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                   .map((transaction) => (

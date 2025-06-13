@@ -251,3 +251,8 @@ body {
     break-before: avoid-column;
   }
 }
+
+.customer-extract-table td {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}

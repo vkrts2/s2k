@@ -227,7 +227,7 @@ export const getSales = async (uid: string, customerId?: string): Promise<Sale[]
   }
 };
 
-export const addSale = async (uid: string, saleData: Omit<Sale, 'id' | 'transactionType'>): Promise<Sale> => {
+export const addSale = async (uid: string, saleData: Omit<Sale, 'id' | 'transactionType' | 'createdAt' | 'updatedAt'>): Promise<Sale> => {
   let description = saleData.description;
   if (saleData.stockItemId && !description) {
     const stockItem = await getStockItemById(uid, saleData.stockItemId); // uid eklendi ve await
