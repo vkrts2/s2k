@@ -30,6 +30,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { SupplierList } from "@/components/suppliers/supplier-list";
@@ -44,17 +45,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import Link from "next/link";
+import { format, parseISO } from 'date-fns';
 
-interface Supplier {
-  id: string;
-  name: string;
-  contactPerson?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  createdAt: string;
-  updatedAt?: string;
-}
+// Force re-evaluation
 
 const supplierFormSchema = z.object({
   name: z.string().min(2, { message: "Tedarikçi adı en az 2 karakter olmalıdır." }),
@@ -89,6 +82,25 @@ export default function SuppliersPage() {
       address: '',
     },
   });
+
+  const formatCurrency = (amount: number, currency: string = 'TRY') => {
+    return new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  const calculateSupplierBalance = useCallback((supplierId: string) => {
+    const supplierPurchases = allPurchases.filter(p => p.supplierId === supplierId);
+    const supplierPayments = allPaymentsToSuppliers.filter(p => p.supplierId === supplierId);
+
+    const totalPurchases = supplierPurchases.reduce((sum, p) => sum + p.amount, 0);
+    const totalPayments = supplierPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    return totalPurchases - totalPayments;
+  }, [allPurchases, allPaymentsToSuppliers]);
 
   const loadData = useCallback(async () => {
     if (!user) {
@@ -179,10 +191,7 @@ export default function SuppliersPage() {
   };
 
   const filteredSuppliers = suppliers.filter(supplier => 
-    supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (supplier.contactPerson && supplier.contactPerson.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (supplier.email && supplier.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (supplier.phone && supplier.phone.includes(searchQuery))
+    supplier.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (authLoading || isLoading) {
@@ -222,45 +231,7 @@ export default function SuppliersPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="contactPerson"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Yetkili Kişi</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Yetkili kişinin adı" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>E-posta</FormLabel>
-                      <FormControl>
-                        <Input placeholder="eposta@tedarikci.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Telefon</FormLabel>
-                      <FormControl>
-                        <Input placeholder="5xx xxx xx xx" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Yetkili Kişi, E-posta ve Telefon alanları kaldırıldı */}
                 <FormField
                   control={form.control}
                   name="address"
@@ -275,7 +246,9 @@ export default function SuppliersPage() {
                   )}
                 />
                 <DialogFooter>
-                  <Button type="submit">{editingSupplier ? 'Kaydet' : 'Ekle'}</Button>
+                  <Button type="submit" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
+                  </Button>
                 </DialogFooter>
               </form>
             </Form>
@@ -289,78 +262,89 @@ export default function SuppliersPage() {
           <CardDescription>Tüm tedarikçilerinizi buradan yönetin.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center space-x-2 mb-4">
-            <Label htmlFor="search" className="sr-only">Ara</Label>
-            <Input
-              id="search"
-              type="text"
-              placeholder="Tedarikçi ara..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
-            />
-            <Button variant="outline"><Search className="h-4 w-4" /></Button>
+          <div className="flex items-center py-4">
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-2 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Tedarikçi ara..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="pl-8"
+              />
+            </div>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Adı</TableHead>
-                <TableHead>Yetkili Kişi</TableHead>
-                <TableHead>E-posta</TableHead>
-                <TableHead>Telefon</TableHead>
-                <TableHead>Adres</TableHead>
-                <TableHead>Oluşturulma Tarihi</TableHead>
-                <TableHead>İşlemler</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSuppliers.map((supplier) => (
-                <TableRow key={supplier.id}>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/suppliers/${supplier.id}`}
-                      className="text-primary underline hover:text-primary/80 transition-colors"
-                    >
-                      {supplier.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{supplier.contactPerson || '-'}</TableCell>
-                  <TableCell>{supplier.email || '-'}</TableCell>
-                  <TableCell>{supplier.phone || '-'}</TableCell>
-                  <TableCell>{supplier.address || '-'}</TableCell>
-                  <TableCell>{new Date(supplier.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <Button variant="outline" size="sm" onClick={() => openEditSupplierModal(supplier)}><Edit className="h-4 w-4" /></Button>
-                    <Button variant="destructive" size="sm" className="ml-2" onClick={() => openDeleteConfirmDialog(supplier.id)}><Trash className="h-4 w-4" /></Button>
-                  </TableCell>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Adı</TableHead>
+                  {/* Yetkili Kişi, E-posta, Telefon kaldırıldı */}
+                  <TableHead>Adres</TableHead>
+                  <TableHead>Oluşturulma Tarihi</TableHead>
+                  <TableHead className="text-right">Bakiye</TableHead>
+                  <TableHead className="text-right">İşlemler</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {filteredSuppliers.length === 0 && (
-            <p className="text-center text-muted-foreground mt-4">Hiç tedarikçi bulunamadı.</p>
-          )}
+              </TableHeader>
+              <TableBody>
+                {filteredSuppliers.length ? (
+                  filteredSuppliers.map((supplier) => (
+                    <TableRow key={supplier.id}>
+                      <TableCell>
+                        <Link href={`/suppliers/${supplier.id}`} className="font-medium">
+                          {supplier.name}
+                        </Link>
+                      </TableCell>
+                      {/* Yetkili Kişi, E-posta, Telefon kaldırıldı */}
+                      <TableCell>{supplier.address || '-'}</TableCell>
+                      <TableCell>{format(parseISO(supplier.createdAt), 'dd.MM.yyyy')}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(calculateSupplierBalance(supplier.id), supplier.defaultCurrency || 'TRY')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => openEditSupplierModal(supplier)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog open={deletingSupplierId === supplier.id} onOpenChange={() => setDeletingSupplierId(null)}>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" onClick={() => openDeleteConfirmDialog(supplier.id)}>
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Tedarikçiyi Sil</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Bu tedarikçiyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve tüm ilişkili alım/ödeme kayıtlarını da silecektir.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>İptal</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={handleDelete}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Sil
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center">
+                      Tedarikçi bulunamadı.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
-
-      <AlertDialog open={!!deletingSupplierId} onOpenChange={(isOpen) => {
-        if(!isOpen) setDeletingSupplierId(null);
-      }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Emin misiniz?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu işlem geri alınamaz. Bu, tedarikçiyi ve bu tedarikçiye ait tüm alım ve ödeme kayıtlarını kalıcı olarak silecektir.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeletingSupplierId(null)}>İptal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-              Sil
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

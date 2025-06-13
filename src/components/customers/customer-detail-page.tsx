@@ -732,6 +732,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         type: contactHistoryFormValues.type,
         summary: contactHistoryFormValues.summary,
         notes: contactHistoryFormValues.notes || undefined,
+        createdAt: formatISO(new Date()),
+        updatedAt: formatISO(new Date()),
       };
 
       const updatedCustomer = {

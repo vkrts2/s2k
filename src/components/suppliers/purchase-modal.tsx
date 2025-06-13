@@ -92,6 +92,15 @@ export function PurchaseModal({
               </Select>
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="description">Açıklama</Label>
+              <Input
+                id="description"
+                value={formValues.description}
+                onChange={(e) => setFormValues({ ...formValues, description: e.target.value })}
+                placeholder="Açıklama (isteğe bağlı)"
+              />
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="stockItem">Stok Ürünü</Label>
               <Select
                 value={formValues.stockItemId}

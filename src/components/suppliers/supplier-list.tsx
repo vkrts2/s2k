@@ -11,10 +11,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Truck, Edit, Trash2 } from "lucide-react";
+import { Truck, Edit, Trash2, Search } from "lucide-react";
 import type { Supplier, Purchase, PaymentToSupplier, Currency } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 
 interface SupplierListProps {
@@ -27,23 +28,13 @@ interface SupplierListProps {
   title?: string;
 }
 
-const formatCurrency = (amount: number, currency: Currency) => {
-  if (typeof amount !== 'number' || isNaN(amount)) {
-    amount = 0;
-  }
-  try {
-    return amount.toLocaleString("tr-TR", {
-      style: "currency",
-      currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  } catch (error) {
-    console.error("Error formatting currency:", error, {amount, currency});
-    if (currency === 'TRY') return `₺${amount.toFixed(2)}`;
-    if (currency === 'USD') return `$${amount.toFixed(2)}`;
-    return `${amount.toFixed(2)} ${currency}`;
-  }
+const formatCurrency = (amount: number, currency: Currency = 'TRY') => {
+  return new Intl.NumberFormat('tr-TR', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 };
 
 export function SupplierList({
@@ -53,9 +44,45 @@ export function SupplierList({
   isLoading,
   onEdit,
   onDelete,
-  title = "Tüm Tedarikçiler",
+  title = "Tedarikçiler",
 }: SupplierListProps) {
   const router = useRouter();
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [sortField, setSortField] = React.useState<"name" | "balance">("name");
+  const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">("asc");
+
+  const calculateBalancesForSupplier = (supplierId: string): Record<Currency, number> => {
+    const supplierPurchases = allPurchases.filter(p => p.supplierId === supplierId);
+    const supplierPayments = allPaymentsToSuppliers.filter(p => p.supplierId === supplierId);
+    
+    const balances: Record<Currency, number> = { TRY: 0, USD: 0 };
+
+    supplierPurchases.forEach(purchase => {
+      balances[purchase.currency] = (balances[purchase.currency] || 0) + purchase.amount;
+    });
+    supplierPayments.forEach(payment => {
+      balances[payment.currency] = (balances[payment.currency] || 0) - payment.amount;
+    });
+    return balances;
+  };
+
+  const filteredAndSortedSuppliers = React.useMemo(() => {
+    let filtered = suppliers.filter(supplier =>
+      supplier.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    return filtered.sort((a, b) => {
+      if (sortField === "name") {
+        return sortDirection === "asc"
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
+      } else {
+        const balanceA = calculateBalancesForSupplier(a.id)[a.defaultCurrency || 'TRY'];
+        const balanceB = calculateBalancesForSupplier(b.id)[b.defaultCurrency || 'TRY'];
+        return sortDirection === "asc" ? balanceA - balanceB : balanceB - balanceA;
+      }
+    });
+  }, [suppliers, searchQuery, sortField, sortDirection]);
 
   if (isLoading) {
     return (
@@ -85,77 +112,76 @@ export function SupplierList({
     );
   }
 
-  const calculateBalancesForSupplier = (supplierId: string): Record<Currency, number> => {
-    const supplierPurchases = allPurchases.filter(p => p.supplierId === supplierId);
-    const supplierPayments = allPaymentsToSuppliers.filter(p => p.supplierId === supplierId);
-    
-    const balances: Record<Currency, number> = { TRY: 0, USD: 0 };
-
-    // For suppliers, purchases increase what you owe them (positive balance from your perspective of debt)
-    // Payments to suppliers decrease what you owe them.
-    supplierPurchases.forEach(purchase => {
-      balances[purchase.currency] = (balances[purchase.currency] || 0) + purchase.amount;
-    });
-    supplierPayments.forEach(payment => {
-      balances[payment.currency] = (balances[payment.currency] || 0) - payment.amount;
-    });
-    return balances;
-  };
-
   return (
     <Card className="shadow-sm">
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>{title}</CardTitle>
+          <div className="relative w-64">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Tedarikçi ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Tedarikçi Adı</TableHead>
-              <TableHead className="text-right">Bakiye (TRY)</TableHead>
-              <TableHead className="text-right">Bakiye (USD)</TableHead>
-              <TableHead className="text-right w-[150px]">Eylemler</TableHead>
+              <TableHead 
+                className="cursor-pointer"
+                onClick={() => {
+                  if (sortField === "name") {
+                    setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                  } else {
+                    setSortField("name");
+                    setSortDirection("asc");
+                  }
+                }}
+              >
+                Tedarikçi Adı {sortField === "name" && (sortDirection === "asc" ? "↑" : "↓")}
+              </TableHead>
+              <TableHead 
+                className="text-right cursor-pointer"
+                onClick={() => {
+                  if (sortField === "balance") {
+                    setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                  } else {
+                    setSortField("balance");
+                    setSortDirection("asc");
+                  }
+                }}
+              >
+                Bakiye {sortField === "balance" && (sortDirection === "asc" ? "↑" : "↓")}
+              </TableHead>
+              <TableHead className="text-right w-[150px]">İşlemler</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {suppliers.map((supplier) => {
+            {filteredAndSortedSuppliers.map((supplier) => {
               const balances = calculateBalancesForSupplier(supplier.id);
-              // For suppliers, a positive balance means you owe them.
-              // A negative balance means you've overpaid or they owe you (less common in this simple model).
-              // We can keep the same color logic: red if you owe (positive), green if they owe you (negative).
-              // Or reverse it: green if you owe (it's a liability on your books), red if they owe you.
-              // Let's keep it consistent with customer: positive is green, negative is red.
-              // For a supplier, balance = (payments_to_them - purchases_from_them).
-              // Or if balance = purchases_from_them - payments_to_them, then positive balance means you owe them.
-              // Let's stick to the latter for now: positive = owe them (red).
-              const displayBalances = {
-                TRY: balances.TRY, // if positive, you owe TRY
-                USD: balances.USD  // if positive, you owe USD
-              };
+              const defaultCurrency = supplier.defaultCurrency || 'TRY';
+              const displayBalance = balances[defaultCurrency];
 
               return (
-                <TableRow
-                  key={supplier.id}
-                >
+                <TableRow key={supplier.id}>
                   <TableCell className="font-medium">
                     <Link
                       href={`/suppliers/${supplier.id}`}
-                      className="text-primary underline hover:text-primary/80 transition-colors"
+                      className="text-primary hover:text-primary/80 transition-colors"
                     >
                       {supplier.name}
                     </Link>
                   </TableCell>
                   <TableCell className={cn(
-                      "text-right font-mono",
-                      displayBalances.TRY > 0 ? "text-red-600" : displayBalances.TRY < 0 ? "text-green-600" : ""
-                    )}>
-                    {formatCurrency(displayBalances.TRY, "TRY")}
-                  </TableCell>
-                  <TableCell className={cn(
-                      "text-right font-mono",
-                      displayBalances.USD > 0 ? "text-red-600" : displayBalances.USD < 0 ? "text-green-600" : ""
-                    )}>
-                    {formatCurrency(displayBalances.USD, "USD")}
+                    "text-right font-mono",
+                    displayBalance > 0 ? "text-red-600" : displayBalance < 0 ? "text-green-600" : ""
+                  )}>
+                    {formatCurrency(displayBalance, defaultCurrency)}
                   </TableCell>
                   <TableCell className="text-right space-x-1">
                     <Button

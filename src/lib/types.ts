@@ -15,6 +15,9 @@ export interface ContactHistoryItem {
   type: 'phone' | 'email' | 'meeting' | 'other';
   summary: string;
   notes?: string;
+  supplierId?: string; // Tedarikçiye özel iletişim geçmişi için eklendi
+  createdAt: string; // ISO string format
+  updatedAt: string; // ISO string format
 }
 
 // Yeni: Müşteri Görevi
@@ -35,6 +38,7 @@ export interface SupplierTask {
   status: 'pending' | 'completed' | 'in-progress';
   createdAt: string; // ISO string format
   updatedAt: string; // ISO string format
+  supplierId?: string; // Tedarikçiye özel görevler için eklendi
 }
 
 export interface BaseEntity {
@@ -117,6 +121,9 @@ export interface PurchaseFormValues {
   date: Date;
   currency: Currency;
   stockItemId?: string;
+  description?: string;
+  quantityPurchased?: string;
+  unitPrice?: string;
 }
 
 export interface PaymentFormValues {
@@ -187,6 +194,8 @@ export interface Purchase extends Transaction {
   description?: string;
   transactionType: 'purchase';
   stockItemId?: string | null;
+  quantityPurchased?: number;
+  unitPrice?: number;
 }
 
 export interface PaymentToSupplier extends Transaction {

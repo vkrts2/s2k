@@ -502,53 +502,102 @@ export const deletePaymentToSupplier = async (uid: string, paymentId: string): P
   await deleteDoc(paymentDocRef);
 };
 
-// Todo Functions
-export const getTodos = async (uid: string): Promise<TodoItem[]> => {
-  console.log(`getTodos called with uid: ${uid}`);
+// Contact History Functions
+export const addContactHistory = async (uid: string, contactHistoryData: Omit<ContactHistoryItem, 'id'>): Promise<ContactHistoryItem> => {
+  const now = formatISO(new Date());
+  const newContactHistoryData = { ...contactHistoryData, createdAt: now, updatedAt: now };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "contactHistory"), newContactHistoryData);
+  return { ...newContactHistoryData, id: docRef.id } as ContactHistoryItem;
+};
+
+export const updateContactHistory = async (uid: string, contactHistoryData: ContactHistoryItem): Promise<ContactHistoryItem> => {
+  const now = formatISO(new Date());
+  const contactHistoryDocRef = doc(_getUserCollectionRef(uid, "contactHistory"), contactHistoryData.id);
+  const finalContactHistory = { ...contactHistoryData, updatedAt: now };
+  await updateDoc(contactHistoryDocRef, finalContactHistory);
+  return finalContactHistory;
+};
+
+export const deleteContactHistory = async (uid: string, contactHistoryId: string): Promise<void> => {
+  const contactHistoryDocRef = doc(_getUserCollectionRef(uid, "contactHistory"), contactHistoryId);
+  await deleteDoc(contactHistoryDocRef);
+};
+
+export const getContactHistory = async (uid: string, supplierId?: string): Promise<ContactHistoryItem[]> => {
   if (!uid) {
-    console.error("getTodos: User ID (uid) is missing.");
+    console.error("getContactHistory: User ID (uid) is missing.");
     return [];
   }
   try {
-    const q = query(_getUserCollectionRef(uid, "todos"), orderBy("createdAt", "desc"));
+    let q = query(_getUserCollectionRef(uid, "contactHistory"), orderBy("date", "desc"));
+    if (supplierId) {
+      q = query(q, where("supplierId", "==", supplierId));
+    }
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data() as Omit<TodoItem, 'id'>
+      ...doc.data() as Omit<ContactHistoryItem, 'id'>,
     }));
   } catch (error) {
-    console.error("Error fetching todos:", error);
+    console.error("Error fetching contact history:", error);
     return [];
   }
 };
 
-export const addTodo = async (uid: string, payload: { text: string; dueDate?: Date; notes?: string; }): Promise<TodoItem> => {
-  const now = formatISO(new Date());
-  const newTodoData = {
-    ...payload,
-    completed: false,
-    createdAt: now,
-    dueDate: payload.dueDate ? formatISO(payload.dueDate, { representation: 'date' }) : undefined, // YYYY-MM-DD formatında kaydet
-    notes: payload.notes || null,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "todos"), newTodoData);
-  return { ...newTodoData, id: docRef.id } as TodoItem;
-};
-
-export const toggleTodoCompleted = async (uid: string, todoId: string): Promise<TodoItem | undefined> => {
-  const todoDocRef = doc(_getUserCollectionRef(uid, "todos"), todoId);
-  const todoSnap = await getDoc(todoDocRef);
-  if (todoSnap.exists()) {
-    const currentStatus = todoSnap.data().completed;
-    await updateDoc(todoDocRef, { completed: !currentStatus, updatedAt: formatISO(new Date()) });
-    return { ...todoSnap.data(), id: todoSnap.id, completed: !currentStatus } as TodoItem;
+// Supplier Task Functions
+export const getSupplierTasks = async (uid: string, supplierId?: string): Promise<SupplierTask[]> => {
+  if (!uid) {
+    console.error("getSupplierTasks: User ID (uid) is missing.");
+    return [];
   }
-  return undefined;
+  try {
+    let q = query(_getUserCollectionRef(uid, "supplierTasks"), orderBy("createdAt", "desc"));
+    if (supplierId) {
+      q = query(q, where("supplierId", "==", supplierId));
+    }
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<SupplierTask, 'id'>,
+    }));
+  } catch (error) {
+    console.error("Error fetching supplier tasks:", error);
+    return [];
+  }
 };
 
-export const deleteTodo = async (uid: string, todoId: string): Promise<void> => {
-  const todoDocRef = doc(_getUserCollectionRef(uid, "todos"), todoId);
-  await deleteDoc(todoDocRef);
+export const addSupplierTask = async (uid: string, taskData: Omit<SupplierTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<SupplierTask> => {
+  const now = formatISO(new Date());
+  const newTaskData = {
+    ...taskData,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "supplierTasks"), newTaskData);
+  return { ...newTaskData, id: docRef.id } as SupplierTask;
+};
+
+export const updateSupplierTask = async (uid: string, taskData: SupplierTask): Promise<SupplierTask> => {
+  const now = formatISO(new Date());
+  const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskData.id);
+  const { id, ...restOfUpdatedData } = taskData;
+  const dataForFirestore: any = {
+    ...restOfUpdatedData,
+    updatedAt: now,
+  };
+  // Remove undefined fields to prevent Firebase errors
+  Object.keys(dataForFirestore).forEach(key => {
+    if (dataForFirestore[key] === undefined) {
+      delete dataForFirestore[key];
+    }
+  });
+  await updateDoc(taskDocRef, dataForFirestore);
+  return { ...dataForFirestore, id: taskData.id } as SupplierTask;
+};
+
+export const deleteSupplierTask = async (uid: string, taskId: string): Promise<void> => {
+  const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskId);
+  await deleteDoc(taskDocRef);
 };
 
 // Portfolio Functions
@@ -751,46 +800,4 @@ export const updateQuotation = async (uid: string, updatedQuotation: Quotation):
 export const deleteQuotation = async (uid: string, quotationId: string): Promise<void> => {
   const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), quotationId);
   await deleteDoc(quotationDocRef);
-};
-
-// Contact History Functions
-export const addContactHistory = async (uid: string, contactHistoryData: Omit<ContactHistoryItem, 'id'>): Promise<ContactHistoryItem> => {
-  const now = formatISO(new Date());
-  const newContactHistoryData = { ...contactHistoryData, createdAt: now, updatedAt: now };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "contactHistory"), newContactHistoryData);
-  return { ...newContactHistoryData, id: docRef.id } as ContactHistoryItem;
-};
-
-export const updateContactHistory = async (uid: string, contactHistoryData: ContactHistoryItem): Promise<ContactHistoryItem> => {
-  const now = formatISO(new Date());
-  const contactHistoryDocRef = doc(_getUserCollectionRef(uid, "contactHistory"), contactHistoryData.id);
-  const finalContactHistory = { ...contactHistoryData, updatedAt: now };
-  await updateDoc(contactHistoryDocRef, finalContactHistory);
-  return finalContactHistory;
-};
-
-export const deleteContactHistory = async (uid: string, contactHistoryId: string): Promise<void> => {
-  const contactHistoryDocRef = doc(_getUserCollectionRef(uid, "contactHistory"), contactHistoryId);
-  await deleteDoc(contactHistoryDocRef);
-};
-
-// Task Functions
-export const addTask = async (uid: string, taskData: Omit<SupplierTask, 'id'>): Promise<SupplierTask> => {
-  const now = formatISO(new Date());
-  const newTaskData = { ...taskData, createdAt: now, updatedAt: now };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "tasks"), newTaskData);
-  return { ...newTaskData, id: docRef.id } as SupplierTask;
-};
-
-export const updateTask = async (uid: string, taskData: SupplierTask): Promise<SupplierTask> => {
-  const now = formatISO(new Date());
-  const taskDocRef = doc(_getUserCollectionRef(uid, "tasks"), taskData.id);
-  const finalTask = { ...taskData, updatedAt: now };
-  await updateDoc(taskDocRef, finalTask);
-  return finalTask;
-};
-
-export const deleteTask = async (uid: string, taskId: string): Promise<void> => {
-  const taskDocRef = doc(_getUserCollectionRef(uid, "tasks"), taskId);
-  await deleteDoc(taskDocRef);
 };

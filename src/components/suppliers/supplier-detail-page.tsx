@@ -16,7 +16,14 @@ import {
   getStockItemById,
   deleteSupplier as storageDeleteSupplier,
   updateContactHistory as storageUpdateContactHistory,
-  addContactHistory as storageAddContactHistory
+  addContactHistory as storageAddContactHistory,
+  getContactHistory,
+  getSupplierTasks,
+  addSupplierTask,
+  updateSupplierTask,
+  deleteSupplierTask,
+  getPurchases,
+  getPaymentsToSuppliers
 } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,7 +71,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { PlusCircle, Trash2, DollarSign, ShoppingCart, Edit3, Pencil, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline as UnderlineIcon } from 'lucide-react';
+import { PlusCircle, Trash2, Edit3, DollarSign, ShoppingCart, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline as UnderlineIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isValid, formatISO, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -88,7 +95,6 @@ import { EditSupplierModal } from "./edit-supplier-modal";
 import { DeleteConfirmationModal } from "../common/delete-confirmation-modal";
 import { ContactHistoryModal } from "./contact-history-modal";
 import { TaskModal } from "./task-modal";
-import { PrintView } from "./print-view";
 
 interface SupplierDetailPageClientProps {
   supplier: Supplier;
@@ -104,6 +110,7 @@ type PurchaseFormValues = {
   stockItemId?: string;
   quantityPurchased?: string;
   unitPrice?: string;
+  description?: string;
 };
 
 type PaymentToSupplierFormValues = {
@@ -166,6 +173,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const [purchases, setPurchases] = useState<Purchase[]>(initialPurchases);
   const [paymentsToSupplier, setPaymentsToSupplier] = useState<PaymentToSupplier[]>(initialPaymentsToSupplier);
   const [availableStockItems, setAvailableStockItems] = useState<StockItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseFormValues, setPurchaseFormValues] = useState<PurchaseFormValues>(EMPTY_PURCHASE_FORM_VALUES);
@@ -184,9 +192,11 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const [showContactHistoryModal, setShowContactHistoryModal] = useState(false);
   const [contactHistoryFormValues, setContactHistoryFormValues] = useState<ContactHistoryFormValues>(EMPTY_CONTACT_HISTORY_FORM_VALUES);
   const [editingContactHistoryItem, setEditingContactHistoryItem] = useState<ContactHistoryItem | null>(null);
+  const [contactHistory, setContactHistory] = useState<ContactHistoryItem[]>([]);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskFormValues, setTaskFormValues] = useState<SupplierTaskFormValues>(EMPTY_TASK_FORM_VALUES);
   const [editingTask, setEditingTask] = useState<SupplierTask | null>(null);
+  const [tasks, setTasks] = useState<SupplierTask[]>([]);
   const [deletingSupplier, setDeletingSupplier] = useState<string | null>(null);
 
   const [stockItemDisplayNames, setStockItemDisplayNames] = useState<Record<string, string>>({});
@@ -199,7 +209,6 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const [showPrintView, setShowPrintView] = useState(false);
 
   const getStockItemName = useCallback((stockItemId: string) => {
     return stockItemDisplayNames[stockItemId] || 'Bilinmeyen Ürün';
@@ -396,14 +405,14 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         stockItemId: purchaseFormValues.stockItemId === 'none' ? undefined : purchaseFormValues.stockItemId,
         quantityPurchased: purchaseFormValues.quantityPurchased ? parseFloat(purchaseFormValues.quantityPurchased) : undefined,
         unitPrice: purchaseFormValues.unitPrice ? parseFloat(purchaseFormValues.unitPrice) : undefined,
-        description: purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none'
+        description: purchaseFormValues.description || (purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none'
           ? `${getStockItemName(purchaseFormValues.stockItemId)} - ${purchaseFormValues.quantityPurchased} adet`
-          : 'Manuel alış',
+          : 'Manuel alış'),
         transactionType: 'purchase',
         category: 'odeme',
         tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: editingPurchase?.createdAt || formatISO(new Date()),
+        updatedAt: formatISO(new Date()),
       };
 
       if (editingPurchase) {
@@ -414,8 +423,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           description: 'Alış başarıyla güncellendi.',
         });
       } else {
-        await addPurchase(user.uid, purchaseData);
-        setPurchases([...purchases, purchaseData]);
+        const newPurchase = await addPurchase(user.uid, purchaseData);
+        setPurchases(prevPurchases => [...prevPurchases, newPurchase]);
         toast({
           title: 'Başarılı',
           description: 'Alış başarıyla eklendi.',
@@ -634,27 +643,27 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         id: editingTask?.id || crypto.randomUUID(),
         supplierId: supplier.id,
         description: formValues.description,
-        dueDate: formValues.dueDate ? formatISO(formValues.dueDate) : undefined,
+        dueDate: formValues.dueDate ? formatISO(formValues.dueDate, { representation: 'date' }) : undefined,
         status: formValues.status,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: editingTask?.createdAt || formatISO(new Date()),
+        updatedAt: formatISO(new Date()),
       };
 
       if (editingTask) {
-        await storageUpdateTask(user.uid, taskData);
+        await updateSupplierTask(user.uid, taskData);
         setTasks(tasks.map(task => 
           task.id === editingTask.id ? taskData : task
         ));
         toast({
           title: 'Başarılı',
-          description: 'Görev güncellendi.',
+          description: 'Görev başarıyla güncellendi.',
         });
       } else {
-        await storageAddTask(user.uid, taskData);
-        setTasks([...tasks, taskData]);
+        const newTask = await addSupplierTask(user.uid, taskData);
+        setTasks([...tasks, newTask]);
         toast({
           title: 'Başarılı',
-          description: 'Görev eklendi.',
+          description: 'Görev başarıyla eklendi.',
         });
       }
 
@@ -671,70 +680,199 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     }
   };
 
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      const [loadedPurchases, loadedPayments] = await Promise.all([
+        getPurchases(user.uid, supplier.id),
+        getPaymentsToSuppliers(user.uid, supplier.id)
+      ]);
+      setPurchases(loadedPurchases);
+      setPaymentsToSupplier(loadedPayments);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "Hata",
+        description: "Veriler yüklenirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, supplier.id, toast]);
+
+  const calculateBalancesForSupplier = (supplierId: string): Record<Currency, number> => {
+    const supplierPurchases = purchases.filter(p => p.supplierId === supplierId);
+    const supplierPayments = paymentsToSupplier.filter(p => p.supplierId === supplierId);
+    
+    const balances: Record<Currency, number> = { TRY: 0, USD: 0 };
+
+    supplierPurchases.forEach(purchase => {
+      balances[purchase.currency] = (balances[purchase.currency] || 0) + purchase.amount;
+    });
+    supplierPayments.forEach(payment => {
+      balances[payment.currency] = (balances[payment.currency] || 0) - payment.amount;
+    });
+    return balances;
+  };
+
   if (!supplier) {
     return <div className="text-center py-8">Tedarikçi bulunamadı.</div>;
   }
 
-  if (showPrintView) {
-    return (
-      <div className="print:block hidden">
-        <PrintView />
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">{supplier.name}</h1>
+          <p className="text-muted-foreground mt-1">
+            {supplier.address && <span className="block">{supplier.address}</span>}
+            {supplier.phone && <span className="block">{supplier.phone}</span>}
+            {supplier.email && <span className="block">{supplier.email}</span>}
+          </p>
+        </div>
+        <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowEditSupplierModal(true)}
+          >
+            <Edit3 className="h-4 w-4 mr-2" />
+            Düzenle
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => setDeletingSupplier(supplier.id)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Sil
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Toplam Alış</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(totalPurchases, supplier.defaultCurrency || 'TRY')}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Toplam Ödeme</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(totalPayments, supplier.defaultCurrency || 'TRY')}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Bakiye</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={cn(
+              "text-2xl font-bold",
+              balance > 0 ? "text-red-600" : balance < 0 ? "text-green-600" : ""
+            )}>
+              {formatCurrency(balance, supplier.defaultCurrency || 'TRY')}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-3xl font-bold">{supplier.name} Detayları</CardTitle>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowEditSupplierModal(true)}
-            >
-              <Edit3 className="mr-2 h-4 w-4" />
-              Düzenle
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setDeletingSupplier(supplier.id)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Sil
-            </Button>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>İşlemler</CardTitle>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowPurchaseModal(true)}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Alış Ekle
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowPaymentToSupplierModal(true)}
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Ödeme Ekle
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Toplam Alış</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(totalPurchases, 'TRY')}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Toplam Ödeme</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(totalPayments, 'TRY')}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Bakiye</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(balance, 'TRY')}</div>
-              </CardContent>
-            </Card>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tarih</TableHead>
+                <TableHead>Tür</TableHead>
+                <TableHead>Açıklama</TableHead>
+                <TableHead className="text-right">Tutar</TableHead>
+                <TableHead className="text-right">İşlemler</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {unifiedTransactions.map((transaction) => (
+                <TableRow key={transaction.id}>
+                  <TableCell>
+                    {format(parseISO(transaction.date), 'dd.MM.yyyy')}
+                  </TableCell>
+                  <TableCell>
+                    {transaction.transactionType === 'purchase' ? 'Alış' : 'Ödeme'}
+                  </TableCell>
+                  <TableCell>{transaction.description}</TableCell>
+                  <TableCell className={cn(
+                    "text-right font-mono",
+                    transaction.transactionType === 'purchase' ? "text-red-600" : "text-green-600"
+                  )}>
+                    {formatCurrency(transaction.amount, transaction.currency)}
+                  </TableCell>
+                  <TableCell className="text-right space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => {
+                        if (transaction.transactionType === 'purchase') {
+                          setEditingPurchase(transaction);
+                          setShowPurchaseModal(true);
+                        } else {
+                          setEditingPaymentToSupplier(transaction);
+                          setShowPaymentToSupplierModal(true);
+                        }
+                      }}
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => {
+                        if (transaction.transactionType === 'purchase') {
+                          setDeletingPurchaseId(transaction.id);
+                        } else {
+                          setDeletingPaymentToSupplierId(transaction.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
