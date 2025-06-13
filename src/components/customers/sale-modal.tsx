@@ -10,6 +10,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Dispatch, SetStateAction } from "react";
+import { Textarea } from "@/components/ui/textarea";
 
 interface SaleModalProps {
   isOpen: boolean;
@@ -27,7 +28,8 @@ const EMPTY_SALE_FORM_VALUES: SaleFormValues = {
   currency: 'TRY',
   stockItemId: 'none',
   quantity: '',
-  unitPrice: ''
+  unitPrice: '',
+  description: '',
 };
 
 export function SaleModal({
@@ -108,7 +110,6 @@ export function SaleModal({
                 <SelectValue placeholder="Stok ürünü seçin" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Manuel Giriş</SelectItem>
                 {availableStockItems.map(item => (
                   <SelectItem key={item.id} value={item.id}>
                     {item.name} ({item.unit})
@@ -117,7 +118,7 @@ export function SaleModal({
               </SelectContent>
             </Select>
           </div>
-          {formValues.stockItemId && formValues.stockItemId !== 'none' && (
+          {formValues.stockItemId && (
             <>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="quantity" className="text-right">Miktar</Label>
@@ -145,6 +146,16 @@ export function SaleModal({
               </div>
             </>
           )}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="description" className="text-right">Açıklama</Label>
+            <Textarea
+              id="description"
+              value={formValues.description}
+              onChange={(e) => setFormValues({ ...formValues, description: e.target.value })}
+              className="col-span-3"
+              placeholder="Satış açıklaması (isteğe bağlı)"
+            />
+          </div>
           <div className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={onClose}>
               İptal

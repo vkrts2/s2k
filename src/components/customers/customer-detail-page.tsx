@@ -113,7 +113,7 @@ const EMPTY_SALE_FORM_VALUES: SaleFormValues = {
   amount: '',
   date: new Date(),
   currency: 'TRY',
-  stockItemId: 'none',
+  stockItemId: undefined,
   quantity: '',
   unitPrice: '',
   description: '',
@@ -372,19 +372,17 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   useEffect(() => {
     const quantity = parseFloat(saleFormValues.quantity || '0');
     const price = parseFloat(saleFormValues.unitPrice || '0');
-    if (saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none' && !isNaN(quantity) && !isNaN(price) && quantity > 0 && price >= 0) {
-      setSaleFormValues(prev => ({ ...prev, amount: (quantity * price).toFixed(2) }));
-    } else if (!saleFormValues.stockItemId || saleFormValues.stockItemId === 'none') {
-      // Allow manual amount entry if no stock item is selected or unit price/qty is zero
-    } else {
-       setSaleFormValues(prev => ({ ...prev, amount: ''})); // Clear amount if calculation is not possible
+    if (saleFormValues.stockItemId) {
+      if (!isNaN(quantity) && !isNaN(price) && quantity > 0 && price >= 0) {
+        setSaleFormValues(prev => ({ ...prev, amount: (quantity * price).toFixed(2) }));
+      } else {
+        setSaleFormValues(prev => ({ ...prev, amount: ''}));
+      }
     }
   }, [saleFormValues.quantity, saleFormValues.unitPrice, saleFormValues.stockItemId]);
 
   useEffect(() => {
-    // Stok kalemi seçildiğinde birim fiyatını otomatik doldurma mantığını kaldırıyoruz
-    // Artık StockItem'ın salePrice özelliği yok, bu yüzden kullanıcı manuel olarak girecek.
-        setSaleFormValues(prev => ({ ...prev, unitPrice: '', currency: 'TRY' }));
+    setSaleFormValues(prev => ({ ...prev, unitPrice: '', currency: 'TRY' }));
   }, [saleFormValues.stockItemId]);
 
   const refreshCustomerData = useCallback(async () => {
@@ -494,8 +492,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
     try {
       const amount = parseFloat(saleFormValues.amount);
-      const quantity = parseFloat(saleFormValues.quantity);
-      const unitPrice = parseFloat(saleFormValues.unitPrice);
+      const quantity = saleFormValues.stockItemId ? parseFloat(saleFormValues.quantity || '0') : undefined;
+      const unitPrice = saleFormValues.stockItemId ? parseFloat(saleFormValues.unitPrice || '0') : undefined;
 
       if (isNaN(amount) || amount <= 0) {
         toast({
@@ -506,8 +504,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         return;
       }
 
-      if (saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none') {
-        if (isNaN(quantity) || quantity <= 0) {
+      if (saleFormValues.stockItemId) {
+        if (isNaN(quantity!) || quantity! <= 0) {
           toast({
             title: 'Hata',
             description: 'Geçerli bir miktar giriniz.',
@@ -515,7 +513,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           });
           return;
         }
-        if (isNaN(unitPrice) || unitPrice <= 0) {
+        if (isNaN(unitPrice!) || unitPrice! <= 0) {
           toast({
             title: 'Hata',
             description: 'Geçerli bir birim fiyat giriniz.',
@@ -524,7 +522,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           return;
         }
         const stockItem = availableStockItems.find(item => item.id === saleFormValues.stockItemId);
-        if (stockItem && stockItem.currentStock < quantity) {
+        if (stockItem && stockItem.currentStock < quantity!) {
           toast({
             title: 'Hata',
             description: `Yetersiz stok. Mevcut: ${stockItem.currentStock} ${stockItem.unit || 'adet'}`,
@@ -540,12 +538,12 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         amount,
         date: formatISO(saleFormValues.date),
         currency: saleFormValues.currency,
-        stockItemId: saleFormValues.stockItemId === 'none' ? undefined : saleFormValues.stockItemId,
-        quantity: saleFormValues.stockItemId === 'none' ? undefined : quantity,
-        unitPrice: saleFormValues.stockItemId === 'none' ? undefined : unitPrice,
-        totalPrice: saleFormValues.stockItemId === 'none' ? undefined : amount,
-        description: saleFormValues.description || (saleFormValues.stockItemId && saleFormValues.stockItemId !== 'none'
-          ? `${getStockItemName(saleFormValues.stockItemId)} - ${quantity} adet`
+        stockItemId: saleFormValues.stockItemId,
+        quantity: saleFormValues.stockItemId ? quantity : undefined,
+        unitPrice: saleFormValues.stockItemId ? unitPrice : undefined,
+        totalPrice: saleFormValues.stockItemId ? amount : undefined,
+        description: saleFormValues.description || (saleFormValues.stockItemId
+          ? `${stockItemDisplayNames[saleFormValues.stockItemId]} - ${quantity} adet`
           : 'Manuel satış'),
         transactionType: 'sale',
         category: 'satis',
@@ -906,7 +904,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           title: "Görev Güncellendi",
           description: "Görev başarıyla güncellendi.",
         });
-    } else {
+      } else {
         updatedTasks = [...(customer.tasks || []), (taskToSave as CustomerTask)];
         toast({
           title: "Görev Eklendi",
@@ -1219,349 +1217,454 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
   return (
     <div className="container mx-auto py-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{customer.name}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="transactions">
-            <TabsList>
-              <TabsTrigger value="transactions">İşlemler</TabsTrigger>
-              <TabsTrigger value="notes">Notlar</TabsTrigger>
-              <TabsTrigger value="contact-history">İletişim Geçmişi</TabsTrigger>
-              <TabsTrigger value="tasks">Görevler</TabsTrigger>
-            </TabsList>
-            <TabsContent value="transactions">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>İşlemler</CardTitle>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowSaleModal(true)}
-                      >
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Satış Ekle
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowPaymentModal(true)}
-                      >
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Ödeme Ekle
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center mb-4">
-                    <Input
-                      placeholder="İşlem ara..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="max-w-sm"
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">{customer.name}</h1>
+        <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowEditCustomerModal(true)}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Düzenle
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" onClick={() => setDeletingCustomer(customer.id)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Sil
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Müşteriyi Sil</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Bu müşteriyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setDeletingCustomer(null)}>İptal</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteCustomer}>Sil</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Toplam Satış</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totalSales, 'TRY')}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Toplam Ödeme</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totalPayments, 'TRY')}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Bakiye</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={cn(
+              "text-2xl font-bold",
+              balance > 0 ? "text-red-500" : "text-green-500"
+            )}>
+              {formatCurrency(balance, 'TRY')}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="transactions">
+        <TabsList>
+          <TabsTrigger value="transactions">İşlemler</TabsTrigger>
+          <TabsTrigger value="notes">Notlar</TabsTrigger>
+          <TabsTrigger value="contact-history">İletişim Geçmişi</TabsTrigger>
+          <TabsTrigger value="tasks">Görevler</TabsTrigger>
+          <TabsTrigger value="statement">Ekstre</TabsTrigger>
+        </TabsList>
+        <TabsContent value="transactions">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>İşlemler</CardTitle>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleOpenAddSaleModal}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Satış Ekle
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleOpenAddPaymentModal}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Ödeme Ekle
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-between items-center mb-4">
+                <Input
+                  placeholder="İşlem ara..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="max-w-sm"
+                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="date"
+                      variant={"outline"}
+                      className={cn(
+                        "w-[300px] justify-start text-left font-normal",
+                        !dateRange?.from && !dateRange?.to && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange?.from ? (
+                        dateRange.to ? (
+                          <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>
+                        ) : (
+                          format(dateRange.from, "LLL dd, y")
+                        )
+                      ) : (
+                        <span>Tarih aralığı seçin</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange?.from}
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      numberOfMonths={2}
                     />
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          id="date"
-                          variant={"outline"}
-                          className={cn(
-                            "w-[300px] justify-start text-left font-normal",
-                            !dateRange?.from && !dateRange?.to && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateRange?.from ? (
-                            dateRange.to ? (
-                              <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>
-                            ) : (
-                              format(dateRange.from, "LLL dd, y")
-                            )
-                          ) : (
-                            <span>Tarih aralığı seçin</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="end">
-                        <Calendar
-                          initialFocus
-                          mode="range"
-                          defaultMonth={dateRange?.from}
-                          selected={dateRange}
-                          onSelect={setDateRange}
-                          numberOfMonths={2}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <Select
-                      value={sortOrder}
-                      onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)}
-                    >
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Sıralama" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="desc">En Yeniye Göre</SelectItem>
-                        <SelectItem value="asc">En Eskiye Göre</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  </PopoverContent>
+                </Popover>
+                <Select
+                  value={sortOrder}
+                  onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Sıralama" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">En Yeniye Göre</SelectItem>
+                    <SelectItem value="asc">En Eskiye Göre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tarih</TableHead>
-                        <TableHead>İşlem Tipi</TableHead>
-                        <TableHead className="text-right">Tutar</TableHead>
-                        <TableHead>Açıklama</TableHead>
-                        <TableHead className="text-right">İşlemler</TableHead>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tarih</TableHead>
+                    <TableHead>İşlem Tipi</TableHead>
+                    <TableHead className="text-right">Tutar</TableHead>
+                    <TableHead>Açıklama</TableHead>
+                    <TableHead className="text-right">İşlemler</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedTransactions.length > 0 ? (
+                    paginatedTransactions.map((item) => (
+                      <TableRow key={`${item.transactionType}-${item.id}`}>
+                        <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
+                        <TableCell>{item.transactionType === 'sale' ? (
+                          <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Satış</Badge>
+                        ) : (
+                          <Badge variant="default" className="bg-green-500 hover:bg-green-600">Ödeme</Badge>
+                        )}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(item.amount, item.currency)}
+                        </TableCell>
+                        <TableCell>
+                          {item.transactionType === 'sale' ? (item as Sale).description || '' : (item as Payment).description || ''}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (item.transactionType === 'sale') {
+                                setEditingSale(item as Sale);
+                                setSaleFormValues({
+                                  amount: (item as Sale).amount.toString(),
+                                  date: parseISO((item as Sale).date),
+                                  currency: (item as Sale).currency,
+                                  stockItemId: (item as Sale).stockItemId || undefined,
+                                  quantity: (item as Sale).quantity?.toString() || '',
+                                  unitPrice: (item as Sale).unitPrice?.toString() || '',
+                                  description: (item as Sale).description || '',
+                                });
+                                setShowSaleModal(true);
+                              } else {
+                                setEditingPayment(item as Payment);
+                                setPaymentFormValues({
+                                  amount: (item as Payment).amount.toString(),
+                                  date: parseISO((item as Payment).date),
+                                  method: (item as Payment).method,
+                                  currency: (item as Payment).currency,
+                                  referenceNumber: (item as Payment).referenceNumber || '',
+                                  description: (item as Payment).description || '',
+                                });
+                                setShowPaymentModal(true);
+                              }
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (item.transactionType === 'sale') {
+                                setDeletingSaleId(item.id);
+                              } else {
+                                setDeletingPaymentId(item.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedTransactions.length > 0 ? (
-                        paginatedTransactions.map((item) => (
-                          <TableRow key={`${item.transactionType}-${item.id}`}>
-                            <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
-                            <TableCell>{item.transactionType === 'sale' ? (
-                              <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Satış</Badge>
-                            ) : (
-                              <Badge variant="default" className="bg-green-500 hover:bg-green-600">Ödeme</Badge>
-                            )}</TableCell>
-                            <TableCell className="text-right font-medium">
-                              {formatCurrency(item.amount, item.currency)}
-                            </TableCell>
-                            <TableCell>
-                              {item.transactionType === 'sale' ? (item as Sale).description || '' : (item as Payment).description || ''}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  if (item.transactionType === 'sale') {
-                                    setEditingSale(item as Sale);
-                                    setSaleFormValues({
-                                      amount: (item as Sale).amount.toString(),
-                                      date: parseISO((item as Sale).date),
-                                      currency: (item as Sale).currency,
-                                      stockItemId: (item as Sale).stockItemId || 'none',
-                                      quantity: (item as Sale).quantity?.toString() || '',
-                                      unitPrice: (item as Sale).unitPrice?.toString() || '',
-                                      description: (item as Sale).description || '',
-                                    });
-                                    setShowSaleModal(true);
-                                  } else {
-                                    setEditingPayment(item as Payment);
-                                    setPaymentFormValues({
-                                      amount: (item as Payment).amount.toString(),
-                                      date: parseISO((item as Payment).date),
-                                      method: (item as Payment).method,
-                                      currency: (item as Payment).currency,
-                                      referenceNumber: (item as Payment).referenceNumber || '',
-                                      description: (item as Payment).description || '',
-                                    });
-                                    setShowPaymentModal(true);
-                                  }
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  if (item.transactionType === 'sale') {
-                                    setDeletingSaleId(item.id);
-                                  } else {
-                                    setDeletingPaymentId(item.id);
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center">
-                            İşlem bulunamadı.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                  <div className="flex justify-end mt-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Önceki
-                    </Button>
-                    <span className="mx-2">Sayfa {currentPage} / {totalPages}</span>
-                    <Button
-                      variant="outline"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Sonraki
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">
+                        İşlem bulunamadı.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+              <div className="flex justify-end mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Önceki
+                </Button>
+                <span className="mx-2">Sayfa {currentPage} / {totalPages}</span>
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Sonraki
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <TabsContent value="notes">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Notlar</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <EditorContent editor={editor} />
-                  <Button onClick={handleSaveNotes} className="mt-4">Notları Kaydet</Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
+        <TabsContent value="notes">
+          <Card>
+            <CardHeader>
+              <CardTitle>Notlar</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <EditorContent editor={editor} />
+              <Button onClick={handleSaveNotes} className="mt-4">Notları Kaydet</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <TabsContent value="contact-history">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>İletişim Geçmişi</CardTitle>
-                    <Button
-                      variant="outline"
-                      onClick={handleOpenAddContactHistoryModal}
-                    >
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      İletişim Ekle
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tarih</TableHead>
-                        <TableHead>Tip</TableHead>
-                        <TableHead>Özet</TableHead>
-                        <TableHead>Notlar</TableHead>
-                        <TableHead className="text-right">İşlemler</TableHead>
+        <TabsContent value="contact-history">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>İletişim Geçmişi</CardTitle>
+                <Button
+                  variant="outline"
+                  onClick={handleOpenAddContactHistoryModal}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  İletişim Ekle
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tarih</TableHead>
+                    <TableHead>Tip</TableHead>
+                    <TableHead>Özet</TableHead>
+                    <TableHead>Notlar</TableHead>
+                    <TableHead className="text-right">İşlemler</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(customer.contactHistory || []).length > 0 ? (
+                    (customer.contactHistory || []).map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
+                        <TableCell>{item.type}</TableCell>
+                        <TableCell>{item.summary}</TableCell>
+                        <TableCell>{item.notes}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenEditContactHistoryModal(item)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteContactHistoryItem(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(customer.contactHistory || []).length > 0 ? (
-                        (customer.contactHistory || []).map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
-                            <TableCell>{item.type}</TableCell>
-                            <TableCell>{item.summary}</TableCell>
-                            <TableCell>{item.notes}</TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleOpenEditContactHistoryModal(item)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteContactHistoryItem(item.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center">
-                            İletişim geçmişi bulunamadı.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">
+                        İletişim geçmişi bulunamadı.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <TabsContent value="tasks">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Görevler</CardTitle>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowTaskModal(true)}
-                    >
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Görev Ekle
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Açıklama</TableHead>
-                        <TableHead>Durum</TableHead>
-                        <TableHead>Son Tarih</TableHead>
-                        <TableHead className="text-right">İşlemler</TableHead>
+        <TabsContent value="tasks">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Görevler</CardTitle>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTaskModal(true)}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Görev Ekle
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Açıklama</TableHead>
+                    <TableHead>Durum</TableHead>
+                    <TableHead>Son Tarih</TableHead>
+                    <TableHead className="text-right">İşlemler</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(customer.tasks || []).length > 0 ? (
+                    (customer.tasks || []).map((task) => (
+                      <TableRow key={task.id}>
+                        <TableCell>{task.description}</TableCell>
+                        <TableCell>{task.status}</TableCell>
+                        <TableCell>{task.dueDate ? safeFormatDate(task.dueDate, 'dd.MM.yyyy') : '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingTask(task);
+                              setTaskFormValues({
+                                description: task.description,
+                                dueDate: task.dueDate ? parseISO(task.dueDate) : undefined,
+                                status: task.status,
+                              });
+                              setShowTaskModal(true);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteTask(task.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(customer.tasks || []).length > 0 ? (
-                        (customer.tasks || []).map((task) => (
-                          <TableRow key={task.id}>
-                            <TableCell>{task.description}</TableCell>
-                            <TableCell>{task.status}</TableCell>
-                            <TableCell>{task.dueDate ? safeFormatDate(task.dueDate, 'dd.MM.yyyy') : '-'}</TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingTask(task);
-                                  setTaskFormValues({
-                                    description: task.description,
-                                    dueDate: task.dueDate ? parseISO(task.dueDate) : undefined,
-                                    status: task.status,
-                                  });
-                                  setShowTaskModal(true);
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteTask(task.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center">
-                            Görev bulunamadı.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center">
+                        Görev bulunamadı.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="statement">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ekstre Görünümü</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-end mb-4">
+                <Button onClick={() => exportToCSV(filteredAndSortedTransactions, customer.name)}>
+                  <Download className="mr-2 h-4 w-4" /> CSV İndir
+                </Button>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tarih</TableHead>
+                    <TableHead>İşlem Tipi</TableHead>
+                    <TableHead className="text-right">Tutar</TableHead>
+                    <TableHead>Açıklama</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAndSortedTransactions.length > 0 ? (
+                    filteredAndSortedTransactions.map((item) => (
+                      <TableRow key={`${item.transactionType}-${item.id}`}>
+                        <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
+                        <TableCell>{item.transactionType === 'sale' ? 'Satış' : 'Ödeme'}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.amount, item.currency)}</TableCell>
+                        <TableCell>{item.description}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center">
+                        Ekstrede işlem bulunamadı.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <SaleModal
         isOpen={showSaleModal}
