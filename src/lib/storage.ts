@@ -255,10 +255,17 @@ export const updateSale = async (uid: string, updatedSaleData: Sale): Promise<Sa
   const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), updatedSaleData.id);
 
   const { id, ...restOfUpdatedData } = updatedSaleData;
-  const dataForFirestore: any = {
+  const dataForFirestore: { [key: string]: any } = {
     ...restOfUpdatedData,
     updatedAt: now,
   };
+
+  // Remove undefined fields to prevent Firebase errors
+  Object.keys(dataForFirestore).forEach(key => {
+    if (dataForFirestore[key] === undefined) {
+      delete dataForFirestore[key];
+    }
+  });
 
   await updateDoc(saleDocRef, dataForFirestore);
   return { ...dataForFirestore, id: updatedSaleData.id } as Sale;

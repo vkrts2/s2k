@@ -397,6 +397,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   }, [customer?.id, toast]);
 
   const handleOpenEditSaleModal = (sale: Sale) => {
+    console.log("handleOpenEditSaleModal called with sale:", sale);
     setEditingSale(sale);
     setSaleFormValues({
       amount: sale.amount.toString(),
@@ -428,7 +429,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
       }
 
       // For new sales, Firestore generates the ID. For existing sales, we use the existing ID.
-      const saleToSave: Omit<Sale, 'id' | 'transactionType'> = {
+      const saleToSave: Omit<Sale, 'id' | 'transactionType' | 'createdAt' | 'updatedAt'> = {
         customerId: customer.id,
         amount,
         date: formatISO(values.date),
@@ -441,15 +442,18 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         tags: [],
       };
 
+      console.log("handleSaleSubmit - saleToSave before update/add:", saleToSave);
+
       if (editingSale) {
         // Existing sale: prepare the full Sale object for update
         const updatedSale: Sale = {
           ...saleToSave,
           id: editingSale.id, // Preserve the original ID
           transactionType: 'sale',
-          createdAt: editingSale.createdAt, // Preserve original creation date
+          createdAt: editingSale.createdAt || formatISO(new Date()), // Ensure createdAt is never undefined
           updatedAt: formatISO(new Date()), // Update last updated date
         };
+        console.log("handleSaleSubmit - updatedSale before storageUpdateSale:", updatedSale);
         await storageUpdateSale(user.uid, updatedSale);
         setSales(sales.map(s => s.id === updatedSale.id ? updatedSale : s));
         toast({
@@ -458,7 +462,9 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         });
       } else {
         // New sale: Firestore will assign an ID. Use the returned object.
+        console.log("handleSaleSubmit - new sale, calling addSale with:", saleToSave);
         const newSale = await addSale(user.uid, saleToSave);
+        console.log("handleSaleSubmit - newSale after addSale:", newSale);
         setSales(prevSales => [...prevSales, newSale]);
         toast({
           title: "Satış eklendi",
