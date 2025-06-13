@@ -383,6 +383,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   };
 
   const handleOpenAddSaleModal = useCallback(() => {
+    console.log("Opening Sale Modal");
     if (!customer?.id) {
       toast({
         title: "Hata",
@@ -500,6 +501,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   }, [deletingSaleId, toast, refreshCustomerData, user]);
 
   const handleOpenAddPaymentModal = useCallback(() => {
+    console.log("Opening Payment Modal");
     if (!customer?.id) {
       toast({
         title: "Hata",

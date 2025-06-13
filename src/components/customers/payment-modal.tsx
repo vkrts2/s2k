@@ -41,10 +41,10 @@ export function PaymentModal({
           <DialogTitle>Ödeme Ekle</DialogTitle>
           <DialogDescription>Yeni bir ödeme işlemi ekleyin veya mevcut bir ödemeyi düzenleyin.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={(e) => { 
-          e.preventDefault(); 
-          console.log("Payment form submitted!"); 
-          onSubmit(e); 
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          console.log("Payment form submitted!"); // Debugging log
+          onSubmit(e);
         }} className="space-y-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="amount" className="text-right">Tutar</Label>

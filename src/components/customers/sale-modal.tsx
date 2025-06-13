@@ -48,10 +48,10 @@ export function SaleModal({
           <DialogTitle>Satış Ekle</DialogTitle>
           <DialogDescription>Yeni bir satış işlemi ekleyin veya mevcut bir satışı düzenleyin.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={(e) => { 
-          e.preventDefault(); 
-          console.log("Sale form submitted!"); 
-          onSubmit(formValues); 
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          console.log("Sale form submitted!");
+          onSubmit(formValues);
         }} className="space-y-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="stockItemId" className="text-right">Stok Ürünü</Label>
