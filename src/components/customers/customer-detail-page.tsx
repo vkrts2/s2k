@@ -674,13 +674,13 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         date: formatISO(paymentFormValues.date),
         currency: paymentFormValues.currency,
         method: paymentFormValues.method,
-        referenceNumber: paymentFormValues.referenceNumber || undefined,
         description: paymentFormValues.description || `${paymentFormValues.method} ile ödeme`,
         transactionType: 'payment',
         category: 'odeme',
         tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        ...(paymentFormValues.referenceNumber && { referenceNumber: paymentFormValues.referenceNumber }),
       };
 
       if (editingPayment) {
@@ -1192,13 +1192,13 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         date: formatISO(values.date),
         currency: values.currency,
         method: values.method,
-        referenceNumber: values.referenceNumber || undefined,
         description: values.description || `${values.method} ile ödeme`,
         transactionType: 'payment',
         category: 'odeme',
         tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        ...(values.referenceNumber && { referenceNumber: values.referenceNumber }),
       };
 
       setPayments(prevPayments => [...prevPayments, newPayment]);
