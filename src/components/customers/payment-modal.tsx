@@ -129,7 +129,7 @@ export function PaymentModal({
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button type="submit">
+            <Button type="submit" onClick={() => console.log("Kaydet button clicked (Payment Modal)!")}>
               Kaydet
             </Button>
           </div>

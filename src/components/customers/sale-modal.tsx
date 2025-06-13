@@ -174,7 +174,7 @@ export function SaleModal({
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button type="submit">
+            <Button type="submit" onClick={() => console.log("Kaydet button clicked (Sale Modal)!")}> 
               Kaydet
             </Button>
           </div>
