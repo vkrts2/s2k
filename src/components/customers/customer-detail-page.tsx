@@ -372,7 +372,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   useEffect(() => {
     const quantity = parseFloat(saleFormValues.quantity || '0');
     const price = parseFloat(saleFormValues.unitPrice || '0');
-    if (saleFormValues.stockItemId) {
+    if (saleFormValues.stockItemId !== null) {
       if (!isNaN(quantity) && !isNaN(price) && quantity > 0 && price >= 0) {
         setSaleFormValues(prev => ({ ...prev, amount: (quantity * price).toFixed(2) }));
       } else {
@@ -479,7 +479,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
       date: isValid(parseISO(sale.date)) ? parseISO(sale.date) : new Date(),
       currency: sale.currency,
       stockItemId: sale.stockItemId || undefined,
-      quantity: sale.quantity?.toString() || '', // quantitySold yerine quantity
+      quantity: sale.quantity?.toString() || '',
       unitPrice: sale.unitPrice?.toString() || '',
       description: sale.description || '',
     });
@@ -497,8 +497,15 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
     try {
       const amount = parseFloat(saleFormValues.amount);
-      const quantity = saleFormValues.stockItemId ? parseFloat(saleFormValues.quantity || '0') : undefined;
-      const unitPrice = saleFormValues.stockItemId ? parseFloat(saleFormValues.unitPrice || '0') : undefined;
+      const quantity = parseFloat(saleFormValues.quantity || '0');
+      const unitPrice = parseFloat(saleFormValues.unitPrice || '0');
+
+      console.log("Before creating saleData:");
+      console.log("  saleFormValues:", saleFormValues);
+      console.log("  amount:", amount);
+      console.log("  quantity:", quantity);
+      console.log("  unitPrice:", unitPrice);
+      console.log("  stockItemId from formValues:", saleFormValues.stockItemId);
 
       if (isNaN(amount) || amount <= 0) {
         toast({
@@ -511,7 +518,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
       }
 
       if (saleFormValues.stockItemId) {
-        if (isNaN(quantity!) || quantity! <= 0) {
+        if (isNaN(quantity) || quantity <= 0) {
           toast({
             title: 'Hata',
             description: 'Geçerli bir miktar giriniz.',
@@ -520,7 +527,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           console.error('Invalid quantity:', quantity);
           return;
         }
-        if (isNaN(unitPrice!) || unitPrice! <= 0) {
+        if (isNaN(unitPrice) || unitPrice <= 0) {
           toast({
             title: 'Hata',
             description: 'Geçerli bir birim fiyat giriniz.',
@@ -530,7 +537,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           return;
         }
         const stockItem = availableStockItems.find(item => item.id === saleFormValues.stockItemId);
-        if (stockItem && stockItem.currentStock < quantity!) {
+        if (stockItem && stockItem.currentStock < quantity) {
           toast({
             title: 'Hata',
             description: `Yetersiz stok. Mevcut: ${stockItem.currentStock} ${stockItem.unit || 'adet'}`,
@@ -547,10 +554,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         amount,
         date: formatISO(saleFormValues.date),
         currency: saleFormValues.currency,
-        stockItemId: saleFormValues.stockItemId,
-        quantity: saleFormValues.stockItemId ? quantity : undefined,
-        unitPrice: saleFormValues.stockItemId ? unitPrice : undefined,
-        totalPrice: saleFormValues.stockItemId ? amount : undefined,
         description: saleFormValues.description || (saleFormValues.stockItemId
           ? `${stockItemDisplayNames[saleFormValues.stockItemId]} - ${quantity} adet`
           : 'Manuel satış'),
@@ -560,6 +563,18 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+
+      if (saleFormValues.stockItemId) {
+          saleData.stockItemId = saleFormValues.stockItemId;
+          saleData.quantity = quantity;
+          saleData.unitPrice = unitPrice;
+          saleData.totalPrice = amount;
+      } else {
+          delete saleData.stockItemId;
+          delete saleData.quantity;
+          delete saleData.unitPrice;
+          delete saleData.totalPrice;
+      }
 
       if (editingSale) {
         await storageUpdateSale(user.uid, saleData);
