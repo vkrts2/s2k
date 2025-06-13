@@ -133,3 +133,121 @@ body {
     /* .m-4, .sm\:m-6, .md\:m-8 { margin: 0 !important; } */
   }
 }
+
+/* Print styles */
+@media print {
+  body {
+    background: white;
+  }
+
+  .container {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .print\:p-0 {
+    padding: 0 !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+
+  .print\:text-black {
+    color: black !important;
+  }
+
+  .print\:bg-white {
+    background-color: white !important;
+  }
+
+  .print\:border {
+    border: 1px solid #e5e7eb !important;
+  }
+
+  .print\:shadow-none {
+    box-shadow: none !important;
+  }
+
+  .print\:break-inside-avoid {
+    break-inside: avoid;
+  }
+
+  .print\:break-after-page {
+    break-after: page;
+  }
+
+  .print\:break-before-page {
+    break-before: page;
+  }
+
+  .print\:break-inside-auto {
+    break-inside: auto;
+  }
+
+  .print\:break-after-auto {
+    break-after: auto;
+  }
+
+  .print\:break-before-auto {
+    break-before: auto;
+  }
+
+  .print\:break-after-avoid {
+    break-after: avoid;
+  }
+
+  .print\:break-before-avoid {
+    break-before: avoid;
+  }
+
+  .print\:break-after-all {
+    break-after: all;
+  }
+
+  .print\:break-before-all {
+    break-before: all;
+  }
+
+  .print\:break-after-left {
+    break-after: left;
+  }
+
+  .print\:break-before-left {
+    break-before: left;
+  }
+
+  .print\:break-after-right {
+    break-after: right;
+  }
+
+  .print\:break-before-right {
+    break-before: right;
+  }
+
+  .print\:break-after-column {
+    break-after: column;
+  }
+
+  .print\:break-before-column {
+    break-before: column;
+  }
+
+  .print\:break-inside-avoid-column {
+    break-inside: avoid-column;
+  }
+
+  .print\:break-after-avoid-column {
+    break-after: avoid-column;
+  }
+
+  .print\:break-before-avoid-column {
+    break-before: avoid-column;
+  }
+}

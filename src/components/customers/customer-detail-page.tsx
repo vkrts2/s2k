@@ -62,7 +62,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { PlusCircle, Trash2, DollarSign, ShoppingCart, Edit3, Pencil, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline as UnderlineIcon } from 'lucide-react';
+import { PlusCircle, Trash2, DollarSign, ShoppingCart, Edit3, Pencil, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline as UnderlineIcon, Receipt } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isValid, formatISO, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -1131,6 +1131,10 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => window.open(`/customers/${customer.id}/extract`, '_blank')}>
+            <Receipt className="h-4 w-4 mr-2" />
+            Ekstre Görüntüle
+          </Button>
           <Button variant="outline" onClick={() => setShowPrintView(true)}>
             <Printer className="h-4 w-4 mr-2" />
             Yazdır
