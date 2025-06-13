@@ -155,7 +155,7 @@ export function PurchaseModal({
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button type="submit" onClick={() => console.log("Kaydet button clicked (Purchase Modal)!")}>Kaydet</Button>
+            <Button type="submit">Kaydet</Button>
           </div>
         </form>
       </DialogContent>
