@@ -50,8 +50,15 @@ export interface BaseEntity {
 
 export interface Customer extends BaseEntity {
   name: string;
-  contactHistory?: ContactHistoryItem[]; // Yeni alan
-  tasks?: CustomerTask[]; // Yeni alan
+  email?: string;
+  phone?: string;
+  address?: string;
+  taxNumber?: string;
+  taxOffice?: string;
+  notes?: string | null;
+  contactHistory?: ContactHistoryItem[];
+  tasks?: CustomerTask[];
+  defaultCurrency?: Currency;
 }
 
 export interface Supplier extends BaseEntity {
@@ -61,9 +68,10 @@ export interface Supplier extends BaseEntity {
   address?: string;
   taxNumber?: string;
   taxOffice?: string;
-  notes?: string;
+  notes?: string | null;
   contactHistory?: ContactHistoryItem[];
   tasks?: SupplierTask[];
+  defaultCurrency?: Currency;
 }
 
 export type TransactionCategory =
@@ -94,23 +102,21 @@ export interface Transaction {
   description?: string;
 }
 
-export interface SaleFormValues {
+export type SaleFormValues = {
   amount: string;
   date: Date;
   currency: Currency;
   stockItemId?: string;
-  quantity: string;
-  unitPrice: string;
-  description?: string;
-}
+  description: string;
+  quantity?: string;
+  unitPrice?: string;
+};
 
 export interface PurchaseFormValues {
   amount: string;
   date: Date;
   currency: Currency;
   stockItemId?: string;
-  quantityPurchased?: string;
-  unitPrice?: string;
 }
 
 export interface PaymentFormValues {
@@ -143,20 +149,21 @@ export interface SupplierTaskFormValues {
   status: 'pending' | 'completed' | 'in-progress';
 }
 
-export interface Sale extends BaseEntity {
+export interface Sale {
+  id: string;
   customerId: string;
-  stockItemId?: string | null;
-  quantity?: number | null;
-  quantitySold?: number | null;
-  unitPrice?: number | null;
-  totalPrice?: number | null;
   amount: number;
   date: string;
   currency: Currency;
+  stockItemId?: string;
+  description?: string;
+  quantity?: number;
+  unitPrice?: number;
   category: 'satis';
   tags: TransactionTag[];
   transactionType: 'sale';
-  description?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Payment extends BaseEntity {
@@ -180,8 +187,6 @@ export interface Purchase extends Transaction {
   description?: string;
   transactionType: 'purchase';
   stockItemId?: string | null;
-  quantityPurchased?: number | null;
-  unitPrice?: number | null;
 }
 
 export interface PaymentToSupplier extends Transaction {
@@ -261,7 +266,6 @@ export interface StockItem {
   id: string;
   name: string;
   description?: string;
-  currentStock: number;
   unit?: string;
   createdAt: string;
   updatedAt: string;

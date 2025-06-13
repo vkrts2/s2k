@@ -160,7 +160,6 @@ export const addStockItem = async (uid: string, itemData: Omit<StockItem, 'id' |
   const now = formatISO(new Date());
   const dataForFirestore: any = {
     ...itemData,
-    currentStock: Number(itemData.currentStock) || 0,
     createdAt: now,
     updatedAt: now,
   };
@@ -178,7 +177,6 @@ export const updateStockItem = async (uid: string, updatedItemData: StockItem): 
   const { id, ...restOfUpdatedData } = updatedItemData;
   const dataForFirestore: any = {
     ...restOfUpdatedData,
-    currentStock: Number(updatedItemData.currentStock),
     updatedAt: now,
   };
 
@@ -238,82 +236,36 @@ export const addSale = async (uid: string, saleData: Omit<Sale, 'id' | 'transact
     description = "Genel Satış";
   }
 
+  const now = formatISO(new Date());
   const newSaleData = {
     ...saleData,
     transactionType: 'sale',
     description: description,
+    createdAt: now,
+    updatedAt: now,
   };
 
   const docRef = await addDoc(_getUserCollectionRef(uid, "sales"), newSaleData);
-
-  if (saleData.stockItemId && typeof saleData.quantitySold === 'number' && saleData.quantitySold > 0) {
-    const stockItem = await getStockItemById(uid, saleData.stockItemId); // uid eklendi ve await
-    if (stockItem) {
-      const updatedStockItem = {
-        ...stockItem,
-        currentStock: stockItem.currentStock - saleData.quantitySold,
-      };
-      await updateStockItem(uid, updatedStockItem); // uid eklendi ve await
-    }
-  }
 
   return { ...newSaleData, id: docRef.id } as Sale;
 };
 
 export const updateSale = async (uid: string, updatedSaleData: Sale): Promise<Sale> => {
+  const now = formatISO(new Date());
   const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), updatedSaleData.id);
-  const oldSaleSnapshot = await getDoc(saleDocRef); // getDoc import edildi
-  const oldSale = oldSaleSnapshot.exists() ? oldSaleSnapshot.data() as Sale : undefined;
 
-  // Eski stok etkisini geri al
-  if (oldSale && oldSale.stockItemId && typeof oldSale.quantitySold === 'number' && oldSale.quantitySold > 0) {
-    const oldStockItem = await getStockItemById(uid, oldSale.stockItemId); // uid eklendi ve await
-    if (oldStockItem) {
-      await updateStockItem(uid, { // uid eklendi ve await
-        ...oldStockItem,
-        currentStock: oldStockItem.currentStock + oldSale.quantitySold,
-      });
-    }
-  }
+  const { id, ...restOfUpdatedData } = updatedSaleData;
+  const dataForFirestore: any = {
+    ...restOfUpdatedData,
+    updatedAt: now,
+  };
 
-  let description = updatedSaleData.description;
-  if (updatedSaleData.stockItemId && !description) {
-    const stockItem = await getStockItemById(uid, updatedSaleData.stockItemId); // uid eklendi ve await
-    description = stockItem ? stockItem.name : "Stok Ürünü Satışı";
-  } else if (!description) {
-    description = "Genel Satış";
-  }
-
-  // Yeni stok etkisini uygula
-  if (updatedSaleData.stockItemId && typeof updatedSaleData.quantitySold === 'number' && updatedSaleData.quantitySold > 0) {
-    const newStockItem = await getStockItemById(uid, updatedSaleData.stockItemId); // uid eklendi ve await
-    if (newStockItem) {
-      await updateStockItem(uid, { // uid eklendi ve await
-        ...newStockItem,
-        currentStock: newStockItem.currentStock - updatedSaleData.quantitySold,
-      });
-    }
-  }
-
-  const { id, ...finalUpdatedSale } = { ...updatedSaleData, description: description };
-  await updateDoc(saleDocRef, finalUpdatedSale);
-  return { ...updatedSaleData, description: description };
+  await updateDoc(saleDocRef, dataForFirestore);
+  return { ...dataForFirestore, id: updatedSaleData.id } as Sale;
 };
 
 export const deleteSale = async (uid: string, saleId: string): Promise<void> => {
   const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), saleId);
-  const saleToDeleteSnapshot = await getDoc(saleDocRef); // getDoc import edildi
-  const saleToDelete = saleToDeleteSnapshot.exists() ? saleToDeleteSnapshot.data() as Sale : undefined;
-
-  if (saleToDelete && saleToDelete.stockItemId && typeof saleToDelete.quantitySold === 'number' && saleToDelete.quantitySold > 0) {
-    const stockItem = await getStockItemById(uid, saleToDelete.stockItemId); // uid eklendi ve await
-    if (stockItem) {
-      await updateStockItem(uid, { // uid eklendi ve await
-        ...stockItem,
-        currentStock: stockItem.currentStock + saleToDelete.quantitySold,
-      });
-    }
-  }
   await deleteDoc(saleDocRef);
 };
 
@@ -330,13 +282,11 @@ export const getPayments = async (uid: string, customerId?: string): Promise<Pay
       paymentsQuery = query(paymentsQuery, where("customerId", "==", customerId));
     }
     const querySnapshot = await getDocs(paymentsQuery);
-    console.log("getPayments - querySnapshot.docs:", querySnapshot.docs);
-    const payments: Payment[] = querySnapshot.docs.map(doc => ({
+    return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data() as Omit<Payment, 'id'>,
       currency: doc.data().currency || 'TRY',
     }));
-    return payments;
   } catch (error) {
     console.error("Error fetching payments:", error);
     return [];
@@ -344,19 +294,27 @@ export const getPayments = async (uid: string, customerId?: string): Promise<Pay
 };
 
 export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 'transactionType'>): Promise<Payment> => {
+  const now = formatISO(new Date());
   const newPaymentData = {
     ...paymentData,
     transactionType: 'payment',
+    createdAt: now,
+    updatedAt: now,
   };
   const docRef = await addDoc(_getUserCollectionRef(uid, "payments"), newPaymentData);
   return { ...newPaymentData, id: docRef.id } as Payment;
 };
 
 export const updatePayment = async (uid: string, updatedPayment: Payment): Promise<Payment> => {
+  const now = formatISO(new Date());
   const paymentDocRef = doc(_getUserCollectionRef(uid, "payments"), updatedPayment.id);
-  const { id, ...finalPayment } = updatedPayment;
-  await updateDoc(paymentDocRef, finalPayment);
-  return updatedPayment;
+  const { id, ...restOfUpdatedData } = updatedPayment;
+  const dataForFirestore: any = {
+    ...restOfUpdatedData,
+    updatedAt: now,
+  };
+  await updateDoc(paymentDocRef, dataForFirestore);
+  return { ...dataForFirestore, id: updatedPayment.id } as Payment;
 };
 
 export const deletePayment = async (uid: string, paymentId: string): Promise<void> => {
@@ -366,12 +324,22 @@ export const deletePayment = async (uid: string, paymentId: string): Promise<voi
 
 // Supplier Functions
 export const getSuppliers = async (uid: string): Promise<Supplier[]> => {
-  const q = query(_getUserCollectionRef(uid, "suppliers"), orderBy("createdAt", "desc"));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data() as Omit<Supplier, 'id'>
-  }));
+  console.log(`getSuppliers called with uid: ${uid}`);
+  if (!uid) {
+    console.error("getSuppliers: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    const q = query(_getUserCollectionRef(uid, "suppliers"), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<Supplier, 'id'>
+    }));
+  } catch (error) {
+    console.error("Error fetching suppliers:", error);
+    return [];
+  }
 };
 
 export const getSupplierById = async (uid: string, supplierId: string): Promise<Supplier | undefined> => {
@@ -407,16 +375,18 @@ export const deleteSupplier = async (uid: string, supplierId: string): Promise<v
   const supplierDocRef = doc(_getUserCollectionRef(uid, "suppliers"), supplierId);
   await deleteDoc(supplierDocRef);
 
+  // Tedarikçiye ait alışları sil
   const purchasesQuery = query(_getUserCollectionRef(uid, "purchases"), where("supplierId", "==", supplierId));
   const purchasesSnapshot = await getDocs(purchasesQuery);
   purchasesSnapshot.forEach(async (purchaseDoc) => {
     await deleteDoc(doc(_getUserCollectionRef(uid, "purchases"), purchaseDoc.id));
   });
 
-  const paymentsToSuppliersQuery = query(_getUserCollectionRef(uid, "paymentsToSuppliers"), where("supplierId", "==", supplierId));
-  const paymentsToSuppliersSnapshot = await getDocs(paymentsToSuppliersQuery);
-  paymentsToSuppliersSnapshot.forEach(async (paymentDoc) => {
-    await deleteDoc(doc(_getUserCollectionRef(uid, "paymentsToSuppliers"), paymentDoc.id));
+  // Tedarikçiye ait ödemeleri sil
+  const paymentsToSupplierQuery = query(_getUserCollectionRef(uid, "paymentsToSuppliers"), where("supplierId", "==", supplierId));
+  const paymentsToSupplierSnapshot = await getDocs(paymentsToSupplierQuery);
+  paymentsToSupplierSnapshot.forEach(async (paymentToSupplierDoc) => {
+    await deleteDoc(doc(_getUserCollectionRef(uid, "paymentsToSuppliers"), paymentToSupplierDoc.id));
   });
 };
 
@@ -433,23 +403,10 @@ export const getPurchases = async (uid: string, supplierId?: string): Promise<Pu
       purchasesQuery = query(purchasesQuery, where("supplierId", "==", supplierId));
     }
     const querySnapshot = await getDocs(purchasesQuery);
-    console.log("getPurchases - querySnapshot.docs:", querySnapshot.docs);
-    const purchases: Purchase[] = querySnapshot.docs.map(doc => {
-      let description = doc.data().description;
-      if (!description && doc.data().stockItemId) {
-        // Stok ürünü bilgisi Firestore'dan çekilmeli
-        description = "Stok Ürünü Alımı"; // Geçici varsayılan değer
-      } else if (!description) {
-        description = "Genel Alım";
-      }
-      return {
-        id: doc.id,
-        ...doc.data() as Omit<Purchase, 'id'>,
-        currency: doc.data().currency || 'TRY',
-        description: description
-      };
-    });
-    return purchases;
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<Purchase, 'id'>
+    }));
   } catch (error) {
     console.error("Error fetching purchases:", error);
     return [];
@@ -457,95 +414,35 @@ export const getPurchases = async (uid: string, supplierId?: string): Promise<Pu
 };
 
 export const addPurchase = async (uid: string, purchaseData: Omit<Purchase, 'id' | 'transactionType' | 'description'> & {description?: string}): Promise<Purchase> => {
-  let description = purchaseData.description;
-  if (purchaseData.stockItemId && !description) {
-    const stockItem = await getStockItemById(uid, purchaseData.stockItemId);
-    description = stockItem ? stockItem.name : "Stok Ürünü Alımı";
-  } else if (!description) {
-    description = "Genel Alım";
-  }
-
+  const now = formatISO(new Date());
   const newPurchaseData = {
     ...purchaseData,
     transactionType: 'purchase',
-    description: description,
+    createdAt: now,
+    updatedAt: now,
   };
-
   const docRef = await addDoc(_getUserCollectionRef(uid, "purchases"), newPurchaseData);
-
-  if (purchaseData.stockItemId && typeof purchaseData.quantityPurchased === 'number' && purchaseData.quantityPurchased > 0) {
-    const stockItem = await getStockItemById(uid, purchaseData.stockItemId);
-    if (stockItem) {
-      const updatedStockItem = {
-        ...stockItem,
-        currentStock: stockItem.currentStock + purchaseData.quantityPurchased,
-      };
-      await updateStockItem(uid, updatedStockItem);
-    }
-  }
-
   return { ...newPurchaseData, id: docRef.id } as Purchase;
 };
 
 export const updatePurchase = async (uid: string, updatedPurchaseData: Purchase): Promise<Purchase> => {
+  const now = formatISO(new Date());
   const purchaseDocRef = doc(_getUserCollectionRef(uid, "purchases"), updatedPurchaseData.id);
-  const oldPurchaseSnapshot = await getDoc(purchaseDocRef);
-  const oldPurchase = oldPurchaseSnapshot.exists() ? oldPurchaseSnapshot.data() as Purchase : undefined;
-
-  // Eski stok etkisini geri al
-  if (oldPurchase && oldPurchase.stockItemId && typeof oldPurchase.quantityPurchased === 'number' && oldPurchase.quantityPurchased > 0) {
-    const oldStockItem = await getStockItemById(uid, oldPurchase.stockItemId);
-    if (oldStockItem) {
-      await updateStockItem(uid, {
-        ...oldStockItem,
-        currentStock: oldStockItem.currentStock - oldPurchase.quantityPurchased,
-      });
-    }
-  }
-
-  let description = updatedPurchaseData.description;
-  if (updatedPurchaseData.stockItemId && !description) {
-    const stockItem = await getStockItemById(uid, updatedPurchaseData.stockItemId);
-    description = stockItem ? stockItem.name : "Stok Ürünü Alımı";
-  } else if (!description) {
-    description = "Genel Alım";
-  }
-
-  // Yeni stok etkisini uygula
-  if (updatedPurchaseData.stockItemId && typeof updatedPurchaseData.quantityPurchased === 'number' && updatedPurchaseData.quantityPurchased > 0) {
-    const newStockItem = await getStockItemById(uid, updatedPurchaseData.stockItemId);
-    if (newStockItem) {
-      await updateStockItem(uid, {
-        ...newStockItem,
-        currentStock: newStockItem.currentStock + updatedPurchaseData.quantityPurchased,
-      });
-    }
-  }
-
-  const { id, ...updateData } = updatedPurchaseData;
-  const finalUpdatedPurchase = { ...updateData, description };
-  await updateDoc(purchaseDocRef, finalUpdatedPurchase);
-  return { ...finalUpdatedPurchase, id } as Purchase;
+  const { id, ...restOfUpdatedData } = updatedPurchaseData;
+  const dataForFirestore: any = {
+    ...restOfUpdatedData,
+    updatedAt: now,
+  };
+  await updateDoc(purchaseDocRef, dataForFirestore);
+  return { ...dataForFirestore, id: updatedPurchaseData.id } as Purchase;
 };
 
 export const deletePurchase = async (uid: string, purchaseId: string): Promise<void> => {
   const purchaseDocRef = doc(_getUserCollectionRef(uid, "purchases"), purchaseId);
-  const purchaseToDeleteSnapshot = await getDoc(purchaseDocRef);
-  const purchaseToDelete = purchaseToDeleteSnapshot.exists() ? purchaseToDeleteSnapshot.data() as Purchase : undefined;
-
-  if (purchaseToDelete && purchaseToDelete.stockItemId && typeof purchaseToDelete.quantityPurchased === 'number' && purchaseToDelete.quantityPurchased > 0) {
-    const stockItem = await getStockItemById(uid, purchaseToDelete.stockItemId);
-    if (stockItem) {
-      await updateStockItem(uid, {
-        ...stockItem,
-        currentStock: stockItem.currentStock - purchaseToDelete.quantityPurchased,
-      });
-    }
-  }
   await deleteDoc(purchaseDocRef);
 };
 
-// Payment To Supplier Functions
+// PaymentToSupplier Functions
 export const getPaymentsToSuppliers = async (uid: string, supplierId?: string): Promise<PaymentToSupplier[]> => {
   console.log(`getPaymentsToSuppliers called with uid: ${uid}`);
   if (!uid) {
@@ -553,17 +450,16 @@ export const getPaymentsToSuppliers = async (uid: string, supplierId?: string): 
     return [];
   }
   try {
-    let paymentsToSuppliersQuery = query(_getUserCollectionRef(uid, "paymentsToSuppliers"), orderBy("date", "desc"));
+    let paymentsQuery = query(_getUserCollectionRef(uid, "paymentsToSuppliers"), orderBy("date", "desc"));
     if (supplierId) {
-      paymentsToSuppliersQuery = query(paymentsToSuppliersQuery, where("supplierId", "==", supplierId));
+      paymentsQuery = query(paymentsQuery, where("supplierId", "==", supplierId));
     }
-    const querySnapshot = await getDocs(paymentsToSuppliersQuery);
-    console.log("getPaymentsToSuppliers - querySnapshot.docs:", querySnapshot.docs);
-    const paymentsToSuppliers: PaymentToSupplier[] = querySnapshot.docs.map(doc => ({
+    const querySnapshot = await getDocs(paymentsQuery);
+    return querySnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data() as Omit<PaymentToSupplier, 'id'>
+      ...doc.data() as Omit<PaymentToSupplier, 'id'>,
+      currency: doc.data().currency || 'TRY',
     }));
-    return paymentsToSuppliers;
   } catch (error) {
     console.error("Error fetching payments to suppliers:", error);
     return [];
@@ -571,19 +467,27 @@ export const getPaymentsToSuppliers = async (uid: string, supplierId?: string): 
 };
 
 export const addPaymentToSupplier = async (uid: string, paymentData: Omit<PaymentToSupplier, 'id' | 'transactionType'>): Promise<PaymentToSupplier> => {
+  const now = formatISO(new Date());
   const newPaymentData = {
     ...paymentData,
     transactionType: 'paymentToSupplier',
+    createdAt: now,
+    updatedAt: now,
   };
   const docRef = await addDoc(_getUserCollectionRef(uid, "paymentsToSuppliers"), newPaymentData);
   return { ...newPaymentData, id: docRef.id } as PaymentToSupplier;
 };
 
 export const updatePaymentToSupplier = async (uid: string, updatedPayment: PaymentToSupplier): Promise<PaymentToSupplier> => {
+  const now = formatISO(new Date());
   const paymentDocRef = doc(_getUserCollectionRef(uid, "paymentsToSuppliers"), updatedPayment.id);
-  const { id, ...updateData } = updatedPayment;
-  await updateDoc(paymentDocRef, updateData);
-  return updatedPayment;
+  const { id, ...restOfUpdatedData } = updatedPayment;
+  const dataForFirestore: any = {
+    ...restOfUpdatedData,
+    updatedAt: now,
+  };
+  await updateDoc(paymentDocRef, dataForFirestore);
+  return { ...dataForFirestore, id: updatedPayment.id } as PaymentToSupplier;
 };
 
 export const deletePaymentToSupplier = async (uid: string, paymentId: string): Promise<void> => {
@@ -594,27 +498,30 @@ export const deletePaymentToSupplier = async (uid: string, paymentId: string): P
 // Todo Functions
 export const getTodos = async (uid: string): Promise<TodoItem[]> => {
   console.log(`getTodos called with uid: ${uid}`);
-  const q = query(_getUserCollectionRef(uid, "todos"), orderBy("createdAt", "desc"));
-  const querySnapshot = await getDocs(q);
-  const todos: TodoItem[] = querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data() as Omit<TodoItem, 'id'>
-  }));
-  // Tarihe göre sıralama (varsa dueDate, yoksa createdAt)
-  return todos.sort((a, b) => {
-    const dateA = a.dueDate ? parseISO(a.dueDate).getTime() : parseISO(a.createdAt).getTime();
-    const dateB = b.dueDate ? parseISO(b.dueDate).getTime() : parseISO(b.createdAt).getTime();
-    return dateB - dateA;
-  });
+  if (!uid) {
+    console.error("getTodos: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    const q = query(_getUserCollectionRef(uid, "todos"), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<TodoItem, 'id'>
+    }));
+  } catch (error) {
+    console.error("Error fetching todos:", error);
+    return [];
+  }
 };
 
 export const addTodo = async (uid: string, payload: { text: string; dueDate?: Date; notes?: string; }): Promise<TodoItem> => {
   const now = formatISO(new Date());
   const newTodoData = {
-    text: payload.text,
+    ...payload,
     completed: false,
     createdAt: now,
-    dueDate: payload.dueDate ? formatISO(payload.dueDate, { representation: 'date' }) : null,
+    dueDate: payload.dueDate ? formatISO(payload.dueDate, { representation: 'date' }) : undefined, // YYYY-MM-DD formatında kaydet
     notes: payload.notes || null,
   };
   const docRef = await addDoc(_getUserCollectionRef(uid, "todos"), newTodoData);
@@ -623,11 +530,11 @@ export const addTodo = async (uid: string, payload: { text: string; dueDate?: Da
 
 export const toggleTodoCompleted = async (uid: string, todoId: string): Promise<TodoItem | undefined> => {
   const todoDocRef = doc(_getUserCollectionRef(uid, "todos"), todoId);
-  const docSnap = await getDoc(todoDocRef);
-  if (docSnap.exists()) {
-    const currentStatus = docSnap.data().completed;
-    await updateDoc(todoDocRef, { completed: !currentStatus });
-    return { ...docSnap.data() as TodoItem, id: docSnap.id, completed: !currentStatus };
+  const todoSnap = await getDoc(todoDocRef);
+  if (todoSnap.exists()) {
+    const currentStatus = todoSnap.data().completed;
+    await updateDoc(todoDocRef, { completed: !currentStatus, updatedAt: formatISO(new Date()) });
+    return { ...todoSnap.data(), id: todoSnap.id, completed: !currentStatus } as TodoItem;
   }
   return undefined;
 };
@@ -641,18 +548,12 @@ export const deleteTodo = async (uid: string, todoId: string): Promise<void> => 
 export const getPortfolioItems = async (uid: string): Promise<PortfolioItem[]> => {
   console.log(`getPortfolioItems called with uid: ${uid}`);
   if (!uid) {
-    console.error("getPortfolioItems: User ID (uid) is missing. Returning empty array.");
+    console.error("getPortfolioItems: User ID (uid) is missing.");
     return [];
   }
   try {
     const q = query(_getUserCollectionRef(uid, "portfolioItems"), orderBy("createdAt", "desc"));
     const querySnapshot = await getDocs(q);
-
-    if (!Array.isArray(querySnapshot.docs)) {
-      console.error("getPortfolioItems: querySnapshot.docs is not an array.", querySnapshot.docs);
-      return [];
-    }
-
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data() as Omit<PortfolioItem, 'id'>
@@ -678,7 +579,6 @@ export const addPortfolioItem = async (uid: string, itemData: Omit<PortfolioItem
     ...itemData,
     createdAt: now,
     updatedAt: now,
-    notes: itemData.notes || null,
   };
   const docRef = await addDoc(_getUserCollectionRef(uid, "portfolioItems"), newItemData);
   return { ...newItemData, id: docRef.id } as PortfolioItem;
@@ -687,10 +587,13 @@ export const addPortfolioItem = async (uid: string, itemData: Omit<PortfolioItem
 export const updatePortfolioItem = async (uid: string, updatedItem: PortfolioItem): Promise<PortfolioItem> => {
   const now = formatISO(new Date());
   const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), updatedItem.id);
-  const { id, ...updateData } = updatedItem;
-  const finalItem = { ...updateData, updatedAt: now, notes: updateData.notes || null };
-  await updateDoc(portfolioItemDocRef, finalItem);
-  return { ...finalItem, id } as PortfolioItem;
+  const { id, ...restOfUpdatedItem } = updatedItem;
+  const dataForFirestore: any = {
+    ...restOfUpdatedItem,
+    updatedAt: now,
+  };
+  await updateDoc(portfolioItemDocRef, dataForFirestore);
+  return { ...dataForFirestore, id: updatedItem.id } as PortfolioItem;
 };
 
 export const deletePortfolioItem = async (uid: string, itemId: string): Promise<void> => {
@@ -698,22 +601,16 @@ export const deletePortfolioItem = async (uid: string, itemId: string): Promise<
   await deleteDoc(portfolioItemDocRef);
 };
 
-// Archived Files Metadata Functions (Dosyaların kendisi için Firebase Storage düşünülebilir)
+// Archived Files Functions
 export const getArchivedFilesMetadata = async (uid: string): Promise<ArchivedFile[]> => {
   console.log(`getArchivedFilesMetadata called with uid: ${uid}`);
   if (!uid) {
-    console.error("getArchivedFilesMetadata: User ID (uid) is missing. Returning empty array.");
+    console.error("getArchivedFilesMetadata: User ID (uid) is missing.");
     return [];
   }
   try {
-    const q = query(_getUserCollectionRef(uid, "archivedFilesMetadata"), orderBy("uploadDate", "desc"));
+    const q = query(_getUserCollectionRef(uid, "archivedFiles"), orderBy("uploadDate", "desc"));
     const querySnapshot = await getDocs(q);
-
-    if (!Array.isArray(querySnapshot.docs)) {
-      console.error("getArchivedFilesMetadata: querySnapshot.docs is not an array.", querySnapshot.docs);
-      return [];
-    }
-
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data() as Omit<ArchivedFile, 'id'>
@@ -725,40 +622,30 @@ export const getArchivedFilesMetadata = async (uid: string): Promise<ArchivedFil
 };
 
 export const addArchivedFile = async (uid: string, fileMetadataInput: Omit<ArchivedFile, 'id' | 'uploadDate'>, fileBlob: Blob): Promise<ArchivedFile> => {
-  // Not: Dosya içeriği (fileBlob) şu anda Firestore'a kaydedilmiyor.
-  // Büyük dosyalar için Firebase Storage kullanılması önerilir.
-  // Bu örnekte sadece metadata Firestore'a kaydediliyor.
   const now = formatISO(new Date());
-  const newMetadata = {
+  const newFileMetadata = {
     ...fileMetadataInput,
     uploadDate: now,
   };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "archivedFilesMetadata"), newMetadata);
-  return { ...newMetadata, id: docRef.id } as ArchivedFile;
+  const docRef = await addDoc(_getUserCollectionRef(uid, "archivedFiles"), newFileMetadata);
+  return { ...newFileMetadata, id: docRef.id } as ArchivedFile;
 };
 
 export const deleteArchivedFile = async (uid: string, fileId: string): Promise<void> => {
-  const fileDocRef = doc(_getUserCollectionRef(uid, "archivedFilesMetadata"), fileId);
+  const fileDocRef = doc(_getUserCollectionRef(uid, "archivedFiles"), fileId);
   await deleteDoc(fileDocRef);
-  // Not: Eğer dosya Firebase Storage'da ise, buradan ayrıca silinmelidir.
 };
 
 // Useful Links Functions
 export const getUsefulLinks = async (uid: string): Promise<UsefulLink[]> => {
   console.log(`getUsefulLinks called with uid: ${uid}`);
   if (!uid) {
-    console.error("getUsefulLinks: User ID (uid) is missing. Returning empty array.");
+    console.error("getUsefulLinks: User ID (uid) is missing.");
     return [];
   }
   try {
     const q = query(_getUserCollectionRef(uid, "usefulLinks"), orderBy("createdAt", "desc"));
     const querySnapshot = await getDocs(q);
-
-    if (!Array.isArray(querySnapshot.docs)) {
-      console.error("getUsefulLinks: querySnapshot.docs is not an array.", querySnapshot.docs);
-      return [];
-    }
-
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data() as Omit<UsefulLink, 'id'>
@@ -786,6 +673,7 @@ export const deleteUsefulLink = async (uid: string, linkId: string): Promise<voi
 
 // Quotation Functions
 export const getQuotations = async (uid: string): Promise<Quotation[]> => {
+  console.log(`getQuotations called with uid: ${uid}`);
   if (!uid) {
     console.error("getQuotations: User ID (uid) is missing.");
     return [];
@@ -793,27 +681,10 @@ export const getQuotations = async (uid: string): Promise<Quotation[]> => {
   try {
     const q = query(_getUserCollectionRef(uid, "quotations"), orderBy("createdAt", "desc"));
     const querySnapshot = await getDocs(q);
-
-    if (!Array.isArray(querySnapshot.docs)) {
-      console.error("getQuotations: querySnapshot.docs is not an array.", querySnapshot.docs);
-      return [];
-    }
-
-    return querySnapshot.docs.map(doc => {
-      const data = doc.data() as Omit<Quotation, 'id'>;
-      return {
-        id: doc.id,
-        ...data,
-        // date alanını ISO string formatında tutmaya devam et
-        date: data.date || formatISO(new Date()), // Firestore'dan gelen stringi kullan, yoksa varsayılan ISO string
-        validUntilDate: data.validUntilDate || formatISO(addDays(new Date(), 30)), // Firestore'dan gelen stringi kullan, yoksa varsayılan ISO string
-        // items dizisindeki her bir item'ın total değerini hesaplama
-        items: data.items?.map((item: any) => ({
-          ...item,
-          total: (item.quantity || 0) * (item.unitPrice || 0) // quantity ve unitPrice null/undefined ise 0 kabul et
-        })) || []
-      };
-    });
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<Quotation, 'id'>
+    }));
   } catch (error) {
     console.error("Error fetching quotations:", error);
     return [];
@@ -830,25 +701,23 @@ export const getQuotationById = async (uid: string, quotationId: string): Promis
 };
 
 export const generateQuotationNumber = async (uid: string): Promise<string> => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const q = query(_getUserCollectionRef(uid, "quotations"), 
-                  where("date", ">=", formatISO(new Date(year, 0, 1), { representation: 'date' })),
-                  where("date", "<=", formatISO(new Date(year, 11, 31), { representation: 'date' })),
-                  orderBy("createdAt", "desc"), // En yeni teklif numarasını bulmak için
-                  limit(1) // Sadece 1 sonuç al
-                );
+  const q = query(
+    _getUserCollectionRef(uid, "quotations"),
+    orderBy("createdAt", "desc"),
+    limit(1)
+  );
   const querySnapshot = await getDocs(q);
-  let latestNumber = 0;
+  let lastNumber = 0;
   if (!querySnapshot.empty) {
-    const latestQuotation = querySnapshot.docs[0].data() as Quotation;
-    const match = latestQuotation.quotationNumber.match(/TEKLIF-(\d{4})-(\d{3})/);
-    if (match && parseInt(match[1]) === year) {
-      latestNumber = parseInt(match[2]);
+    const lastQuotation = querySnapshot.docs[0].data() as Quotation;
+    const match = lastQuotation.quotationNumber.match(/\d+$/);
+    if (match) {
+      lastNumber = parseInt(match[0], 10);
     }
   }
-  const nextNumber = latestNumber + 1;
-  return `TEKLIF-${year}-${String(nextNumber).padStart(3, '0')}`;
+  const newNumber = lastNumber + 1;
+  const year = new Date().getFullYear();
+  return `TEKLIF-${year}-${String(newNumber).padStart(3, '0')}`;
 };
 
 export const addQuotation = async (uid: string, quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation> => {
@@ -856,7 +725,7 @@ export const addQuotation = async (uid: string, quotationData: Omit<Quotation, '
   const quotationNumber = await generateQuotationNumber(uid);
   const newQuotationData = {
     ...quotationData,
-    quotationNumber: quotationNumber,
+    quotationNumber,
     createdAt: now,
     updatedAt: now,
   };
@@ -867,10 +736,9 @@ export const addQuotation = async (uid: string, quotationData: Omit<Quotation, '
 export const updateQuotation = async (uid: string, updatedQuotation: Quotation): Promise<Quotation> => {
   const now = formatISO(new Date());
   const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), updatedQuotation.id);
-  const { id, ...updateData } = updatedQuotation;
-  const finalQuotation = { ...updateData, updatedAt: now };
+  const finalQuotation = { ...updatedQuotation, updatedAt: now };
   await updateDoc(quotationDocRef, finalQuotation);
-  return { ...finalQuotation, id } as Quotation;
+  return finalQuotation;
 };
 
 export const deleteQuotation = async (uid: string, quotationId: string): Promise<void> => {
@@ -880,14 +748,18 @@ export const deleteQuotation = async (uid: string, quotationId: string): Promise
 
 // Contact History Functions
 export const addContactHistory = async (uid: string, contactHistoryData: Omit<ContactHistoryItem, 'id'>): Promise<ContactHistoryItem> => {
-  const docRef = await addDoc(_getUserCollectionRef(uid, "contactHistory"), contactHistoryData);
-  return { ...contactHistoryData, id: docRef.id } as ContactHistoryItem;
+  const now = formatISO(new Date());
+  const newContactHistoryData = { ...contactHistoryData, createdAt: now, updatedAt: now };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "contactHistory"), newContactHistoryData);
+  return { ...newContactHistoryData, id: docRef.id } as ContactHistoryItem;
 };
 
 export const updateContactHistory = async (uid: string, contactHistoryData: ContactHistoryItem): Promise<ContactHistoryItem> => {
+  const now = formatISO(new Date());
   const contactHistoryDocRef = doc(_getUserCollectionRef(uid, "contactHistory"), contactHistoryData.id);
-  await updateDoc(contactHistoryDocRef, contactHistoryData);
-  return contactHistoryData;
+  const finalContactHistory = { ...contactHistoryData, updatedAt: now };
+  await updateDoc(contactHistoryDocRef, finalContactHistory);
+  return finalContactHistory;
 };
 
 export const deleteContactHistory = async (uid: string, contactHistoryId: string): Promise<void> => {
@@ -897,14 +769,18 @@ export const deleteContactHistory = async (uid: string, contactHistoryId: string
 
 // Task Functions
 export const addTask = async (uid: string, taskData: Omit<SupplierTask, 'id'>): Promise<SupplierTask> => {
-  const docRef = await addDoc(_getUserCollectionRef(uid, "tasks"), taskData);
-  return { ...taskData, id: docRef.id } as SupplierTask;
+  const now = formatISO(new Date());
+  const newTaskData = { ...taskData, createdAt: now, updatedAt: now };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "tasks"), newTaskData);
+  return { ...newTaskData, id: docRef.id } as SupplierTask;
 };
 
 export const updateTask = async (uid: string, taskData: SupplierTask): Promise<SupplierTask> => {
+  const now = formatISO(new Date());
   const taskDocRef = doc(_getUserCollectionRef(uid, "tasks"), taskData.id);
-  await updateDoc(taskDocRef, taskData);
-  return taskData;
+  const finalTask = { ...taskData, updatedAt: now };
+  await updateDoc(taskDocRef, finalTask);
+  return finalTask;
 };
 
 export const deleteTask = async (uid: string, taskId: string): Promise<void> => {

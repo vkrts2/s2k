@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 interface SaleModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => Promise<void>;
+  onSubmit: (values: SaleFormValues) => Promise<void>;
   formValues: SaleFormValues;
   setFormValues: Dispatch<SetStateAction<SaleFormValues>>;
   availableStockItems: StockItem[];
@@ -26,10 +26,10 @@ const EMPTY_SALE_FORM_VALUES: SaleFormValues = {
   amount: '',
   date: new Date(),
   currency: 'TRY',
-  stockItemId: 'none',
-  quantity: '',
-  unitPrice: '',
+  stockItemId: undefined,
   description: '',
+  quantity: undefined,
+  unitPrice: undefined,
 };
 
 export function SaleModal({
@@ -47,9 +47,64 @@ export function SaleModal({
         <DialogHeader>
           <DialogTitle>Satış Ekle</DialogTitle>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); onSubmit(formValues); }} className="space-y-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="amount" className="text-right">Tutar</Label>
+            <Label htmlFor="stockItemId" className="text-right">Stok Ürünü</Label>
+            <Select
+              value={formValues.stockItemId}
+              onValueChange={(value) => setFormValues({ ...formValues, stockItemId: value === 'none' ? undefined : value })}
+            >
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Stok ürünü seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Yok</SelectItem>
+                {availableStockItems.map(item => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name} ({item.unit})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="quantity" className="text-right">Miktar</Label>
+            <Input
+              id="quantity"
+              type="number"
+              value={formValues.quantity || ''}
+              onChange={(e) => {
+                const quantity = e.target.value;
+                const amount = quantity && formValues.unitPrice
+                  ? (parseFloat(quantity) * parseFloat(formValues.unitPrice)).toString()
+                  : formValues.amount;
+                setFormValues({ ...formValues, quantity, amount });
+              }}
+              className="col-span-3"
+              step="0.01"
+              min="0"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="unitPrice" className="text-right">Birim Fiyat</Label>
+            <Input
+              id="unitPrice"
+              type="number"
+              value={formValues.unitPrice || ''}
+              onChange={(e) => {
+                const unitPrice = e.target.value;
+                const amount = unitPrice && formValues.quantity
+                  ? (parseFloat(unitPrice) * parseFloat(formValues.quantity)).toString()
+                  : formValues.amount;
+                setFormValues({ ...formValues, unitPrice, amount });
+              }}
+              className="col-span-3"
+              step="0.01"
+              min="0"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="amount" className="text-right">Toplam Tutar</Label>
             <Input
               id="amount"
               type="number"
@@ -100,52 +155,6 @@ export function SaleModal({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="stockItemId" className="text-right">Stok Ürünü</Label>
-            <Select
-              value={formValues.stockItemId}
-              onValueChange={(value) => setFormValues({ ...formValues, stockItemId: value })}
-            >
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Stok ürünü seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableStockItems.map(item => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name} ({item.unit})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {formValues.stockItemId && (
-            <>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="quantity" className="text-right">Miktar</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  value={formValues.quantity}
-                  onChange={(e) => setFormValues({ ...formValues, quantity: e.target.value })}
-                  className="col-span-3"
-                  step="0.01"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="unitPrice" className="text-right">Birim Fiyat</Label>
-                <Input
-                  id="unitPrice"
-                  type="number"
-                  value={formValues.unitPrice}
-                  onChange={(e) => setFormValues({ ...formValues, unitPrice: e.target.value })}
-                  className="col-span-3"
-                  step="0.01"
-                  required
-                />
-              </div>
-            </>
-          )}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="description" className="text-right">Açıklama</Label>
             <Textarea
