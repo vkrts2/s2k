@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,8 +46,13 @@ export function SaleModal({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Satış Ekle</DialogTitle>
+          <DialogDescription>Yeni bir satış işlemi ekleyin veya mevcut bir satışı düzenleyin.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit(formValues); }} className="space-y-4">
+        <form onSubmit={(e) => { 
+          e.preventDefault(); 
+          console.log("Sale form submitted!"); 
+          onSubmit(formValues); 
+        }} className="space-y-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="stockItemId" className="text-right">Stok Ürünü</Label>
             <Select
