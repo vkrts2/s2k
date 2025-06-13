@@ -488,7 +488,12 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
   const handleSaleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !customer.id) return;
+    console.log('handleSaleSubmit called');
+    console.log('Sale Form Values:', saleFormValues);
+    if (!user || !customer.id) {
+      console.error('User not logged in or customer ID missing.');
+      return;
+    }
 
     try {
       const amount = parseFloat(saleFormValues.amount);
@@ -501,6 +506,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           description: 'Geçerli bir tutar giriniz.',
           variant: 'destructive',
         });
+        console.error('Invalid amount:', amount);
         return;
       }
 
@@ -511,6 +517,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
             description: 'Geçerli bir miktar giriniz.',
             variant: 'destructive',
           });
+          console.error('Invalid quantity:', quantity);
           return;
         }
         if (isNaN(unitPrice!) || unitPrice! <= 0) {
@@ -519,6 +526,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
             description: 'Geçerli bir birim fiyat giriniz.',
             variant: 'destructive',
           });
+          console.error('Invalid unit price:', unitPrice);
           return;
         }
         const stockItem = availableStockItems.find(item => item.id === saleFormValues.stockItemId);
@@ -528,6 +536,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
             description: `Yetersiz stok. Mevcut: ${stockItem.currentStock} ${stockItem.unit || 'adet'}`,
             variant: 'destructive',
           });
+          console.error('Insufficient stock:', stockItem.currentStock, quantity);
           return;
         }
       }
@@ -624,7 +633,12 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !customer.id) return;
+    console.log('handlePaymentSubmit called');
+    console.log('Payment Form Values:', paymentFormValues);
+    if (!user || !customer.id) {
+      console.error('User not logged in or customer ID missing.');
+      return;
+    }
 
     try {
       const amount = parseFloat(paymentFormValues.amount);
@@ -634,6 +648,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           description: 'Geçerli bir tutar giriniz.',
           variant: 'destructive',
         });
+        console.error('Invalid amount:', amount);
         return;
       }
 
