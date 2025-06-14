@@ -202,7 +202,7 @@ export interface PaymentToSupplier extends Transaction {
   supplierId: string;
   method: string; // Ödeme yöntemi
   description?: string; // Ek açıklama
-  referenceNumber?: string;
+  referenceNumber?: string | null;
   transactionType: 'paymentToSupplier';
 }
 

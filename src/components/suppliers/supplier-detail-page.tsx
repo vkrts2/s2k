@@ -360,6 +360,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
 
   const handlePurchaseFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("handlePurchaseFormSubmit çağrıldı. purchaseFormValues:", purchaseFormValues);
     if (!user || !supplier.id) return;
 
     try {
@@ -402,7 +403,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         amount,
         date: formatISO(purchaseFormValues.date),
         currency: purchaseFormValues.currency,
-        stockItemId: purchaseFormValues.stockItemId === 'none' ? undefined : purchaseFormValues.stockItemId,
+        stockItemId: purchaseFormValues.stockItemId === 'none' ? null : purchaseFormValues.stockItemId,
         quantityPurchased: purchaseFormValues.quantityPurchased ? parseFloat(purchaseFormValues.quantityPurchased) : undefined,
         unitPrice: purchaseFormValues.unitPrice ? parseFloat(purchaseFormValues.unitPrice) : undefined,
         description: purchaseFormValues.description || (purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none'
@@ -466,7 +467,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         date: formatISO(paymentToSupplierFormValues.date),
         currency: paymentToSupplierFormValues.currency,
         method: paymentToSupplierFormValues.method,
-        referenceNumber: paymentToSupplierFormValues.referenceNumber || undefined,
+        referenceNumber: paymentToSupplierFormValues.referenceNumber || null,
         description: `${paymentToSupplierFormValues.method} ile ödeme`,
         transactionType: 'paymentToSupplier',
         category: 'odeme',
@@ -1003,8 +1004,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         isOpen={!!deletingPurchaseId}
         onClose={() => setDeletingPurchaseId(null)}
         onConfirm={async () => {
-          if (deletingPurchaseId) {
-            await storageDeletePurchase(deletingPurchaseId);
+          if (deletingPurchaseId && user) {
+            await storageDeletePurchase(user!.uid, deletingPurchaseId);
             setPurchases(purchases.filter(p => p.id !== deletingPurchaseId));
             setDeletingPurchaseId(null);
           }
@@ -1017,8 +1018,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         isOpen={!!deletingPaymentToSupplierId}
         onClose={() => setDeletingPaymentToSupplierId(null)}
         onConfirm={async () => {
-          if (deletingPaymentToSupplierId) {
-            await storageDeletePaymentToSupplier(deletingPaymentToSupplierId);
+          if (deletingPaymentToSupplierId && user) {
+            await storageDeletePaymentToSupplier(user!.uid, deletingPaymentToSupplierId);
             setPaymentsToSupplier(paymentsToSupplier.filter(p => p.id !== deletingPaymentToSupplierId));
             setDeletingPaymentToSupplierId(null);
           }
@@ -1031,8 +1032,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         isOpen={!!deletingSupplier}
         onClose={() => setDeletingSupplier(null)}
         onConfirm={async () => {
-          if (deletingSupplier) {
-            await storageDeleteSupplier(deletingSupplier);
+          if (deletingSupplier && user) {
+            await storageDeleteSupplier(user!.uid, deletingSupplier);
             window.location.href = '/suppliers';
           }
         }}
