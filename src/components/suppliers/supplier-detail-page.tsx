@@ -381,7 +381,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     setShowPurchaseModal(true);
   }, []);
 
-  const handleOpenEditPurchaseModal = (purchase: Purchase) => {
+  const handleOpenEditPurchaseModal = useCallback((purchase: Purchase) => {
     setEditingPurchase(purchase);
     setPurchaseFormValues({
       amount: purchase.amount.toString(),
@@ -389,11 +389,11 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       currency: purchase.currency,
       stockItemId: purchase.stockItemId || undefined,
       description: purchase.description,
-      quantityPurchased: purchase.quantityPurchased || undefined,
-      unitPrice: purchase.unitPrice || undefined,
+      quantityPurchased: purchase.quantityPurchased?.toString() || undefined,
+      unitPrice: purchase.unitPrice?.toString() || undefined,
     });
     setShowPurchaseModal(true);
-  };
+  }, []);
 
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -434,7 +434,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           quantityPurchased: quantityPurchased,
           unitPrice: unitPrice,
           transactionType: 'purchase',
-          category: 'urun-alim',
+          category: 'diger',
           tags: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -465,7 +465,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     setShowPaymentToSupplierModal(true);
   }, []);
 
-  const handleOpenEditPaymentToSupplierModal = (payment: PaymentToSupplier) => {
+  const handleOpenEditPaymentToSupplierModal = useCallback((payment: PaymentToSupplier) => {
     setEditingPaymentToSupplier(payment);
     setPaymentToSupplierFormValues({
       amount: payment.amount.toString(),
@@ -474,11 +474,11 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       currency: payment.currency,
       referenceNumber: payment.referenceNumber || '',
       description: payment.description || '',
-      checkDate: payment.checkDate ? parseISO(payment.checkDate) : null,
+      checkDate: payment.checkDate ? parseISO(payment.checkDate as string) : null,
       checkSerialNumber: payment.checkSerialNumber || null,
     });
     setShowPaymentToSupplierModal(true);
-  };
+  }, []);
 
   const handlePaymentToSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -547,7 +547,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const handleDeletePurchase = useCallback(async (purchaseId: string) => {
     if (!user || !supplier?.id) return;
     try {
-      await storageDeletePurchase(user.uid, supplier.id, purchaseId);
+      await storageDeletePurchase(user.uid, purchaseId);
       setPurchases(prev => prev.filter(p => p.id !== purchaseId));
       toast({
         title: "Satın alma silindi",
@@ -566,7 +566,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const handleDeletePaymentToSupplier = useCallback(async (paymentId: string) => {
     if (!user || !supplier?.id) return;
     try {
-      await storageDeletePaymentToSupplier(user.uid, supplier.id, paymentId);
+      await storageDeletePaymentToSupplier(user.uid, paymentId);
       setPaymentsToSupplier(prev => prev.filter(p => p.id !== paymentId));
       toast({
         title: "Ödeme silindi",
@@ -582,10 +582,11 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     }
   }, [user, supplier, toast]);
 
-  const safeFormatDate = (dateString: string, formatString: string) => {
+  const safeFormatDate = useCallback((dateString?: string | null, formatString: string = 'dd.MM.yyyy') => {
+    if (!dateString) return 'Tarih Yok';
     const date = parseISO(dateString);
     return isValid(date) ? format(date, formatString, { locale: tr }) : 'Geçersiz Tarih';
-  };
+  }, []);
 
   const renderTransactionDetail = (item: UnifiedTransactionClient) => {
     if (item.transactionType === 'purchase') {
@@ -600,13 +601,13 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
               <p>{stockItemDisplayNames[purchase.stockItemId] || 'Yükleniyor...'}</p>
             </>
           )}
-          {purchase.quantityPurchased && (
+          {purchase.quantityPurchased !== undefined && purchase.quantityPurchased !== null && (
             <>
               <p className="font-medium">Adet:</p>
               <p>{purchase.quantityPurchased}</p>
             </>
           )}
-          {purchase.unitPrice && (
+          {purchase.unitPrice !== undefined && purchase.unitPrice !== null && (
             <>
               <p className="font-medium">Birim Fiyat:</p>
               <p>{formatCurrency(purchase.unitPrice, purchase.currency)}</p>
@@ -658,7 +659,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       date: parseISO(item.date),
       type: item.type,
       summary: item.summary,
-      notes: item.notes,
+      notes: item.notes || '',
     });
     setShowContactHistoryModal(true);
   }, []);
@@ -672,28 +673,27 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           date: formatISO(values.date),
           type: values.type,
           summary: values.summary,
-          notes: values.notes,
+          notes: values.notes || '',
           updatedAt: new Date().toISOString(),
         };
-        await storageUpdateContactHistory(user.uid, supplier.id, updatedItem);
+        await storageUpdateContactHistory(user.uid, updatedItem);
         setContactHistory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
         toast({
           title: "İletişim Geçmişi Güncellendi",
           description: "İletişim geçmişi kaydı başarıyla güncellendi.",
         });
       } else {
-        const newItem: ContactHistoryItem = {
-          id: Math.random().toString(36).substr(2, 9),
+        const newItem: Omit<ContactHistoryItem, 'id'> = {
           supplierId: supplier.id,
           date: formatISO(values.date),
           type: values.type,
           summary: values.summary,
-          notes: values.notes,
+          notes: values.notes || '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        await storageAddContactHistory(user.uid, supplier.id, newItem);
-        setContactHistory(prev => [...prev, newItem]);
+        await storageAddContactHistory(user.uid, newItem);
+        setContactHistory(prev => [...prev, { ...newItem, id: Math.random().toString(36).substr(2, 9) }]);
         toast({
           title: "İletişim Geçmişi Eklendi",
           description: "Yeni iletişim geçmişi kaydı başarıyla eklendi.",
@@ -744,15 +744,14 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           status: values.status,
           updatedAt: new Date().toISOString(),
         };
-        await updateSupplierTask(user.uid, supplier.id, updatedTask);
+        await updateSupplierTask(user.uid, updatedTask);
         setTasks(prev => prev.map(task => task.id === updatedTask.id ? updatedTask : task));
         toast({
           title: "Görev Güncellendi",
           description: "Görev başarıyla güncellendi.",
         });
       } else {
-        const newTask: SupplierTask = {
-          id: Math.random().toString(36).substr(2, 9),
+        const newTask: Omit<SupplierTask, 'id'> = {
           supplierId: supplier.id,
           description: values.description,
           dueDate: values.dueDate ? formatISO(values.dueDate) : undefined,
@@ -760,8 +759,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        await addSupplierTask(user.uid, supplier.id, newTask);
-        setTasks(prev => [...prev, newTask]);
+        await addSupplierTask(user.uid, newTask);
+        setTasks(prev => [...prev, { ...newTask, id: Math.random().toString(36).substr(2, 9) }]);
         toast({
           title: "Görev Eklendi",
           description: "Yeni görev başarıyla eklendi.",
@@ -977,6 +976,48 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     }
   }, [user, toast]);
 
+  const handleSaveNotes = useCallback(async () => {
+    if (!user || !supplier?.id) return;
+    try {
+      const updatedSupplier: Supplier = { ...supplier, notes: notesContent };
+      await storageUpdateSupplier(user.uid, updatedSupplier);
+      setSupplier(updatedSupplier);
+      toast({
+        title: "Notlar Güncellendi",
+        description: "Tedarikçi notları başarıyla kaydedildi.",
+      });
+    } catch (error) {
+      console.error("Notlar kaydedilirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "Notlar kaydedilirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, supplier, notesContent, toast]);
+
+  const handleDeleteSupplier = useCallback(async () => {
+    if (!user || !deletingSupplier) return;
+    try {
+      await storageDeleteSupplier(user.uid, deletingSupplier);
+      toast({
+        title: "Tedarikçi Silindi",
+        description: "Tedarikçi başarıyla silindi.",
+      });
+      // Tedarikçi silindikten sonra ana tedarikçi listesi sayfasına yönlendir
+      window.location.href = "/suppliers";
+    } catch (error) {
+      console.error("Tedarikçi silinirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "Tedarikçi silinirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingSupplier(null);
+    }
+  }, [user, deletingSupplier, toast]);
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -1185,6 +1226,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                                   currency: (item as Purchase).currency,
                                   stockItemId: (item as Purchase).stockItemId === '' ? undefined : (item as Purchase).stockItemId,
                                   description: (item as Purchase).description || '',
+                                  quantityPurchased: (item as Purchase).quantityPurchased?.toString() || undefined,
+                                  unitPrice: (item as Purchase).unitPrice?.toString() || undefined,
                                 });
                                 setShowPurchaseModal(true);
                               } else {
@@ -1196,7 +1239,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                                   currency: (item as PaymentToSupplier).currency,
                                   referenceNumber: (item as PaymentToSupplier).referenceNumber || '',
                                   description: (item as PaymentToSupplier).description || '',
-                                  checkDate: (item as PaymentToSupplier).checkDate ? parseISO((item as PaymentToSupplier).checkDate) : null,
+                                  checkDate: (item as PaymentToSupplier).checkDate ? parseISO((item as PaymentToSupplier).checkDate as string) : null,
                                   checkSerialNumber: (item as PaymentToSupplier).checkSerialNumber || null,
                                 });
                                 setShowPaymentToSupplierModal(true);
@@ -1451,6 +1494,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
             </CardContent>
           </Card>
         </TabsContent>
+
       </Tabs>
 
       <PurchaseModal
@@ -1461,7 +1505,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         setFormValues={setPurchaseFormValues}
         availableStockItems={availableStockItems}
         getStockItemName={getStockItemName}
-        userId={user?.uid}
+        stockItemDisplayNames={stockItemDisplayNames}
       />
 
       <PaymentToSupplierModal
@@ -1482,7 +1526,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       <DeleteConfirmationModal
         isOpen={!!deletingPurchaseId}
         onClose={() => setDeletingPurchaseId(null)}
-        onConfirm={handleDeletePurchase}
+        onConfirm={() => handleDeletePurchase(deletingPurchaseId!)}
         title="Satın Alışı Sil"
         description="Bu satın alışı silmek istediğinizden emin misiniz?"
       />
@@ -1490,7 +1534,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       <DeleteConfirmationModal
         isOpen={!!deletingPaymentToSupplierId}
         onClose={() => setDeletingPaymentToSupplierId(null)}
-        onConfirm={handleDeletePaymentToSupplier}
+        onConfirm={() => handleDeletePaymentToSupplier(deletingPaymentToSupplierId!)}
         title="Ödemeyi Sil"
         description="Bu ödemeyi silmek istediğinizden emin misiniz?"
       />
@@ -1540,6 +1584,10 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                 formatCurrency={formatCurrency}
                 getStockItemName={getStockItemName}
                 safeFormatDate={safeFormatDate}
+                filteredAndSortedTransactions={filteredAndSortedTransactions}
+                totalPurchases={totalPurchases}
+                totalPaymentsToSupplier={totalPayments}
+                balance={balance}
               />
             )}
           </div>
