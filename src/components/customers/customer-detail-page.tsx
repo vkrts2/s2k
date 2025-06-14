@@ -415,75 +415,69 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
     setShowSaleModal(true);
   };
 
-  const handleSaleSubmit = async (values: SaleFormValues) => {
-    if (!user) return;
+  const handleSaleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      toast({
+        title: "Hata",
+        description: "Kullanıcı oturumu bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
-      const amount = values.quantity && values.unitPrice
-        ? parseFloat(values.quantity) * parseFloat(values.unitPrice)
-        : parseFloat(values.amount);
-
-      if (isNaN(amount) || amount <= 0) {
-        toast({
-          title: "Geçersiz Tutar",
-          description: "Tutar pozitif bir sayı olmalıdır.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // For new sales, Firestore generates the ID. For existing sales, we use the existing ID.
-      const saleToSave: Omit<Sale, 'id' | 'transactionType' | 'createdAt' | 'updatedAt'> = {
-        customerId: customer.id,
-        amount,
-        date: formatISO(values.date),
-        currency: values.currency,
-        stockItemId: values.stockItemId,
-        description: values.description,
-        quantity: values.quantity ? parseFloat(values.quantity) : undefined,
-        unitPrice: values.unitPrice ? parseFloat(values.unitPrice) : undefined,
-        category: 'satis',
-        tags: [],
-      };
-
-      console.log("handleSaleSubmit - saleToSave before update/add:", saleToSave);
+      const amount = parseFloat(saleFormValues.amount);
+      const date = formatISO(saleFormValues.date);
 
       if (editingSale) {
-        // Existing sale: prepare the full Sale object for update
         const updatedSale: Sale = {
-          ...saleToSave,
-          id: editingSale.id, // Preserve the original ID
-          transactionType: 'sale',
-          createdAt: editingSale.createdAt || formatISO(new Date()), // Ensure createdAt is never undefined
-          updatedAt: formatISO(new Date()), // Update last updated date
+          ...editingSale,
+          amount,
+          date,
+          currency: saleFormValues.currency,
+          stockItemId: saleFormValues.stockItemId,
+          description: saleFormValues.description || '',
+          updatedAt: formatISO(new Date())
         };
-        console.log("handleSaleSubmit - updatedSale before storageUpdateSale:", updatedSale);
+
         await storageUpdateSale(user.uid, updatedSale);
-        setSales(sales.map(s => s.id === updatedSale.id ? updatedSale : s));
+        setSales(sales.map(s => (s.id === editingSale.id ? updatedSale : s)));
         toast({
-          title: "Satış güncellendi",
-          description: "Satış başarıyla güncellendi.",
+          title: "Başarılı",
+          description: "Satış güncellendi.",
         });
       } else {
-        // New sale: Firestore will assign an ID. Use the returned object.
-        console.log("handleSaleSubmit - new sale, calling addSale with:", saleToSave);
-        const newSale = await addSale(user.uid, saleToSave);
-        console.log("handleSaleSubmit - newSale after addSale:", newSale);
-        setSales(prevSales => [...prevSales, newSale]);
+        const newSale: Omit<Sale, 'id'> = {
+          customerId: customer.id,
+          amount,
+          date,
+          currency: saleFormValues.currency,
+          stockItemId: saleFormValues.stockItemId,
+          description: saleFormValues.description || '',
+          transactionType: 'sale',
+          category: 'satis',
+          tags: [],
+          createdAt: formatISO(new Date()),
+          updatedAt: formatISO(new Date())
+        };
+
+        const addedSale = await addSale(user.uid, newSale);
+        setSales(prev => [...prev, addedSale]);
         toast({
-          title: "Satış eklendi",
-          description: "Yeni satış başarıyla eklendi.",
+          title: "Başarılı",
+          description: "Yeni satış eklendi.",
         });
       }
-
       setShowSaleModal(false);
       setSaleFormValues(EMPTY_SALE_FORM_VALUES);
       setEditingSale(null);
     } catch (error) {
-      console.error("Error saving sale:", error);
+      console.error("Satış kaydederken hata oluştu:", error);
       toast({
         title: "Hata",
-        description: "Satış kaydedilirken bir hata oluştu.",
+        description: "Satış kaydedilirken bir sorun oluştu.",
         variant: "destructive",
       });
     }
@@ -545,7 +539,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
     try {
       const amount = parseFloat(paymentFormValues.amount);
-      const date = paymentFormValues.date ? formatISO(paymentFormValues.date) : formatISO(new Date());
+      const date = formatISO(paymentFormValues.date);
 
       if (editingPayment) {
         const updatedPayment: Payment = {
