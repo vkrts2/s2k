@@ -288,15 +288,6 @@ export const deleteSale = async (uid: string, saleId: string): Promise<void> => 
   await deleteDoc(saleDocRef);
 };
 
-export const getSaleById = async (uid: string, saleId: string): Promise<Sale | undefined> => {
-  const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), saleId);
-  const docSnap = await getDoc(saleDocRef);
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() as Omit<Sale, 'id'> };
-  }
-  return undefined;
-};
-
 // Payment Functions
 export const getPayments = async (uid: string, customerId?: string): Promise<Payment[]> => {
   console.log(`getPayments called with uid: ${uid}`);
@@ -348,15 +339,6 @@ export const updatePayment = async (uid: string, updatedPayment: Payment): Promi
 export const deletePayment = async (uid: string, paymentId: string): Promise<void> => {
   const paymentDocRef = doc(_getUserCollectionRef(uid, "payments"), paymentId);
   await deleteDoc(paymentDocRef);
-};
-
-export const getPaymentById = async (uid: string, paymentId: string): Promise<Payment | undefined> => {
-  const paymentDocRef = doc(_getUserCollectionRef(uid, "payments"), paymentId);
-  const docSnap = await getDoc(paymentDocRef);
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() as Omit<Payment, 'id'> };
-  }
-  return undefined;
 };
 
 // Supplier Functions
