@@ -2,6 +2,7 @@
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy } from "firebase/firestore";
 import { getDoc, limit } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { formatISO, parseISO, format, addDays } from 'date-fns';
 import type { Customer, Sale, Payment, Currency, Supplier, Purchase, PaymentToSupplier, TodoItem, PortfolioItem, ArchivedFile, UsefulLink, StockItem, Price, Quotation, QuotationItem, ContactHistoryItem, SupplierTask } from "./types";
 // import { storeFileInDB, deleteFileFromDB } from './indexedDBStorage'; // Firebase Storage kullanılacaksa bu kısım değişecek
@@ -10,6 +11,17 @@ import { useAuth } from '@/contexts/AuthContext';
 // localStorage anahtarları kaldırıldı, artık Firestore koleksiyon yolları kullanılacak
 
 // isClient ve localStorage yardımcıları kaldırıldı
+
+// Firebase Storage referansı
+const storage = getStorage();
+
+// Yardımcı fonksiyon: Dosyayı Firebase Storage'a yükler ve URL'sini döndürür
+export const uploadFileToFirebaseStorage = async (uid: string, file: File, path: string): Promise<string> => {
+  const storageRef = ref(storage, `${uid}/${path}/${file.name}_${Date.now()}`);
+  const snapshot = await uploadBytes(storageRef, file);
+  const downloadURL = await getDownloadURL(snapshot.ref);
+  return downloadURL;
+};
 
 // Yardımcı fonksiyon: Kullanıcıya özel koleksiyon referansı döndürür
 const _getUserCollectionRef = (uid: string, collectionName: string) => {

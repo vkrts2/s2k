@@ -154,23 +154,21 @@ export function PaymentModal({
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="checkImage1" className="text-right">Çek Görseli 1 (URL)</Label>
+                <Label htmlFor="checkImage1" className="text-right">Çek Görseli 1</Label>
                 <Input
                   id="checkImage1"
-                  value={formValues.checkImage1 || ''}
-                  onChange={(e) => setFormValues({ ...formValues, checkImage1: e.target.value || null })}
+                  type="file"
+                  onChange={(e) => setFormValues({ ...formValues, checkImage1: e.target.files ? e.target.files[0] : null })}
                   className="col-span-3"
-                  placeholder="Görsel URL'si"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="checkImage2" className="text-right">Çek Görseli 2 (URL)</Label>
+                <Label htmlFor="checkImage2" className="text-right">Çek Görseli 2</Label>
                 <Input
                   id="checkImage2"
-                  value={formValues.checkImage2 || ''}
-                  onChange={(e) => setFormValues({ ...formValues, checkImage2: e.target.value || null })}
+                  type="file"
+                  onChange={(e) => setFormValues({ ...formValues, checkImage2: e.target.files ? e.target.files[0] : null })}
                   className="col-span-3"
-                  placeholder="Görsel URL'si (Opsiyonel)"
                 />
               </div>
             </>

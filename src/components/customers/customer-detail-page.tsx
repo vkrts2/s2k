@@ -4,17 +4,22 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Customer, Sale, Payment, Currency, UnifiedTransaction as AppUnifiedTransaction, StockItem, Price, ContactHistoryItem, CustomerTask, SaleFormValues, PaymentFormValues } from '@/lib/types';
 import {
-  addSale,
-  updateSale as storageUpdateSale,
-  deleteSale as storageDeleteSale,
   addPayment,
   updatePayment as storageUpdatePayment,
   deletePayment as storageDeletePayment,
-  updateCustomer as storageUpdateCustomer,
-  getCustomerById,
+  addSale,
+  updateSale as storageUpdateSale,
+  deleteSale as storageDeleteSale,
   getStockItems,
   getStockItemById,
-  deleteCustomer as storageDeleteCustomer
+  getCustomerById,
+  updateCustomer as storageUpdateCustomer,
+  deleteCustomer as storageDeleteCustomer,
+  getContactHistory,
+  addContactHistory,
+  updateContactHistory,
+  deleteContactHistory,
+  uploadFileToFirebaseStorage
 } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -560,6 +565,54 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
         updatedAt: new Date().toISOString(),
         ...(paymentFormValues.referenceNumber && { referenceNumber: paymentFormValues.referenceNumber }),
       };
+
+      if (paymentFormValues.method === 'cek') {
+        if (paymentFormValues.checkDate) {
+          paymentData.checkDate = formatISO(paymentFormValues.checkDate);
+        } else {
+          paymentData.checkDate = null;
+        }
+
+        if (paymentFormValues.checkInfo) {
+          paymentData.checkInfo = paymentFormValues.checkInfo;
+        } else {
+          paymentData.checkInfo = null;
+        }
+
+        if (paymentFormValues.checkImage1) {
+          try {
+            const url = await uploadFileToFirebaseStorage(user.uid, paymentFormValues.checkImage1, `payments/${paymentData.id}/checks`);
+            paymentData.checkImage1 = url;
+          } catch (uploadError) {
+            console.error("Çek görseli 1 yüklenirken hata:", uploadError);
+            toast({
+              title: "Hata",
+              description: "Çek görseli 1 yüklenirken bir sorun oluştu.",
+              variant: "destructive",
+            });
+            // Yükleme hatası olsa bile diğer işlemleri devam ettir
+          }
+        } else {
+          paymentData.checkImage1 = null;
+        }
+
+        if (paymentFormValues.checkImage2) {
+          try {
+            const url = await uploadFileToFirebaseStorage(user.uid, paymentFormValues.checkImage2, `payments/${paymentData.id}/checks`);
+            paymentData.checkImage2 = url;
+          } catch (uploadError) {
+            console.error("Çek görseli 2 yüklenirken hata:", uploadError);
+            toast({
+              title: "Hata",
+              description: "Çek görseli 2 yüklenirken bir sorun oluştu.",
+              variant: "destructive",
+            });
+            // Yükleme hatası olsa bile diğer işlemleri devam ettir
+          }
+        } else {
+          paymentData.checkImage2 = null;
+        }
+      }
 
       if (editingPayment) {
         await storageUpdatePayment(user.uid, paymentData);
