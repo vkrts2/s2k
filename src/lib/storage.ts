@@ -239,6 +239,15 @@ export const getSales = async (uid: string, customerId?: string): Promise<Sale[]
   }
 };
 
+export const getSaleById = async (uid: string, saleId: string): Promise<Sale | undefined> => {
+  const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), saleId);
+  const docSnap = await getDoc(saleDocRef);
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() as Omit<Sale, 'id'> };
+  }
+  return undefined;
+};
+
 export const addSale = async (uid: string, saleData: Omit<Sale, 'id' | 'transactionType' | 'createdAt' | 'updatedAt'>): Promise<Sale> => {
   let description = saleData.description;
   if (saleData.stockItemId && !description) {
@@ -310,6 +319,15 @@ export const getPayments = async (uid: string, customerId?: string): Promise<Pay
     console.error("Error fetching payments:", error);
     return [];
   }
+};
+
+export const getPaymentById = async (uid: string, paymentId: string): Promise<Payment | undefined> => {
+  const paymentDocRef = doc(_getUserCollectionRef(uid, "payments"), paymentId);
+  const docSnap = await getDoc(paymentDocRef);
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() as Omit<Payment, 'id'> };
+  }
+  return undefined;
 };
 
 export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 'transactionType'>): Promise<Payment> => {
