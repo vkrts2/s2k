@@ -579,7 +579,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           paymentData.checkInfo = null;
         }
 
-        if (paymentFormValues.checkImage1) {
+        // Çek görsellerini yükle
+        if (paymentFormValues.checkImage1 instanceof File) {
           try {
             const url = await uploadFileToFirebaseStorage(user.uid, paymentFormValues.checkImage1, `payments/${paymentData.id}/checks`);
             paymentData.checkImage1 = url;
@@ -590,13 +591,13 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
               description: "Çek görseli 1 yüklenirken bir sorun oluştu.",
               variant: "destructive",
             });
-            // Yükleme hatası olsa bile diğer işlemleri devam ettir
+            paymentData.checkImage1 = null;
           }
         } else {
           paymentData.checkImage1 = null;
         }
 
-        if (paymentFormValues.checkImage2) {
+        if (paymentFormValues.checkImage2 instanceof File) {
           try {
             const url = await uploadFileToFirebaseStorage(user.uid, paymentFormValues.checkImage2, `payments/${paymentData.id}/checks`);
             paymentData.checkImage2 = url;
@@ -607,7 +608,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
               description: "Çek görseli 2 yüklenirken bir sorun oluştu.",
               variant: "destructive",
             });
-            // Yükleme hatası olsa bile diğer işlemleri devam ettir
+            paymentData.checkImage2 = null;
           }
         } else {
           paymentData.checkImage2 = null;

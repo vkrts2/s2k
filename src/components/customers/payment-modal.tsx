@@ -10,6 +10,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Dispatch, SetStateAction } from "react";
+import { tr } from 'date-fns/locale';
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -70,7 +72,7 @@ export function PaymentModal({
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formValues.date ? format(formValues.date, "PPP") : <span>Tarih seçin</span>}
+                  {formValues.date ? format(formValues.date, "dd.MM.yyyy", { locale: tr }) : <span>Tarih seçin</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
@@ -79,6 +81,7 @@ export function PaymentModal({
                   selected={formValues.date}
                   onSelect={(date) => date && setFormValues({ ...formValues, date })}
                   initialFocus
+                  locale={tr}
                 />
               </PopoverContent>
             </Popover>
@@ -130,7 +133,7 @@ export function PaymentModal({
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formValues.checkDate ? format(formValues.checkDate, "PPP") : <span>Tarih seçin</span>}
+                      {formValues.checkDate ? format(formValues.checkDate, "dd.MM.yyyy", { locale: tr }) : <span>Tarih seçin</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -139,6 +142,7 @@ export function PaymentModal({
                       selected={formValues.checkDate || undefined}
                       onSelect={(date) => setFormValues({ ...formValues, checkDate: date || null })}
                       initialFocus
+                      locale={tr}
                     />
                   </PopoverContent>
                 </Popover>
