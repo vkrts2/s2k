@@ -135,8 +135,8 @@ export interface PaymentFormValues {
   description?: string;
   checkDate?: Date | null;
   checkInfo?: string | null;
-  checkImage1?: File | null;
-  checkImage2?: File | null;
+  checkImage1?: string | null;
+  checkImage2?: string | null;
 }
 
 export interface PaymentToSupplierFormValues {

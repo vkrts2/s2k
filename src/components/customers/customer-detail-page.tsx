@@ -144,16 +144,6 @@ const EMPTY_TASK_FORM_VALUES: TaskFormValues = {
 
 type UnifiedTransactionClient = AppUnifiedTransaction; // AppUnifiedTransaction olarak güncellendi
 
-// Yardımcı fonksiyon: Dosyayı Base64 stringine dönüştürür
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = (error) => reject(error);
-  });
-};
-
 export function CustomerDetailPageClient({ customer: initialCustomer, initialSales, initialPayments, user }: CustomerDetailPageClientProps) {
   const { toast } = useToast();
   const [customer, setCustomer] = useState<Customer>(initialCustomer);
@@ -588,61 +578,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           paymentData.checkInfo = null;
         }
 
-        // Çek görsellerini yükle
-        if (paymentFormValues.checkImage1 instanceof File) {
-          // Firestore belge boyutu sınırı (1MB = 1048576 byte)
-          const MAX_FILE_SIZE = 1048576; 
-          if (paymentFormValues.checkImage1.size > MAX_FILE_SIZE) {
-            toast({
-              title: "Hata",
-              description: "Çek görseli 1 (maksimum 1MB) çok büyük.",
-              variant: "destructive",
-            });
-            paymentData.checkImage1 = null; // Hata durumunda null ayarla
-          } else {
-            try {
-              const base64String = await fileToBase64(paymentFormValues.checkImage1);
-              paymentData.checkImage1 = base64String;
-            } catch (error) {
-              console.error("Çek görseli 1 Base64 dönüştürülürken hata:", error);
-              toast({
-                title: "Hata",
-                description: "Çek görseli 1 dönüştürülürken bir sorun oluştu.",
-                variant: "destructive",
-              });
-              paymentData.checkImage1 = null;
-            }
-          }
-        } else {
-          paymentData.checkImage1 = null;
-        }
-
-        if (paymentFormValues.checkImage2 instanceof File) {
-          const MAX_FILE_SIZE = 1048576; // 1MB
-          if (paymentFormValues.checkImage2.size > MAX_FILE_SIZE) {
-            toast({
-              title: "Hata",
-              description: "Çek görseli 2 (maksimum 1MB) çok büyük.",
-              variant: "destructive",
-            });
-            paymentData.checkImage2 = null;
-          } else {
-            try {
-              const base64String = await fileToBase64(paymentFormValues.checkImage2);
-              paymentData.checkImage2 = base64String;
-            } catch (error) {
-              console.error("Çek görseli 2 Base64 dönüştürülürken hata:", error);
-              toast({
-                title: "Hata",
-                description: "Çek görseli 2 dönüştürülürken bir sorun oluştu.",
-                variant: "destructive",
-              });
-              paymentData.checkImage2 = null;
-            }
-          }
-        } else {
-          paymentData.checkImage2 = null;
-        }
+        paymentData.checkImage1 = paymentFormValues.checkImage1 || null;
+        paymentData.checkImage2 = paymentFormValues.checkImage2 || null;
       }
 
       if (editingPayment) {
@@ -724,35 +661,31 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
     if (item.transactionType === 'sale') {
       const saleItem = item as Sale;
       return (
-        <Link href={`/customers/${customer.id}/sales/${saleItem.id}`} className="block">
-          <div className="flex flex-col">
-            {saleItem.stockItemId && (
-              <span className="text-sm text-muted-foreground">
-                Stok: {stockItemDisplayNames[saleItem.stockItemId]}
-              </span>
-            )}
+        <div className="flex flex-col">
+          {saleItem.stockItemId && (
             <span className="text-sm text-muted-foreground">
-              Açıklama: {saleItem.description || '-'}
+              Stok: {stockItemDisplayNames[saleItem.stockItemId]}
             </span>
-          </div>
-        </Link>
+          )}
+          <span className="text-sm text-muted-foreground">
+            Açıklama: {saleItem.description || '-'}
+          </span>
+        </div>
       );
     } else if (item.transactionType === 'payment') {
       const paymentItem = item as Payment;
       return (
-        <Link href={`/customers/${customer.id}/payments/${paymentItem.id}`} className="block">
-          <div className="flex flex-col">
-            <span className="text-sm text-muted-foreground">
-              Yöntem: {paymentItem.method}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              Referans: {paymentItem.referenceNumber || '-'}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              Açıklama: {paymentItem.description || '-'}
-            </span>
-          </div>
-        </Link>
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground">
+            Yöntem: {paymentItem.method}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            Referans: {paymentItem.referenceNumber || '-'}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            Açıklama: {paymentItem.description || '-'}
+          </span>
+        </div>
       );
     }
     return null;
