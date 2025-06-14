@@ -19,7 +19,6 @@ import {
   addContactHistory,
   updateContactHistory,
   deleteContactHistory,
-  uploadFileToFirebaseStorage
 } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -144,6 +143,16 @@ const EMPTY_TASK_FORM_VALUES: TaskFormValues = {
 };
 
 type UnifiedTransactionClient = AppUnifiedTransaction; // AppUnifiedTransaction olarak güncellendi
+
+// Yardımcı fonksiyon: Dosyayı Base64 stringine dönüştürür
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
 
 export function CustomerDetailPageClient({ customer: initialCustomer, initialSales, initialPayments, user }: CustomerDetailPageClientProps) {
   const { toast } = useToast();
@@ -581,34 +590,55 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
         // Çek görsellerini yükle
         if (paymentFormValues.checkImage1 instanceof File) {
-          try {
-            const url = await uploadFileToFirebaseStorage(user.uid, paymentFormValues.checkImage1, `payments/${paymentData.id}/checks`);
-            paymentData.checkImage1 = url;
-          } catch (uploadError) {
-            console.error("Çek görseli 1 yüklenirken hata:", uploadError);
+          // Firestore belge boyutu sınırı (1MB = 1048576 byte)
+          const MAX_FILE_SIZE = 1048576; 
+          if (paymentFormValues.checkImage1.size > MAX_FILE_SIZE) {
             toast({
               title: "Hata",
-              description: "Çek görseli 1 yüklenirken bir sorun oluştu.",
+              description: "Çek görseli 1 (maksimum 1MB) çok büyük.",
               variant: "destructive",
             });
-            paymentData.checkImage1 = null;
+            paymentData.checkImage1 = null; // Hata durumunda null ayarla
+          } else {
+            try {
+              const base64String = await fileToBase64(paymentFormValues.checkImage1);
+              paymentData.checkImage1 = base64String;
+            } catch (error) {
+              console.error("Çek görseli 1 Base64 dönüştürülürken hata:", error);
+              toast({
+                title: "Hata",
+                description: "Çek görseli 1 dönüştürülürken bir sorun oluştu.",
+                variant: "destructive",
+              });
+              paymentData.checkImage1 = null;
+            }
           }
         } else {
           paymentData.checkImage1 = null;
         }
 
         if (paymentFormValues.checkImage2 instanceof File) {
-          try {
-            const url = await uploadFileToFirebaseStorage(user.uid, paymentFormValues.checkImage2, `payments/${paymentData.id}/checks`);
-            paymentData.checkImage2 = url;
-          } catch (uploadError) {
-            console.error("Çek görseli 2 yüklenirken hata:", uploadError);
+          const MAX_FILE_SIZE = 1048576; // 1MB
+          if (paymentFormValues.checkImage2.size > MAX_FILE_SIZE) {
             toast({
               title: "Hata",
-              description: "Çek görseli 2 yüklenirken bir sorun oluştu.",
+              description: "Çek görseli 2 (maksimum 1MB) çok büyük.",
               variant: "destructive",
             });
             paymentData.checkImage2 = null;
+          } else {
+            try {
+              const base64String = await fileToBase64(paymentFormValues.checkImage2);
+              paymentData.checkImage2 = base64String;
+            } catch (error) {
+              console.error("Çek görseli 2 Base64 dönüştürülürken hata:", error);
+              toast({
+                title: "Hata",
+                description: "Çek görseli 2 dönüştürülürken bir sorun oluştu.",
+                variant: "destructive",
+              });
+              paymentData.checkImage2 = null;
+            }
           }
         } else {
           paymentData.checkImage2 = null;
