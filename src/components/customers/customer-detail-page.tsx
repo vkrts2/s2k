@@ -530,12 +530,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('handlePaymentSubmit called');
-    console.log('Payment Form Values:', paymentFormValues);
-    if (!user || !customer.id) {
-      console.error('User not logged in or customer ID missing.');
-      return;
-    }
+    console.log("handlePaymentSubmit çağrıldı. paymentFormValues:", paymentFormValues);
+    if (!user || !customer.id) return;
 
     try {
       const amount = parseFloat(paymentFormValues.amount);
