@@ -34,36 +34,6 @@ export function PrintView({
   getStockItemName,
   safeFormatDate,
 }: PrintViewProps) {
-  const safeFormatDate = (dateString: string, formatString: string) => {
-    if (!dateString) return "Tarih Yok";
-    try {
-      const date = parseISO(dateString);
-      if (isValid(date)) {
-        return format(date, formatString, { locale: tr });
-      }
-      return "Geçersiz Tarih";
-    } catch (error) {
-      return "Tarih Format Hatası";
-    }
-  };
-
-  const formatCurrency = (amount: number, currency: Currency): string => {
-    if (typeof amount !== 'number' || isNaN(amount)) {
-      amount = 0;
-    }
-    try {
-      return amount.toLocaleString('tr-TR', {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    } catch (e) {
-      console.error("Error formatting currency:", e);
-      return `${amount.toFixed(2)} ${currency}`;
-    }
-  };
-
   return (
     <div className="p-8 space-y-6">
       <div className="text-center space-y-2">
