@@ -120,9 +120,49 @@ export function PaymentModal({
                   <SelectItem value="krediKarti">Kredi Kartı</SelectItem>
                   <SelectItem value="havale">Havale/EFT</SelectItem>
                   <SelectItem value="diger">Diğer</SelectItem>
+                  <SelectItem value="cek">Çek</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {formValues.method === 'cek' && (
+              <div className="grid gap-2">
+                <Label htmlFor="checkDate">Çek Tarihi</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formValues.checkDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formValues.checkDate ? format(formValues.checkDate, "PPP", { locale: tr }) : "Çek Tarihi seçin"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formValues.checkDate || undefined}
+                      onSelect={(date) => setFormValues({ ...formValues, checkDate: date || null })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+            {formValues.method === 'cek' && (
+              <div className="grid gap-2">
+                <Label htmlFor="checkSerialNumber">Çek Seri Numarası</Label>
+                <Input
+                  id="checkSerialNumber"
+                  value={formValues.checkSerialNumber || ''}
+                  onChange={(e) => setFormValues({ ...formValues, checkSerialNumber: e.target.value || null })}
+                  placeholder="Çek seri numarasını girin"
+                  required={formValues.method === 'cek'}
+                />
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="referenceNumber">Referans No</Label>
               <Input

@@ -126,14 +126,16 @@ export interface PurchaseFormValues {
   unitPrice?: string;
 }
 
-export interface PaymentFormValues {
+export type PaymentFormValues = {
   amount: string;
   date: Date;
+  method: 'nakit' | 'krediKarti' | 'havale' | 'diger' | 'cek';
   currency: Currency;
-  method: 'nakit' | 'krediKarti' | 'havale' | 'diger';
   referenceNumber?: string | null;
   description?: string;
-}
+  checkDate?: Date | null;
+  checkSerialNumber?: string | null;
+};
 
 export interface PaymentToSupplierFormValues {
   amount: string;
@@ -183,8 +185,10 @@ export interface Payment {
   category: 'odeme';
   tags: TransactionTag[];
   transactionType: 'payment';
-  method: 'nakit' | 'krediKarti' | 'havale' | 'diger';
+  method: 'nakit' | 'krediKarti' | 'havale' | 'diger' | 'cek';
   description?: string;
+  checkDate?: string | null; // ISO string formatında saklanacak
+  checkSerialNumber?: string | null;
   createdAt: string; // ISO string format
   updatedAt: string; // ISO string format
 }

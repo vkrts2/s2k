@@ -334,9 +334,10 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
   const now = formatISO(new Date());
   const newPaymentData = {
     ...paymentData,
-    transactionType: 'payment',
     createdAt: now,
     updatedAt: now,
+    checkDate: paymentData.checkDate || null,
+    checkSerialNumber: paymentData.checkSerialNumber || null,
   };
   const docRef = await addDoc(_getUserCollectionRef(uid, "payments"), newPaymentData);
   return { ...newPaymentData, id: docRef.id } as Payment;
@@ -345,13 +346,14 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
 export const updatePayment = async (uid: string, updatedPayment: Payment): Promise<Payment> => {
   const now = formatISO(new Date());
   const paymentDocRef = doc(_getUserCollectionRef(uid, "payments"), updatedPayment.id);
-  const { id, ...restOfUpdatedData } = updatedPayment;
-  const dataForFirestore: any = {
-    ...restOfUpdatedData,
+  const finalPayment = {
+    ...updatedPayment,
     updatedAt: now,
+    checkDate: updatedPayment.checkDate || null,
+    checkSerialNumber: updatedPayment.checkSerialNumber || null,
   };
-  await updateDoc(paymentDocRef, dataForFirestore);
-  return { ...dataForFirestore, id: updatedPayment.id } as Payment;
+  await updateDoc(paymentDocRef, finalPayment);
+  return finalPayment;
 };
 
 export const deletePayment = async (uid: string, paymentId: string): Promise<void> => {

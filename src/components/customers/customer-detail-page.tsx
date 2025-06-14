@@ -126,6 +126,8 @@ const EMPTY_PAYMENT_FORM_VALUES: PaymentFormValues = {
   currency: 'TRY',
   referenceNumber: '',
   description: '',
+  checkDate: null,
+  checkSerialNumber: null,
 };
 
 const EMPTY_CONTACT_HISTORY_FORM_VALUES: ContactHistoryFormValues = {
@@ -521,6 +523,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
       currency: payment.currency,
       referenceNumber: payment.referenceNumber || '',
       description: payment.description || '',
+      checkDate: payment.checkDate ? parseISO(payment.checkDate) : null,
+      checkSerialNumber: payment.checkSerialNumber || null,
     });
     setShowPaymentModal(true);
   }, []);
@@ -550,6 +554,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           currency: paymentFormValues.currency,
           referenceNumber: paymentFormValues.referenceNumber || null,
           description: paymentFormValues.description || '',
+          checkDate: paymentFormValues.method === 'cek' && paymentFormValues.checkDate ? formatISO(paymentFormValues.checkDate) : null,
+          checkSerialNumber: paymentFormValues.method === 'cek' ? (paymentFormValues.checkSerialNumber || null) : null,
           updatedAt: formatISO(new Date())
         };
 
@@ -568,6 +574,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           currency: paymentFormValues.currency,
           referenceNumber: paymentFormValues.referenceNumber || null,
           description: paymentFormValues.description || '',
+          checkDate: paymentFormValues.method === 'cek' && paymentFormValues.checkDate ? formatISO(paymentFormValues.checkDate) : null,
+          checkSerialNumber: paymentFormValues.method === 'cek' ? (paymentFormValues.checkSerialNumber || null) : null,
           transactionType: 'payment',
           category: 'odeme',
           tags: [],
