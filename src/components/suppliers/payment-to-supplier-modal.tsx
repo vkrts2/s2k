@@ -34,10 +34,9 @@ export function PaymentToSupplierModal({
           <DialogTitle>Ödeme Ekle</DialogTitle>
           <DialogDescription>Yeni bir ödeme işlemi ekleyin veya mevcut bir ödemeyi düzenleyin.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={(e) => {
+        <form onSubmit={async (e) => {
           e.preventDefault();
-          console.log("Payment to Supplier form submitted!");
-          onSubmit(e);
+          await onSubmit(e);
         }} className="space-y-4">
           <div className="grid gap-4">
             <div className="grid gap-2">

@@ -39,10 +39,9 @@ export function PurchaseModal({
           <DialogTitle>Alış Ekle</DialogTitle>
           <DialogDescription>Yeni bir alış işlemi ekleyin veya mevcut bir alışı düzenleyin.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={(e) => {
+        <form onSubmit={async (e) => {
           e.preventDefault();
-          console.log("Purchase form submitted!");
-          onSubmit(e);
+          await onSubmit(e);
         }} className="space-y-4">
           <div className="grid gap-4">
             <div className="grid gap-2">
