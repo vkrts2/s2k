@@ -721,35 +721,38 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
   // Tek bir satış veya ödeme işleminin detaylarını gösterir
   const renderTransactionDetail = (item: UnifiedTransactionClient) => {
-    // console.log("renderTransactionDetail - item:", item); // Kaldırıldı
     if (item.transactionType === 'sale') {
       const saleItem = item as Sale;
       return (
-        <div className="flex flex-col">
-          {saleItem.stockItemId && (
+        <Link href={`/customers/${customer.id}/sales/${saleItem.id}`} className="block">
+          <div className="flex flex-col">
+            {saleItem.stockItemId && (
+              <span className="text-sm text-muted-foreground">
+                Stok: {stockItemDisplayNames[saleItem.stockItemId]}
+              </span>
+            )}
             <span className="text-sm text-muted-foreground">
-              Stok: {stockItemDisplayNames[saleItem.stockItemId]}
+              Açıklama: {saleItem.description || '-'}
             </span>
-          )}
-          <span className="text-sm text-muted-foreground">
-            Açıklama: {saleItem.description || '-'}
-          </span>
-        </div>
+          </div>
+        </Link>
       );
     } else if (item.transactionType === 'payment') {
       const paymentItem = item as Payment;
       return (
-        <div className="flex flex-col">
-          <span className="text-sm text-muted-foreground">
-            Yöntem: {paymentItem.method}
-          </span>
-          <span className="text-sm text-muted-foreground">
-            Referans: {paymentItem.referenceNumber || '-'}
-          </span>
-          <span className="text-sm text-muted-foreground">
-            Açıklama: {paymentItem.description || '-'}
-          </span>
-        </div>
+        <Link href={`/customers/${customer.id}/payments/${paymentItem.id}`} className="block">
+          <div className="flex flex-col">
+            <span className="text-sm text-muted-foreground">
+              Yöntem: {paymentItem.method}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              Referans: {paymentItem.referenceNumber || '-'}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              Açıklama: {paymentItem.description || '-'}
+            </span>
+          </div>
+        </Link>
       );
     }
     return null;
