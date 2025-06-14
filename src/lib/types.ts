@@ -194,8 +194,8 @@ export interface Purchase extends Transaction {
   description?: string;
   transactionType: 'purchase';
   stockItemId?: string | null;
-  quantityPurchased?: number;
-  unitPrice?: number;
+  quantityPurchased?: number | null;
+  unitPrice?: number | null;
 }
 
 export interface PaymentToSupplier extends Transaction {

@@ -404,8 +404,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         date: formatISO(purchaseFormValues.date),
         currency: purchaseFormValues.currency,
         stockItemId: purchaseFormValues.stockItemId === 'none' ? null : purchaseFormValues.stockItemId,
-        quantityPurchased: purchaseFormValues.quantityPurchased ? parseFloat(purchaseFormValues.quantityPurchased) : undefined,
-        unitPrice: purchaseFormValues.unitPrice ? parseFloat(purchaseFormValues.unitPrice) : undefined,
+        quantityPurchased: purchaseFormValues.quantityPurchased ? (isNaN(parseFloat(purchaseFormValues.quantityPurchased)) ? null : parseFloat(purchaseFormValues.quantityPurchased)) : null,
+        unitPrice: purchaseFormValues.unitPrice ? (isNaN(parseFloat(purchaseFormValues.unitPrice)) ? null : parseFloat(purchaseFormValues.unitPrice)) : null,
         description: purchaseFormValues.description || (purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none'
           ? `${getStockItemName(purchaseFormValues.stockItemId)} - ${purchaseFormValues.quantityPurchased} adet`
           : 'Manuel alış'),
