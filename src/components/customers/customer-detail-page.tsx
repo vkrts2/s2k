@@ -409,7 +409,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
       amount: sale.amount.toString(),
       date: parseISO(sale.date),
       currency: sale.currency,
-      stockItemId: sale.stockItemId,
+      stockItemId: sale.stockItemId === '' ? undefined : sale.stockItemId,
       description: sale.description || '',
       quantity: sale.quantity?.toString(),
       unitPrice: sale.unitPrice?.toString(),
