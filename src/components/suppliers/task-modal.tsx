@@ -11,6 +11,7 @@ import { tr } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SupplierTaskFormValues } from '@/lib/types';
+import { SupplierTask } from '@/lib/types';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ interface TaskModalProps {
   onSubmit: (formValues: SupplierTaskFormValues) => Promise<void>;
   formValues: SupplierTaskFormValues;
   setFormValues: (values: SupplierTaskFormValues) => void;
+  editingTask: SupplierTask | null;
 }
 
 export function TaskModal({
@@ -26,6 +28,7 @@ export function TaskModal({
   onSubmit,
   formValues,
   setFormValues,
+  editingTask,
 }: TaskModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

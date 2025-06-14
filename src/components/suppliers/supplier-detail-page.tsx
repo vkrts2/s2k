@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Supplier, Purchase, PaymentToSupplier, Currency, UnifiedTransaction as AppUnifiedTransaction, StockItem, Price, ContactHistoryItem, SupplierTask, PurchaseFormValues, PaymentToSupplierFormValues } from '@/lib/types';
+import type { Supplier, Purchase, PaymentToSupplier, Currency, UnifiedTransaction as AppUnifiedTransaction, StockItem, Price, ContactHistoryItem, SupplierTask, PurchaseFormValues, PaymentToSupplierFormValues, ContactHistoryFormValues, SupplierTaskFormValues } from '@/lib/types';
 import {
   addPurchase,
   updatePurchase as storageUpdatePurchase,
@@ -71,12 +71,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { PlusCircle, Trash2, Edit3, DollarSign, ShoppingCart, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline as UnderlineIcon, Receipt } from 'lucide-react';
+import { PlusCircle, Trash2, Edit3, DollarSign, ShoppingCart, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline as UnderlineIcon, Receipt, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isValid, formatISO, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import Link from "next/link";
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DateRange } from 'react-day-picker';
@@ -125,26 +124,21 @@ const EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES: PaymentToSupplierFormValues = {
   checkSerialNumber: null,
 };
 
-const EMPTY_CONTACT_HISTORY_FORM_VALUES: ContactHistoryItem = {
-  id: '',
-  date: formatISO(new Date()),
+const EMPTY_CONTACT_HISTORY_FORM_VALUES: ContactHistoryFormValues = {
+  date: new Date(),
   type: 'other',
   summary: '',
   notes: '',
-  createdAt: formatISO(new Date()),
-  updatedAt: formatISO(new Date()),
 };
 
-const EMPTY_TASK_FORM_VALUES: SupplierTask = {
-  id: '',
+const EMPTY_TASK_FORM_VALUES: SupplierTaskFormValues = {
   description: '',
   dueDate: undefined,
   status: 'pending',
-  createdAt: formatISO(new Date()),
-  updatedAt: formatISO(new Date()),
 };
 
-type UnifiedTransactionClient = AppUnifiedTransaction; 
+type UnifiedTransactionClient = (Purchase & { transactionType: 'purchase' }) |
+                              (PaymentToSupplier & { transactionType: 'paymentToSupplier' });
 
 export function SupplierDetailPageClient({ supplier: initialSupplier, initialPurchases, initialPaymentsToSupplier, user }: SupplierDetailPageClientProps) {
   const { toast } = useToast();
@@ -167,12 +161,12 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
 
   const [notesContent, setNotesContent] = useState(initialSupplier.notes || '');
   const [showContactHistoryModal, setShowContactHistoryModal] = useState(false);
-  const [contactHistoryFormValues, setContactHistoryFormValues] = useState<ContactHistoryItem>(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+  const [contactHistoryFormValues, setContactHistoryFormValues] = useState<ContactHistoryFormValues>(EMPTY_CONTACT_HISTORY_FORM_VALUES);
   const [editingContactHistoryItem, setEditingContactHistoryItem] = useState<ContactHistoryItem | null>(null);
   const [contactHistory, setContactHistory] = useState<ContactHistoryItem[]>([]);
 
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [taskFormValues, setTaskFormValues] = useState<SupplierTask>(EMPTY_TASK_FORM_VALUES);
+  const [taskFormValues, setTaskFormValues] = useState<SupplierTaskFormValues>(EMPTY_TASK_FORM_VALUES);
   const [editingTask, setEditingTask] = useState<SupplierTask | null>(null);
   const [tasks, setTasks] = useState<SupplierTask[]>([]);
 
@@ -262,45 +256,47 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
 
   const monthlyStats = useMemo(() => {
     const months = eachMonthOfInterval({
-      start: startOfMonth(new Date(new Date().getFullYear(), 0, 1)),
-      end: endOfMonth(new Date()),
+      start: dateRange?.from || addDays(new Date(), -180),
+      end: dateRange?.to || new Date(),
     });
 
     return months.map(month => {
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
-      const monthPurchases = purchases.filter(p => {
-        const purchaseDate = new Date(p.date);
+      
+      const monthPurchases = purchases.filter(purchase => {
+        const purchaseDate = new Date(purchase.date);
         return purchaseDate >= monthStart && purchaseDate <= monthEnd;
       });
-      const monthPayments = paymentsToSupplier.filter(p => {
-        const paymentDate = new Date(p.date);
+
+      const monthPayments = paymentsToSupplier.filter(payment => {
+        const paymentDate = new Date(payment.date);
         return paymentDate >= monthStart && paymentDate <= monthEnd;
       });
 
+      const totalPurchases = monthPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+      const totalPayments = monthPayments.reduce((sum, payment) => sum + payment.amount, 0);
+
       return {
         month: format(month, 'MMM yyyy', { locale: tr }),
-        alışlar: monthPurchases.reduce((sum, p) => sum + p.amount, 0),
-        ödemeler: monthPayments.reduce((sum, p) => sum + p.amount, 0),
+        satınAlmalar: totalPurchases,
+        ödemeler: totalPayments,
       };
     });
-  }, [purchases, paymentsToSupplier]);
+  }, [purchases, paymentsToSupplier, dateRange]);
 
   const transactionTypeDistribution = useMemo(() => {
-    const total = purchases.length + paymentsToSupplier.length;
+    const total = filteredAndSortedTransactions.length;
+    if (total === 0) return [];
+
+    const purchasesCount = filteredAndSortedTransactions.filter(t => t.transactionType === 'purchase').length;
+    const paymentsCount = filteredAndSortedTransactions.filter(t => t.transactionType === 'paymentToSupplier').length;
+
     return [
-      {
-        name: 'Alışlar',
-        value: purchases.length,
-        percentage: (purchases.length / total) * 100,
-      },
-      {
-        name: 'Ödemeler',
-        value: paymentsToSupplier.length,
-        percentage: (paymentsToSupplier.length / total) * 100,
-      },
+      { name: 'Satın Almalar', value: purchasesCount, percentage: (purchasesCount / total) * 100 },
+      { name: 'Ödemeler', value: paymentsCount, percentage: (paymentsCount / total) * 100 },
     ];
-  }, [purchases, paymentsToSupplier]);
+  }, [filteredAndSortedTransactions]);
 
   useEffect(() => {
     const fetchStockItems = async () => {
@@ -351,168 +347,110 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   }, [purchaseFormValues.quantityPurchased, purchaseFormValues.unitPrice, purchaseFormValues.stockItemId]);
 
   useEffect(() => {
-    setPurchaseFormValues(prev => ({ ...prev, unitPrice: '', currency: 'TRY' }));
-  }, [purchaseFormValues.stockItemId]);
-
-  const refreshSupplierData = useCallback(async () => {
-    if (!supplier?.id || !user) return;
-    const freshSupplier = await getSupplierById(user.uid, supplier.id);
-    if (freshSupplier) {
-      setSupplier(freshSupplier);
-      document.title = `${freshSupplier.name} | Tedarikçi Detayları | ERMAY`;
-    }
-  }, [supplier?.id, user]);
-
-  const handleSupplierUpdate = useCallback(async (data: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'> | Supplier): Promise<void> => {
-    try {
-      if (!user) {
-        console.error("handleSupplierUpdate: User is not logged in.");
-        toast({
-          title: "Hata",
-          description: "Tedarikçi bilgileri güncellenirken bir sorun oluştu: Kullanıcı girişi yapılmamış.",
-          variant: "destructive",
-        });
-        return;
+    const fetchContactHistory = async () => {
+      if (user?.uid && supplier?.id) {
+        const history = await getContactHistory(user.uid, supplier.id);
+        setContactHistory(history);
       }
-      const supplierToUpdate: Supplier = 'id' in data && data.id
-        ? { ...data as Supplier, updatedAt: formatISO(new Date()) }
-        : { ...data, id: initialSupplier.id, createdAt: initialSupplier.createdAt, updatedAt: formatISO(new Date()) };
+    };
+    fetchContactHistory();
+  }, [user?.uid, supplier?.id]);
 
-      await storageUpdateSupplier(user.uid, supplierToUpdate);
-      toast({
-        title: "Tedarikçi Güncellendi",
-        description: `${supplierToUpdate.name} tedarikçi bilgileri güncellendi.`, 
-      });
-      setShowEditSupplierModal(false);
-      await refreshSupplierData();
-    } catch (error) {
-      console.error("Tedarikçi güncellenirken hata:", error);
-      toast({
-        title: "Hata",
-        description: "Tedarikçi bilgileri güncellenirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-    }
-  }, [toast, refreshSupplierData, user, initialSupplier.id, initialSupplier.createdAt]);
-
-  const balances = useMemo(() => {
-    const newBalances: Record<Currency, number> = { USD: 0, TRY: 0 };
-    purchases.forEach(purchase => {
-      newBalances[purchase.currency] = (newBalances[purchase.currency] || 0) + purchase.amount;
-    });
-    paymentsToSupplier.forEach(payment => {
-      newBalances[payment.currency] = (newBalances[payment.currency] || 0) - payment.amount;
-    });
-    return newBalances;
-  }, [purchases, paymentsToSupplier]);
+  useEffect(() => {
+    const fetchTasks = async () => {
+      if (user?.uid && supplier?.id) {
+        const fetchedTasks = await getSupplierTasks(user.uid, supplier.id);
+        setTasks(fetchedTasks);
+      }
+    };
+    fetchTasks();
+  }, [user?.uid, supplier?.id]);
 
   const formatCurrency = (amount: number, currency: Currency): string => {
-    if (typeof amount !== 'number' || isNaN(amount)) {
-      amount = 0;
-    }
-    try {
-      return amount.toLocaleString('tr-TR', {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    } catch (e) {
-      console.error("Error formatting currency:", e);
-      return `${amount.toFixed(2)} ${currency}`;
-    }
+    return new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
   };
 
   const handleOpenAddPurchaseModal = useCallback(() => {
-    console.log("Opening Purchase Modal");
-    if (!supplier?.id) {
-      toast({
-        title: "Hata",
-        description: "Tedarikçi bilgisi bulunamadı.",
-        variant: "destructive",
-      });
-      return;
-    }
     setEditingPurchase(null);
     setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
     setShowPurchaseModal(true);
-  }, [supplier?.id, toast]);
+  }, []);
 
   const handleOpenEditPurchaseModal = (purchase: Purchase) => {
-    console.log("handleOpenEditPurchaseModal called with purchase:", purchase);
     setEditingPurchase(purchase);
     setPurchaseFormValues({
       amount: purchase.amount.toString(),
       date: parseISO(purchase.date),
       currency: purchase.currency,
-      stockItemId: purchase.stockItemId === '' ? undefined : purchase.stockItemId, // Eğer boş string ise undefined yap
-      description: purchase.description || '',
-      quantityPurchased: purchase.quantityPurchased?.toString(),
-      unitPrice: purchase.unitPrice?.toString(),
+      stockItemId: purchase.stockItemId || undefined,
+      description: purchase.description,
+      quantityPurchased: purchase.quantityPurchased || undefined,
+      unitPrice: purchase.unitPrice || undefined,
     });
     setShowPurchaseModal(true);
   };
 
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!user) {
-      toast({
-        title: "Hata",
-        description: "Kullanıcı oturumu bulunamadı.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!user || !supplier?.id) return;
 
     try {
       const amount = parseFloat(purchaseFormValues.amount);
-      const date = formatISO(purchaseFormValues.date);
+      const quantityPurchased = purchaseFormValues.quantityPurchased ? parseFloat(purchaseFormValues.quantityPurchased) : undefined;
+      const unitPrice = purchaseFormValues.unitPrice ? parseFloat(purchaseFormValues.unitPrice) : undefined;
 
       if (editingPurchase) {
         const updatedPurchase: Purchase = {
           ...editingPurchase,
-          amount,
-          date,
+          amount: amount,
+          date: formatISO(purchaseFormValues.date),
           currency: purchaseFormValues.currency,
-          stockItemId: purchaseFormValues.stockItemId === undefined ? null : purchaseFormValues.stockItemId, // undefined ise null yap
-          description: purchaseFormValues.description || '',
-          updatedAt: formatISO(new Date())
+          stockItemId: purchaseFormValues.stockItemId === '' ? null : purchaseFormValues.stockItemId, // Convert empty string to null
+          description: purchaseFormValues.description,
+          quantityPurchased: quantityPurchased,
+          unitPrice: unitPrice,
+          updatedAt: new Date().toISOString(),
         };
-
         await storageUpdatePurchase(user.uid, updatedPurchase);
-        setPurchases(purchases.map(p => (p.id === editingPurchase.id ? updatedPurchase : p)));
+        setPurchases(prev => prev.map(p => p.id === updatedPurchase.id ? updatedPurchase : p));
         toast({
-          title: "Başarılı",
-          description: "Satın alma güncellendi.",
+          title: "Satın alma güncellendi",
+          description: "Satın alma kaydı başarıyla güncellendi.",
         });
       } else {
-        const newPurchase: Omit<Purchase, 'id'> = {
+        const newPurchase: Purchase = {
+          id: Math.random().toString(36).substr(2, 9),
           supplierId: supplier.id,
-          amount,
-          date,
+          amount: amount,
+          date: formatISO(purchaseFormValues.date),
           currency: purchaseFormValues.currency,
-          stockItemId: purchaseFormValues.stockItemId === undefined ? null : purchaseFormValues.stockItemId, // undefined ise null yap
-          description: purchaseFormValues.description || '',
+          stockItemId: purchaseFormValues.stockItemId === '' ? null : purchaseFormValues.stockItemId, // Convert empty string to null
+          description: purchaseFormValues.description || 'Yeni satın alma',
+          quantityPurchased: quantityPurchased,
+          unitPrice: unitPrice,
           transactionType: 'purchase',
-          category: 'satis',
+          category: 'urun-alim',
           tags: [],
-          createdAt: formatISO(new Date()),
-          updatedAt: formatISO(new Date())
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
-
-        const addedPurchase = await addPurchase(user.uid, newPurchase);
-        setPurchases(prev => [...prev, addedPurchase]);
+        await addPurchase(user.uid, newPurchase);
+        setPurchases(prev => [...prev, newPurchase]);
         toast({
-          title: "Başarılı",
-          description: "Yeni satın alma eklendi.",
+          title: "Satın alma eklendi",
+          description: "Yeni satın alma başarıyla eklendi.",
         });
       }
       setShowPurchaseModal(false);
-      setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
       setEditingPurchase(null);
+      setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
     } catch (error) {
-      console.error("Satın alma kaydedilirken hata oluştu:", error);
+      console.error("Satın alma kaydedilirken hata:", error);
       toast({
         title: "Hata",
         description: "Satın alma kaydedilirken bir sorun oluştu.",
@@ -521,40 +459,17 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     }
   };
 
-  const handleDeletePurchase = useCallback(async () => {
-    if (!deletingPurchaseId || !user) return;
-    try {
-      await storageDeletePurchase(user.uid, deletingPurchaseId);
-      setPurchases(prev => prev.filter(p => p.id !== deletingPurchaseId));
-      toast({ title: "Satın Alma Silindi", description: "Satın alma başarıyla silindi." });
-      setDeletingPurchaseId(null);
-      await refreshSupplierData();
-    } catch (error) {
-      console.error("Satın alma silinirken hata:", error);
-      toast({ title: "Hata", description: "Satın alma silinirken bir sorun oluştu.", variant: "destructive" });
-    }
-  }, [deletingPurchaseId, toast, refreshSupplierData, user]);
-
   const handleOpenAddPaymentToSupplierModal = useCallback(() => {
-    console.log("Opening Payment To Supplier Modal");
-    if (!supplier?.id) {
-      toast({
-        title: "Hata",
-        description: "Tedarikçi bilgisi bulunamadı.",
-        variant: "destructive",
-      });
-      return;
-    }
     setEditingPaymentToSupplier(null);
     setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
     setShowPaymentToSupplierModal(true);
-  }, [supplier?.id, toast]);
+  }, []);
 
-  const handleOpenEditPaymentToSupplierModal = useCallback((payment: PaymentToSupplier) => {
+  const handleOpenEditPaymentToSupplierModal = (payment: PaymentToSupplier) => {
     setEditingPaymentToSupplier(payment);
     setPaymentToSupplierFormValues({
       amount: payment.amount.toString(),
-      date: isValid(parseISO(payment.date)) ? parseISO(payment.date) : new Date(),
+      date: parseISO(payment.date),
       method: payment.method,
       currency: payment.currency,
       referenceNumber: payment.referenceNumber || '',
@@ -563,74 +478,64 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       checkSerialNumber: payment.checkSerialNumber || null,
     });
     setShowPaymentToSupplierModal(true);
-  }, []);
+  };
 
   const handlePaymentToSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!user) {
-      toast({
-        title: "Hata",
-        description: "Kullanıcı oturumu bulunamadı.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!user || !supplier?.id) return;
 
     try {
       const amount = parseFloat(paymentToSupplierFormValues.amount);
-      const date = formatISO(paymentToSupplierFormValues.date);
+      const checkDateISO = paymentToSupplierFormValues.checkDate ? formatISO(paymentToSupplierFormValues.checkDate) : null;
 
       if (editingPaymentToSupplier) {
         const updatedPayment: PaymentToSupplier = {
           ...editingPaymentToSupplier,
-          amount,
-          date,
+          amount: amount,
+          date: formatISO(paymentToSupplierFormValues.date),
           method: paymentToSupplierFormValues.method,
           currency: paymentToSupplierFormValues.currency,
-          referenceNumber: paymentToSupplierFormValues.referenceNumber || null,
+          referenceNumber: paymentToSupplierFormValues.referenceNumber || '',
           description: paymentToSupplierFormValues.description || '',
-          checkDate: paymentToSupplierFormValues.method === 'cek' && paymentToSupplierFormValues.checkDate ? formatISO(paymentToSupplierFormValues.checkDate) : null,
-          checkSerialNumber: paymentToSupplierFormValues.method === 'cek' ? (paymentToSupplierFormValues.checkSerialNumber || null) : null,
-          updatedAt: formatISO(new Date())
+          checkDate: checkDateISO,
+          checkSerialNumber: paymentToSupplierFormValues.checkSerialNumber || null,
+          updatedAt: new Date().toISOString(),
         };
-
         await storageUpdatePaymentToSupplier(user.uid, updatedPayment);
-        setPaymentsToSupplier(paymentsToSupplier.map(p => (p.id === editingPaymentToSupplier.id ? updatedPayment : p)));
+        setPaymentsToSupplier(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
         toast({
-          title: "Başarılı",
-          description: "Ödeme güncellendi.",
+          title: "Ödeme güncellendi",
+          description: "Ödeme kaydı başarıyla güncellendi.",
         });
       } else {
-        const newPayment: Omit<PaymentToSupplier, 'id'> = {
+        const newPayment: PaymentToSupplier = {
+          id: Math.random().toString(36).substr(2, 9),
           supplierId: supplier.id,
-          amount,
-          date,
-          method: paymentToSupplierFormValues.method,
+          amount: amount,
+          date: formatISO(paymentToSupplierFormValues.date),
           currency: paymentToSupplierFormValues.currency,
-          referenceNumber: paymentToSupplierFormValues.referenceNumber || null,
+          method: paymentToSupplierFormValues.method,
           description: paymentToSupplierFormValues.description || '',
-          checkDate: paymentToSupplierFormValues.method === 'cek' && paymentToSupplierFormValues.checkDate ? formatISO(paymentToSupplierFormValues.checkDate) : null,
-          checkSerialNumber: paymentToSupplierFormValues.method === 'cek' ? (paymentToSupplierFormValues.checkSerialNumber || null) : null,
+          checkDate: checkDateISO,
+          checkSerialNumber: paymentToSupplierFormValues.checkSerialNumber || null,
           transactionType: 'paymentToSupplier',
           category: 'odeme',
           tags: [],
-          createdAt: formatISO(new Date()),
-          updatedAt: formatISO(new Date())
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
-
-        const addedPayment = await addPaymentToSupplier(user.uid, newPayment);
-        setPaymentsToSupplier(prev => [...prev, addedPayment]);
+        await addPaymentToSupplier(user.uid, newPayment);
+        setPaymentsToSupplier(prev => [...prev, newPayment]);
         toast({
-          title: "Başarılı",
-          description: "Yeni ödeme eklendi.",
+          title: "Ödeme eklendi",
+          description: "Yeni ödeme başarıyla eklendi.",
         });
       }
       setShowPaymentToSupplierModal(false);
-      setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
       setEditingPaymentToSupplier(null);
+      setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
     } catch (error) {
-      console.error("Ödeme kaydederken hata oluştu:", error);
+      console.error("Ödeme kaydedilirken hata:", error);
       toast({
         title: "Hata",
         description: "Ödeme kaydedilirken bir sorun oluştu.",
@@ -639,174 +544,107 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     }
   };
 
-  const handleDeletePaymentToSupplier = useCallback(async () => {
-    if (!deletingPaymentToSupplierId || !user) return;
+  const handleDeletePurchase = useCallback(async (purchaseId: string) => {
+    if (!user || !supplier?.id) return;
     try {
-      await storageDeletePaymentToSupplier(user.uid, deletingPaymentToSupplierId);
-      setPaymentsToSupplier(prev => prev.filter(p => p.id !== deletingPaymentToSupplierId));
-      toast({ title: "Ödeme Silindi", description: "Ödeme başarıyla silindi." });
-      setDeletingPaymentToSupplierId(null);
-      await refreshSupplierData();
+      await storageDeletePurchase(user.uid, supplier.id, purchaseId);
+      setPurchases(prev => prev.filter(p => p.id !== purchaseId));
+      toast({
+        title: "Satın alma silindi",
+        description: "Satın alma kaydı başarıyla silindi.",
+      });
+    } catch (error) {
+      console.error("Satın alma silinirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "Satın alma silinirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, supplier, toast]);
+
+  const handleDeletePaymentToSupplier = useCallback(async (paymentId: string) => {
+    if (!user || !supplier?.id) return;
+    try {
+      await storageDeletePaymentToSupplier(user.uid, supplier.id, paymentId);
+      setPaymentsToSupplier(prev => prev.filter(p => p.id !== paymentId));
+      toast({
+        title: "Ödeme silindi",
+        description: "Ödeme başarıyla silindi.",
+      });
     } catch (error) {
       console.error("Ödeme silinirken hata:", error);
-      toast({ title: "Hata", description: "Ödeme silinirken bir sorun oluştu.", variant: "destructive" });
+      toast({
+        title: "Hata",
+        description: "Ödeme silinirken bir sorun oluştu.",
+        variant: "destructive",
+      });
     }
-  }, [deletingPaymentToSupplierId, toast, refreshSupplierData, user]);
+  }, [user, supplier, toast]);
 
   const safeFormatDate = (dateString: string, formatString: string) => {
-    if (!dateString) return '-';
     const date = parseISO(dateString);
-    return isValid(date) ? format(date, formatString, { locale: tr }) : '-';
+    return isValid(date) ? format(date, formatString, { locale: tr }) : 'Geçersiz Tarih';
   };
-
-  const getStockItemNameForPurchaseForm = useCallback(async (stockItemId?: string): Promise<string> => {
-    if (!stockItemId || stockItemId === 'none' || !user) return ""; 
-    try {
-      const stockItem = await getStockItemById(user.uid, stockItemId);
-      return stockItem ? `${stockItem.name} (${stockItem.unit || 'Adet'})` : ""; 
-    } catch (error) {
-      console.error("Stok kalemi adı getirilirken hata:", error);
-      return "";
-    }
-  }, [user]);
-
-  const formatPriceForDisplay = useCallback((price?: Price): string => {
-    if (!price || typeof price.amount !== 'number' || !price.currency) return "-";
-    try {
-      return price.amount.toLocaleString('tr-TR', { style: "currency", currency: price.currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    } catch (e) {
-      return `${price.amount.toFixed(2)} ${price.currency}`;
-    }
-  }, []);
 
   const renderTransactionDetail = (item: UnifiedTransactionClient) => {
     if (item.transactionType === 'purchase') {
-      const purchaseItem = item as Purchase;
+      const purchase = item as Purchase;
       return (
-        <div className="flex flex-col">
-          {purchaseItem.stockItemId && (
-            <span className="text-sm text-muted-foreground">
-              Stok: {stockItemDisplayNames[purchaseItem.stockItemId] || 'Bilinmeyen Ürün'}
-            </span>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <p className="font-medium">Açıklama:</p>
+          <p>{purchase.description || '-'}</p>
+          {purchase.stockItemId && (
+            <>
+              <p className="font-medium">Stok Kalemi:</p>
+              <p>{stockItemDisplayNames[purchase.stockItemId] || 'Yükleniyor...'}</p>
+            </>
           )}
-          <span className="text-sm text-muted-foreground">
-            Açıklama: {purchaseItem.description || '-'}
-          </span>
+          {purchase.quantityPurchased && (
+            <>
+              <p className="font-medium">Adet:</p>
+              <p>{purchase.quantityPurchased}</p>
+            </>
+          )}
+          {purchase.unitPrice && (
+            <>
+              <p className="font-medium">Birim Fiyat:</p>
+              <p>{formatCurrency(purchase.unitPrice, purchase.currency)}</p>
+            </>
+          )}
         </div>
       );
     } else if (item.transactionType === 'paymentToSupplier') {
-      const paymentItem = item as PaymentToSupplier;
+      const payment = item as PaymentToSupplier;
       return (
-        <div className="flex flex-col">
-          <span className="text-sm text-muted-foreground">
-            Yöntem: {paymentItem.method}
-          </span>
-          <span className="text-sm text-muted-foreground">
-            Referans: {paymentItem.referenceNumber || '-'}
-          </span>
-          <span className="text-sm text-muted-foreground">
-            Açıklama: {paymentItem.description || '-'}
-          </span>
-          {paymentItem.method === 'cek' && paymentItem.checkDate && (
-            <span className="text-sm text-muted-foreground">
-              Çek Tarihi: {safeFormatDate(paymentItem.checkDate, 'dd.MM.yyyy')}
-            </span>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <p className="font-medium">Açıklama:</p>
+          <p>{payment.description || '-'}</p>
+          <p className="font-medium">Ödeme Yöntemi:</p>
+          <p>{payment.method === 'nakit' ? 'Nakit' : payment.method === 'banka' ? 'Banka Havalesi' : 'Çek'}</p>
+          {payment.referenceNumber && (
+            <>
+              <p className="font-medium">Referans No:</p>
+              <p>{payment.referenceNumber}</p>
+            </>
           )}
-          {paymentItem.method === 'cek' && paymentItem.checkSerialNumber && (
-            <span className="text-sm text-muted-foreground">
-              Çek Seri No: {paymentItem.checkSerialNumber}
-            </span>
+          {payment.checkDate && (
+            <>
+              <p className="font-medium">Çek Tarihi:</p>
+              <p>{safeFormatDate(payment.checkDate, 'dd.MM.yyyy')}</p>
+            </>
+          )}
+          {payment.checkSerialNumber && (
+            <>
+              <p className="font-medium">Çek Seri No:</p>
+              <p>{payment.checkSerialNumber}</p>
+            </>
           )}
         </div>
       );
     }
     return null;
   };
-
-  const handleSaveNotes = useCallback(async () => {
-    if (!user || !supplier?.id) return;
-    try {
-      const updatedSupplier: Supplier = { ...supplier, notes: notesContent };
-      await storageUpdateSupplier(user.uid, updatedSupplier);
-      setSupplier(updatedSupplier);
-      toast({
-        title: "Notlar Güncellendi",
-        description: "Tedarikçi notları başarıyla kaydedildi.",
-      });
-    } catch (error) {
-      console.error("Notlar kaydedilirken hata:", error);
-      toast({
-        title: "Hata",
-        description: "Notlar kaydedilirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-    }
-  }, [user, supplier, notesContent, toast]);
-
-  const handleDeleteSupplier = useCallback(async () => {
-    if (!user || !deletingSupplier) return;
-    try {
-      await storageDeleteSupplier(user.uid, deletingSupplier);
-      toast({
-        title: "Tedarikçi Silindi",
-        description: "Tedarikçi başarıyla silindi.",
-      });
-      window.location.href = "/suppliers"; 
-    } catch (error) {
-      console.error("Tedarikçi silinirken hata:", error);
-      toast({
-        title: "Hata",
-        description: "Tedarikçi silinirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-    } finally {
-      setDeletingSupplier(null);
-    }
-  }, [user, deletingSupplier, toast]);
-
-  const handleContactHistorySubmit = useCallback(async (formValues: ContactHistoryItem) => {
-    if (!user || !supplier?.id) {
-      toast({
-        title: "Hata",
-        description: "Kullanıcı oturumu bulunamadı.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const newContactHistoryItem: ContactHistoryItem = {
-        id: crypto.randomUUID(),
-        date: formatISO(formValues.date),
-        type: formValues.type,
-        summary: formValues.summary,
-        notes: formValues.notes || undefined,
-        createdAt: formatISO(new Date()),
-        updatedAt: formatISO(new Date()),
-      };
-
-      const updatedSupplier = {
-        ...supplier,
-        contactHistory: [...(supplier.contactHistory || []), newContactHistoryItem],
-      };
-
-      await storageUpdateSupplier(user.uid, updatedSupplier);
-      setSupplier(updatedSupplier);
-      setShowContactHistoryModal(false);
-      setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
-      toast({
-        title: "Başarılı",
-        description: "İletişim geçmişi eklendi.",
-      });
-    } catch (error) {
-      console.error("Error adding contact history:", error);
-      toast({
-        title: "Hata",
-        description: "İletişim geçmişi eklenirken bir hata oluştu.",
-        variant: "destructive",
-      });
-    }
-  }, [user, supplier, toast]);
 
   const handleOpenAddContactHistoryModal = useCallback(() => {
     setEditingContactHistoryItem(null);
@@ -820,20 +658,69 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       date: parseISO(item.date),
       type: item.type,
       summary: item.summary,
-      notes: item.notes || '',
+      notes: item.notes,
     });
     setShowContactHistoryModal(true);
   }, []);
 
-  const handleDeleteContactHistoryItem = useCallback(async (itemId: string) => {
+  const handleContactHistorySubmit = useCallback(async (values: ContactHistoryFormValues) => {
     if (!user || !supplier?.id) return;
     try {
-      const updatedContactHistory = (supplier.contactHistory || []).filter(item => item.id !== itemId);
-      const updatedSupplier: Supplier = { ...supplier, contactHistory: updatedContactHistory };
+      if (editingContactHistoryItem) {
+        const updatedItem: ContactHistoryItem = {
+          ...editingContactHistoryItem,
+          date: formatISO(values.date),
+          type: values.type,
+          summary: values.summary,
+          notes: values.notes,
+          updatedAt: new Date().toISOString(),
+        };
+        await storageUpdateContactHistory(user.uid, supplier.id, updatedItem);
+        setContactHistory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+        toast({
+          title: "İletişim Geçmişi Güncellendi",
+          description: "İletişim geçmişi kaydı başarıyla güncellendi.",
+        });
+      } else {
+        const newItem: ContactHistoryItem = {
+          id: Math.random().toString(36).substr(2, 9),
+          supplierId: supplier.id,
+          date: formatISO(values.date),
+          type: values.type,
+          summary: values.summary,
+          notes: values.notes,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await storageAddContactHistory(user.uid, supplier.id, newItem);
+        setContactHistory(prev => [...prev, newItem]);
+        toast({
+          title: "İletişim Geçmişi Eklendi",
+          description: "Yeni iletişim geçmişi kaydı başarıyla eklendi.",
+        });
+      }
+      setShowContactHistoryModal(false);
+      setEditingContactHistoryItem(null);
+      setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+    } catch (error) {
+      console.error("İletişim geçmişi kaydedilirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "İletişim geçmişi kaydedilirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, supplier, editingContactHistoryItem, toast]);
+
+  const handleDeleteContactHistory = useCallback(async (itemId: string) => {
+    if (!user || !supplier?.id) return;
+    try {
+      const updatedHistory = (supplier.contactHistory || []).filter(item => item.id !== itemId);
+      const updatedSupplier: Supplier = { ...supplier, contactHistory: updatedHistory };
       await storageUpdateSupplier(user.uid, updatedSupplier);
       setSupplier(updatedSupplier);
       toast({
-        title: "İletişim Silindi",
+        title: "İletişim Geçmişi Silindi",
         description: "İletişim geçmişi kaydı başarıyla silindi.",
       });
     } catch (error) {
@@ -846,38 +733,40 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     }
   }, [user, supplier, toast]);
 
-  const handleTaskFormSubmit = useCallback(async (formValues: SupplierTask) => {
+  const handleAddTask = useCallback(async (values: SupplierTaskFormValues) => {
     if (!user || !supplier?.id) return;
     try {
-      const taskToSave = {
-        ...formValues,
-        dueDate: formValues.dueDate ? formatISO(formValues.dueDate, { representation: 'date' }) : undefined,
-        id: editingTask?.id || crypto.randomUUID(),
-        createdAt: editingTask?.createdAt || formatISO(new Date()),
-        updatedAt: formatISO(new Date()),
-      };
-
-      let updatedTasks: SupplierTask[];
-
       if (editingTask) {
-        updatedTasks = (supplier.tasks || []).map(task =>
-          task.id === editingTask.id ? (taskToSave as SupplierTask) : task
-        );
+        const updatedTask: SupplierTask = {
+          ...editingTask,
+          description: values.description,
+          dueDate: values.dueDate ? formatISO(values.dueDate) : undefined,
+          status: values.status,
+          updatedAt: new Date().toISOString(),
+        };
+        await updateSupplierTask(user.uid, supplier.id, updatedTask);
+        setTasks(prev => prev.map(task => task.id === updatedTask.id ? updatedTask : task));
         toast({
           title: "Görev Güncellendi",
           description: "Görev başarıyla güncellendi.",
         });
       } else {
-        updatedTasks = [...(supplier.tasks || []), (taskToSave as SupplierTask)];
+        const newTask: SupplierTask = {
+          id: Math.random().toString(36).substr(2, 9),
+          supplierId: supplier.id,
+          description: values.description,
+          dueDate: values.dueDate ? formatISO(values.dueDate) : undefined,
+          status: values.status,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await addSupplierTask(user.uid, supplier.id, newTask);
+        setTasks(prev => [...prev, newTask]);
         toast({
           title: "Görev Eklendi",
           description: "Yeni görev başarıyla eklendi.",
         });
       }
-
-      const updatedSupplier: Supplier = { ...supplier, tasks: updatedTasks };
-      await storageUpdateSupplier(user.uid, updatedSupplier);
-      setSupplier(updatedSupplier);
       setShowTaskModal(false);
       setEditingTask(null);
       setTaskFormValues(EMPTY_TASK_FORM_VALUES);
@@ -953,50 +842,6 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     link.click();
     document.body.removeChild(link);
   };
-
-  const monthlyStats = useMemo(() => {
-    const months = eachMonthOfInterval({
-      start: dateRange?.from || addDays(new Date(), -180),
-      end: dateRange?.to || new Date(),
-    });
-
-    return months.map(month => {
-      const monthStart = startOfMonth(month);
-      const monthEnd = endOfMonth(month);
-      
-      const monthPurchases = purchases.filter(purchase => {
-        const purchaseDate = new Date(purchase.date);
-        return purchaseDate >= monthStart && purchaseDate <= monthEnd;
-      });
-
-      const monthPayments = paymentsToSupplier.filter(payment => {
-        const paymentDate = new Date(payment.date);
-        return paymentDate >= monthStart && paymentDate <= monthEnd;
-      });
-
-      const totalPurchases = monthPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
-      const totalPayments = monthPayments.reduce((sum, payment) => sum + payment.amount, 0);
-
-      return {
-        month: format(month, 'MMM yyyy', { locale: tr }),
-        satınAlmalar: totalPurchases,
-        ödemeler: totalPayments,
-      };
-    });
-  }, [purchases, paymentsToSupplier, dateRange]);
-
-  const transactionTypeDistribution = useMemo(() => {
-    const total = filteredAndSortedTransactions.length;
-    if (total === 0) return [];
-
-    const purchasesCount = filteredAndSortedTransactions.filter(t => t.transactionType === 'purchase').length;
-    const paymentsCount = filteredAndSortedTransactions.filter(t => t.transactionType === 'paymentToSupplier').length;
-
-    return [
-      { name: 'Satın Almalar', value: purchasesCount, percentage: (purchasesCount / total) * 100 },
-      { name: 'Ödemeler', value: paymentsCount, percentage: (paymentsCount / total) * 100 },
-    ];
-  }, [filteredAndSortedTransactions]);
 
   const editor = useEditor({
     extensions: [StarterKit, Underline],
@@ -1231,14 +1076,14 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                 <div className="flex space-x-2">
                   <Button
                     variant="outline"
-                    onClick={handleOpenAddPurchaseModal}
+                    onClick={() => handleOpenAddPurchaseModal()}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Satın Alma Ekle
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={handleOpenAddPaymentToSupplierModal}
+                    onClick={() => handleOpenAddPaymentToSupplierModal()}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Ödeme Ekle
@@ -1358,7 +1203,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                               }
                             }}
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Edit3 className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -1395,47 +1240,164 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
               <CardTitle>Notlar</CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Notes content */}
+              <div className="tiptap-editor border rounded-md min-h-[200px] mb-4 overflow-auto">
+                <EditorContent editor={editor} className="prose max-w-none p-2" />
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <Button
+                  onClick={() => editor?.chain().focus().toggleBold().run()}
+                  variant="outline"
+                  size="sm"
+                  className={editor?.isActive('bold') ? 'is-active' : ''}
+                >
+                  <Bold className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => editor?.chain().focus().toggleItalic().run()}
+                  variant="outline"
+                  size="sm"
+                  className={editor?.isActive('italic') ? 'is-active' : ''}
+                >
+                  <Italic className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => editor?.chain().focus().toggleUnderline().run()}
+                  variant="outline"
+                  size="sm"
+                  className={editor?.isActive('underline') ? 'is-active' : ''}
+                >
+                  <UnderlineIcon className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => editor?.chain().focus().toggleStrike().run()}
+                  variant="outline"
+                  size="sm"
+                  className={editor?.isActive('strike') ? 'is-active' : ''}
+                >
+                  <Strikethrough className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => editor?.chain().focus().toggleBulletList().run()}
+                  variant="outline"
+                  size="sm"
+                  className={editor?.isActive('bulletList') ? 'is-active' : ''}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+                  variant="outline"
+                  size="sm"
+                  className={editor?.isActive('orderedList') ? 'is-active' : ''}
+                >
+                  <ListOrdered className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button onClick={() => handleSaveNotes()}>Notları Kaydet</Button>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="contact-history">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>İletişim Geçmişi</CardTitle>
-                <Button
-                  variant="outline"
-                  onClick={handleOpenAddContactHistoryModal}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  İletişim Ekle
-                </Button>
-              </div>
+            <CardHeader className="flex flex-row justify-between items-center">
+              <CardTitle>İletişim Geçmişi</CardTitle>
+              <Button variant="outline" onClick={() => handleOpenAddContactHistoryModal()}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                İletişim Ekle
+              </Button>
             </CardHeader>
             <CardContent>
-              {/* Contact history content */}
+              {supplier.contactHistory && supplier.contactHistory.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tarih</TableHead>
+                      <TableHead>Tür</TableHead>
+                      <TableHead>Özet</TableHead>
+                      <TableHead>Notlar</TableHead>
+                      <TableHead className="text-right">İşlemler</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {supplier.contactHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(item => (
+                      <TableRow key={item.id}>
+                        <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy HH:mm')}</TableCell>
+                        <TableCell>{item.type}</TableCell>
+                        <TableCell>{item.summary}</TableCell>
+                        <TableCell className="max-w-[300px] truncate">{item.notes}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenEditContactHistoryModal(item)}>
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteContactHistory(item.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground">Henüz bir iletişim geçmişi kaydı bulunmamaktadır.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="tasks">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Görevler</CardTitle>
-                <Button
-                  variant="outline"
-                  onClick={handleOpenAddTaskModal}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Görev Ekle
-                </Button>
-              </div>
+            <CardHeader className="flex flex-row justify-between items-center">
+              <CardTitle>Görevler</CardTitle>
+              <Button variant="outline" onClick={() => handleOpenAddTaskModal()}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Görev Ekle
+              </Button>
             </CardHeader>
             <CardContent>
-              {/* Tasks content */}
+              {supplier.tasks && supplier.tasks.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Açıklama</TableHead>
+                      <TableHead>Durum</TableHead>
+                      <TableHead>Son Tarih</TableHead>
+                      <TableHead className="text-right">İşlemler</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {supplier.tasks.sort((a, b) => {
+                      if (a.status === 'completed' && b.status !== 'completed') return 1;
+                      if (a.status !== 'completed' && b.status === 'completed') return -1;
+                      if (!a.dueDate) return 1;
+                      if (!b.dueDate) return -1;
+                      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+                    }).map(task => (
+                      <TableRow key={task.id}>
+                        <TableCell className={cn(task.status === 'completed' && 'line-through text-muted-foreground')}>{task.description}</TableCell>
+                        <TableCell>
+                          <Badge variant={task.status === 'completed' ? 'secondary' : 'default'}>
+                            {task.status === 'pending' && 'Beklemede'}
+                            {task.status === 'completed' && 'Tamamlandı'}
+                            {task.status === 'in-progress' && 'Devam Ediyor'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{task.dueDate ? safeFormatDate(task.dueDate, 'dd.MM.yyyy') : '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenEditTaskModal(task)}>
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteTask(task.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground">Henüz bir görev bulunmamaktadır.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1446,34 +1408,65 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
               <CardTitle>Ekstre</CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Export to CSV content */}
+              <div className="flex flex-col md:flex-row gap-4 mb-6">
+                <Card className="flex-1">
+                  <CardHeader>
+                    <CardTitle className="text-md">Aylık İşlem Özeti</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div style={{ width: '100%', height: 300 }}>
+                      <ResponsiveContainer>
+                        <BarChart data={monthlyStats}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis />
+                          <Tooltip formatter={(value: number) => formatCurrency(value, 'TRY')} />
+                          <Bar dataKey="satınAlmalar" fill="#8884d8" name="Satın Almalar" />
+                          <Bar dataKey="ödemeler" fill="#82ca9d" name="Ödemeler" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="flex-1">
+                  <CardHeader>
+                    <CardTitle className="text-md">İşlem Tipi Dağılımı</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {transactionTypeDistribution.map((item, index) => (
+                        <div key={index} className="flex justify-between items-center">
+                          <span>{item.name}</span>
+                          <span className="font-semibold">{item.value} ({item.percentage.toFixed(2)}%)</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              <Button onClick={() => exportToCSV(unifiedTransactions, supplier.name || 'tedarikçi')}>
+                <Download className="mr-2 h-4 w-4" />
+                CSV Olarak Dışa Aktar
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Modals */}
       <PurchaseModal
         isOpen={showPurchaseModal}
-        onClose={() => {
-          setShowPurchaseModal(false);
-          setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
-          setEditingPurchase(null);
-        }}
+        onClose={() => setShowPurchaseModal(false)}
         onSubmit={handlePurchaseSubmit}
         formValues={purchaseFormValues}
         setFormValues={setPurchaseFormValues}
         availableStockItems={availableStockItems}
-        stockItemDisplayNames={stockItemDisplayNames}
+        getStockItemName={getStockItemName}
+        userId={user?.uid}
       />
 
       <PaymentToSupplierModal
         isOpen={showPaymentToSupplierModal}
-        onClose={() => {
-          setShowPaymentToSupplierModal(false);
-          setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
-          setEditingPaymentToSupplier(null);
-        }}
+        onClose={() => setShowPaymentToSupplierModal(false)}
         onSubmit={handlePaymentToSupplierSubmit}
         formValues={paymentToSupplierFormValues}
         setFormValues={setPaymentToSupplierFormValues}
@@ -1490,8 +1483,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         isOpen={!!deletingPurchaseId}
         onClose={() => setDeletingPurchaseId(null)}
         onConfirm={handleDeletePurchase}
-        title="Alışı Sil"
-        description="Bu alışı silmek istediğinizden emin misiniz?"
+        title="Satın Alışı Sil"
+        description="Bu satın alışı silmek istediğinizden emin misiniz?"
       />
 
       <DeleteConfirmationModal
@@ -1512,27 +1505,52 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
 
       <ContactHistoryModal
         isOpen={showContactHistoryModal}
-        onClose={() => {
-          setShowContactHistoryModal(false);
-          setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
-          setEditingContactHistoryItem(null);
-        }}
+        onClose={() => setShowContactHistoryModal(false)}
         onSubmit={handleContactHistorySubmit}
         formValues={contactHistoryFormValues}
         setFormValues={setContactHistoryFormValues}
+        editingContactHistoryItem={editingContactHistoryItem}
       />
 
       <TaskModal
         isOpen={showTaskModal}
         onClose={() => {
           setShowTaskModal(false);
-          setTaskFormValues(EMPTY_TASK_FORM_VALUES);
           setEditingTask(null);
         }}
-        onSubmit={handleTaskFormSubmit}
+        onSubmit={handleAddTask}
         formValues={taskFormValues}
         setFormValues={setTaskFormValues}
+        editingTask={editingTask}
       />
+
+      <Dialog open={showPrintView} onOpenChange={setShowPrintView}>
+        <DialogContent className="max-w-screen-xl h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-4">
+            <DialogTitle>Ekstre Görünümü</DialogTitle>
+            <DialogDescription>Yazdırılabilir ekstre görünümü.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-grow overflow-auto p-4">
+            {showPrintView && (
+              <PrintView
+                supplier={supplier}
+                purchases={purchases}
+                paymentsToSupplier={paymentsToSupplier}
+                dateRange={dateRange}
+                formatCurrency={formatCurrency}
+                getStockItemName={getStockItemName}
+                safeFormatDate={safeFormatDate}
+              />
+            )}
+          </div>
+          <DialogFooter className="p-4">
+            <Button onClick={() => window.print()}>Yazdır</Button>
+            <DialogClose asChild>
+              <Button type="button" variant="secondary">Kapat</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ContactHistoryFormValues } from '@/lib/types';
+import type { ContactHistoryFormValues, ContactHistoryItem } from '@/lib/types';
 
 interface ContactHistoryModalProps {
   isOpen: boolean;
@@ -19,6 +19,7 @@ interface ContactHistoryModalProps {
   onSubmit: (formValues: ContactHistoryFormValues) => Promise<void>;
   formValues: ContactHistoryFormValues;
   setFormValues: (values: ContactHistoryFormValues) => void;
+  editingContactHistoryItem: ContactHistoryItem | null;
 }
 
 export function ContactHistoryModal({
@@ -27,6 +28,7 @@ export function ContactHistoryModal({
   onSubmit,
   formValues,
   setFormValues,
+  editingContactHistoryItem,
 }: ContactHistoryModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

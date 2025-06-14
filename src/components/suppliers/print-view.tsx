@@ -14,6 +14,11 @@ interface PrintViewProps {
   totalPaymentsToSupplier: number;
   balance: number;
   dateRange?: { from?: Date; to?: Date };
+  purchases: Purchase[];
+  paymentsToSupplier: PaymentToSupplier[];
+  formatCurrency: (amount: number, currency: Currency) => string;
+  getStockItemName: (stockItemId?: string) => Promise<string>;
+  safeFormatDate: (dateString: string, formatString: string) => string;
 }
 
 export function PrintView({
@@ -23,6 +28,11 @@ export function PrintView({
   totalPaymentsToSupplier,
   balance,
   dateRange,
+  purchases,
+  paymentsToSupplier,
+  formatCurrency,
+  getStockItemName,
+  safeFormatDate,
 }: PrintViewProps) {
   const safeFormatDate = (dateString: string, formatString: string) => {
     if (!dateString) return "Tarih Yok";

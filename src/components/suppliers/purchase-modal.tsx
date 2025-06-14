@@ -20,6 +20,7 @@ interface PurchaseModalProps {
   formValues: PurchaseFormValues;
   setFormValues: Dispatch<SetStateAction<PurchaseFormValues>>;
   availableStockItems: StockItem[];
+  getStockItemName: (stockItemId?: string) => Promise<string>;
   stockItemDisplayNames: Record<string, string>;
 }
 
@@ -30,6 +31,7 @@ export function PurchaseModal({
   formValues,
   setFormValues,
   availableStockItems,
+  getStockItemName,
   stockItemDisplayNames
 }: PurchaseModalProps) {
   return (
@@ -107,8 +109,8 @@ export function PurchaseModal({
             <div className="grid gap-2">
               <Label htmlFor="stockItem">Stok Ürünü</Label>
               <Select
-                value={formValues.stockItemId}
-                onValueChange={(value) => setFormValues({ ...formValues, stockItemId: value })}
+                value={formValues.stockItemId === null ? "" : formValues.stockItemId}
+                onValueChange={(value) => setFormValues({ ...formValues, stockItemId: value === "" ? null : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Stok ürünü seçin" />
