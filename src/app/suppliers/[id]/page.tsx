@@ -133,6 +133,7 @@ export default function SupplierDetailPage() {
       supplier={supplier}
       initialPurchases={purchases}
       initialPaymentsToSupplier={paymentsToSuppliers}
+      user={user}
     />
   );
 }
