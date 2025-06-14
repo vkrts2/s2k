@@ -120,10 +120,10 @@ export interface PurchaseFormValues {
   amount: string;
   date: Date;
   currency: Currency;
-  stockItemId?: string;
-  description?: string;
+  stockItemId?: string | null;
   quantityPurchased?: string;
   unitPrice?: string;
+  description?: string;
 }
 
 export type PaymentFormValues = {
@@ -143,6 +143,9 @@ export interface PaymentToSupplierFormValues {
   method: string;
   currency: Currency;
   referenceNumber?: string | null;
+  description?: string;
+  checkDate?: Date | null;
+  checkSerialNumber?: string | null;
 }
 
 export interface ContactHistoryFormValues {
@@ -205,12 +208,22 @@ export interface Purchase extends Transaction {
   unitPrice?: number | null;
 }
 
-export interface PaymentToSupplier extends Transaction {
+export interface PaymentToSupplier {
+  id: string;
   supplierId: string;
-  method: string; // Ödeme yöntemi
-  description?: string; // Ek açıklama
+  amount: number;
+  date: string;
+  method: string;
+  currency: Currency;
   referenceNumber?: string | null;
+  description?: string;
+  checkDate?: string | null;
+  checkSerialNumber?: string | null;
   transactionType: 'paymentToSupplier';
+  category: TransactionCategory;
+  tags: TransactionTag[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type StockTransaction = {

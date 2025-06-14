@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Supplier, Purchase, PaymentToSupplier, Currency, UnifiedTransaction as AppUnifiedTransaction, StockItem, Price, ContactHistoryItem, SupplierTask } from '@/lib/types';
+import type { Supplier, Purchase, PaymentToSupplier, Currency, UnifiedTransaction as AppUnifiedTransaction, StockItem, Price, ContactHistoryItem, SupplierTask, PurchaseFormValues, PaymentToSupplierFormValues } from '@/lib/types';
 import {
   addPurchase,
   updatePurchase as storageUpdatePurchase,
@@ -71,7 +71,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { PlusCircle, Trash2, Edit3, DollarSign, ShoppingCart, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline as UnderlineIcon } from 'lucide-react';
+import { PlusCircle, Trash2, Edit3, DollarSign, ShoppingCart, CalendarIcon, FileText, Printer, History, ClipboardList, Download, Bold, Italic, List, ListOrdered, Strikethrough, Underline as UnderlineIcon, Receipt } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isValid, formatISO, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -95,6 +95,7 @@ import { EditSupplierModal } from "./edit-supplier-modal";
 import { DeleteConfirmationModal } from "../common/delete-confirmation-modal";
 import { ContactHistoryModal } from "./contact-history-modal";
 import { TaskModal } from "./task-modal";
+import { PrintView } from "./print-view";
 
 interface SupplierDetailPageClientProps {
   supplier: Supplier;
@@ -103,44 +104,14 @@ interface SupplierDetailPageClientProps {
   user: { uid: string } | null;
 }
 
-type PurchaseFormValues = {
-  amount: string;
-  date: Date;
-  currency: Currency;
-  stockItemId?: string;
-  quantityPurchased?: string;
-  unitPrice?: string;
-  description?: string;
-};
-
-type PaymentToSupplierFormValues = {
-  amount: string;
-  date: Date;
-  method: string;
-  currency: Currency;
-  referenceNumber?: string | null;
-};
-
-type ContactHistoryFormValues = {
-  date: Date;
-  type: 'phone' | 'email' | 'meeting' | 'other';
-  summary: string;
-  notes: string;
-};
-
-type SupplierTaskFormValues = {
-  description: string;
-  dueDate?: Date;
-  status: 'pending' | 'completed' | 'in-progress';
-};
-
 const EMPTY_PURCHASE_FORM_VALUES: PurchaseFormValues = {
   amount: '',
   date: new Date(),
   currency: 'TRY',
-  stockItemId: 'none',
-  quantityPurchased: '',
-  unitPrice: '',
+  stockItemId: undefined,
+  description: '',
+  quantityPurchased: undefined,
+  unitPrice: undefined,
 };
 
 const EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES: PaymentToSupplierFormValues = {
@@ -148,32 +119,38 @@ const EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES: PaymentToSupplierFormValues = {
   date: new Date(),
   method: 'nakit',
   currency: 'TRY',
-  referenceNumber: null,
+  referenceNumber: '',
+  description: '',
+  checkDate: null,
+  checkSerialNumber: null,
 };
 
-const EMPTY_CONTACT_HISTORY_FORM_VALUES: ContactHistoryFormValues = {
-  date: new Date(),
+const EMPTY_CONTACT_HISTORY_FORM_VALUES: ContactHistoryItem = {
+  id: '',
+  date: formatISO(new Date()),
   type: 'other',
   summary: '',
   notes: '',
+  createdAt: formatISO(new Date()),
+  updatedAt: formatISO(new Date()),
 };
 
-const EMPTY_TASK_FORM_VALUES: SupplierTaskFormValues = {
+const EMPTY_TASK_FORM_VALUES: SupplierTask = {
+  id: '',
   description: '',
   dueDate: undefined,
   status: 'pending',
+  createdAt: formatISO(new Date()),
+  updatedAt: formatISO(new Date()),
 };
 
-type UnifiedTransactionClient = (Purchase & { transactionType: 'purchase' }) | 
-                              (PaymentToSupplier & { transactionType: 'paymentToSupplier' });
+type UnifiedTransactionClient = AppUnifiedTransaction; 
 
 export function SupplierDetailPageClient({ supplier: initialSupplier, initialPurchases, initialPaymentsToSupplier, user }: SupplierDetailPageClientProps) {
   const { toast } = useToast();
   const [supplier, setSupplier] = useState<Supplier>(initialSupplier);
   const [purchases, setPurchases] = useState<Purchase[]>(initialPurchases);
   const [paymentsToSupplier, setPaymentsToSupplier] = useState<PaymentToSupplier[]>(initialPaymentsToSupplier);
-  const [availableStockItems, setAvailableStockItems] = useState<StockItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseFormValues, setPurchaseFormValues] = useState<PurchaseFormValues>(EMPTY_PURCHASE_FORM_VALUES);
@@ -190,13 +167,15 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
 
   const [notesContent, setNotesContent] = useState(initialSupplier.notes || '');
   const [showContactHistoryModal, setShowContactHistoryModal] = useState(false);
-  const [contactHistoryFormValues, setContactHistoryFormValues] = useState<ContactHistoryFormValues>(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+  const [contactHistoryFormValues, setContactHistoryFormValues] = useState<ContactHistoryItem>(EMPTY_CONTACT_HISTORY_FORM_VALUES);
   const [editingContactHistoryItem, setEditingContactHistoryItem] = useState<ContactHistoryItem | null>(null);
   const [contactHistory, setContactHistory] = useState<ContactHistoryItem[]>([]);
+
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [taskFormValues, setTaskFormValues] = useState<SupplierTaskFormValues>(EMPTY_TASK_FORM_VALUES);
+  const [taskFormValues, setTaskFormValues] = useState<SupplierTask>(EMPTY_TASK_FORM_VALUES);
   const [editingTask, setEditingTask] = useState<SupplierTask | null>(null);
   const [tasks, setTasks] = useState<SupplierTask[]>([]);
+
   const [deletingSupplier, setDeletingSupplier] = useState<string | null>(null);
 
   const [stockItemDisplayNames, setStockItemDisplayNames] = useState<Record<string, string>>({});
@@ -209,10 +188,9 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [showPrintView, setShowPrintView] = useState(false);
 
-  const getStockItemName = useCallback((stockItemId: string) => {
-    return stockItemDisplayNames[stockItemId] || 'Bilinmeyen Ürün';
-  }, [stockItemDisplayNames]);
+  const [availableStockItems, setAvailableStockItems] = useState<StockItem[]>([]);
 
   const totalPurchases = useMemo(() => {
     return purchases.reduce((sum: number, purchase: Purchase) => sum + purchase.amount, 0);
@@ -249,7 +227,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     const searched = searchQuery
       ? filtered.filter(item => {
           const searchLower = searchQuery.toLowerCase();
-          const description = (item.transactionType === 'purchase' && (item as Purchase).description) || 
+          const description = (item.transactionType === 'purchase' && (item as Purchase).description) ||
                               (item.transactionType === 'paymentToSupplier' && (item as PaymentToSupplier).description) || '';
           return (
             item.amount.toString().includes(searchLower) ||
@@ -266,12 +244,21 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     });
   }, [purchases, paymentsToSupplier, dateRange, searchQuery, sortOrder]);
 
+  const recentTransactions = useMemo(() => {
+    return filteredAndSortedTransactions.slice(0, 5);
+  }, [filteredAndSortedTransactions]);
+
+  const totalPages = Math.ceil(filteredAndSortedTransactions.length / itemsPerPage);
   const paginatedTransactions = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredAndSortedTransactions.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredAndSortedTransactions, currentPage]);
 
-  const totalPages = Math.ceil(filteredAndSortedTransactions.length / itemsPerPage);
+  const getStockItemName = useCallback(async (stockItemId?: string): Promise<string> => {
+    if (!stockItemId || !user?.uid) return 'Bilinmeyen Stok Ürünü';
+    const item = await getStockItemById(user.uid, stockItemId);
+    return item?.name || 'Bilinmeyen Stok Ürünü';
+  }, [user?.uid]);
 
   const monthlyStats = useMemo(() => {
     const months = eachMonthOfInterval({
@@ -317,250 +304,643 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
 
   useEffect(() => {
     const fetchStockItems = async () => {
-      if (!user) return;
-      try {
+      if (user?.uid) {
         const items = await getStockItems(user.uid);
         setAvailableStockItems(items);
-      } catch (error) {
-        console.error('Error fetching stock items:', error);
-        toast({
-          title: 'Hata',
-          description: 'Stok ürünleri yüklenirken bir hata oluştu.',
-          variant: 'destructive',
+        const names: Record<string, string> = {};
+        items.forEach(item => {
+          names[item.id] = item.name;
         });
+        setStockItemDisplayNames(names);
       }
     };
-
     fetchStockItems();
-  }, [user, toast]);
+  }, [user?.uid]);
 
   useEffect(() => {
-    const fetchDisplayNames = async () => {
-      if (!user) return;
-      try {
-        const names: Record<string, string> = {};
-        for (const item of availableStockItems) {
-          names[item.id] = item.name;
+    setSupplier(initialSupplier);
+    setPurchases(initialPurchases);
+    setPaymentsToSupplier(initialPaymentsToSupplier);
+  }, [initialSupplier, initialPurchases, initialPaymentsToSupplier]);
+
+  useEffect(() => {
+    const fetchFreshSupplier = async () => {
+      if (supplier?.id && user?.uid) {
+        const freshSupplier = await getSupplierById(user.uid, supplier.id);
+        if (freshSupplier) {
+          setSupplier(freshSupplier);
         }
-        setStockItemDisplayNames(names);
-      } catch (error) {
-        console.error('Error fetching stock item names:', error);
       }
     };
+    fetchFreshSupplier();
+    if (supplier?.name) {
+      document.title = `${supplier.name} | Tedarikçi Detayları | ERMAY`;
+    }
+  }, [supplier?.id, supplier?.name, user]);
 
-    fetchDisplayNames();
-  }, [user, availableStockItems]);
+  useEffect(() => {
+    const quantity = parseFloat(purchaseFormValues.quantityPurchased || '0');
+    const price = parseFloat(purchaseFormValues.unitPrice || '0');
+    if (purchaseFormValues.stockItemId !== null) {
+      if (!isNaN(quantity) && !isNaN(price) && quantity > 0 && price >= 0) {
+        setPurchaseFormValues(prev => ({ ...prev, amount: (quantity * price).toFixed(2) }));
+      } else {
+        setPurchaseFormValues(prev => ({ ...prev, amount: ''}));
+      }
+    }
+  }, [purchaseFormValues.quantityPurchased, purchaseFormValues.unitPrice, purchaseFormValues.stockItemId]);
 
-  const formatCurrency = (amount: number, currency: Currency): string => {
-    return new Intl.NumberFormat('tr-TR', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
-  };
+  useEffect(() => {
+    setPurchaseFormValues(prev => ({ ...prev, unitPrice: '', currency: 'TRY' }));
+  }, [purchaseFormValues.stockItemId]);
 
-  const handlePurchaseFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("handlePurchaseFormSubmit çağrıldı. purchaseFormValues:", purchaseFormValues);
-    if (!user || !supplier.id) return;
+  const refreshSupplierData = useCallback(async () => {
+    if (!supplier?.id || !user) return;
+    const freshSupplier = await getSupplierById(user.uid, supplier.id);
+    if (freshSupplier) {
+      setSupplier(freshSupplier);
+      document.title = `${freshSupplier.name} | Tedarikçi Detayları | ERMAY`;
+    }
+  }, [supplier?.id, user]);
 
+  const handleSupplierUpdate = useCallback(async (data: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'> | Supplier): Promise<void> => {
     try {
-      const amount = parseFloat(purchaseFormValues.amount);
-      if (isNaN(amount) || amount <= 0) {
+      if (!user) {
+        console.error("handleSupplierUpdate: User is not logged in.");
         toast({
-          title: 'Hata',
-          description: 'Geçerli bir tutar giriniz.',
-          variant: 'destructive',
+          title: "Hata",
+          description: "Tedarikçi bilgileri güncellenirken bir sorun oluştu: Kullanıcı girişi yapılmamış.",
+          variant: "destructive",
         });
         return;
       }
+      const supplierToUpdate: Supplier = 'id' in data && data.id
+        ? { ...data as Supplier, updatedAt: formatISO(new Date()) }
+        : { ...data, id: initialSupplier.id, createdAt: initialSupplier.createdAt, updatedAt: formatISO(new Date()) };
 
-      if (purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none') {
-        const quantity = parseFloat(purchaseFormValues.quantityPurchased || '0');
-        const unitPrice = parseFloat(purchaseFormValues.unitPrice || '0');
+      await storageUpdateSupplier(user.uid, supplierToUpdate);
+      toast({
+        title: "Tedarikçi Güncellendi",
+        description: `${supplierToUpdate.name} tedarikçi bilgileri güncellendi.`, 
+      });
+      setShowEditSupplierModal(false);
+      await refreshSupplierData();
+    } catch (error) {
+      console.error("Tedarikçi güncellenirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "Tedarikçi bilgileri güncellenirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [toast, refreshSupplierData, user, initialSupplier.id, initialSupplier.createdAt]);
 
-        if (isNaN(quantity) || quantity <= 0) {
-          toast({
-            title: 'Hata',
-            description: 'Geçerli bir miktar giriniz.',
-            variant: 'destructive',
-          });
-          return;
-        }
+  const balances = useMemo(() => {
+    const newBalances: Record<Currency, number> = { USD: 0, TRY: 0 };
+    purchases.forEach(purchase => {
+      newBalances[purchase.currency] = (newBalances[purchase.currency] || 0) + purchase.amount;
+    });
+    paymentsToSupplier.forEach(payment => {
+      newBalances[payment.currency] = (newBalances[payment.currency] || 0) - payment.amount;
+    });
+    return newBalances;
+  }, [purchases, paymentsToSupplier]);
 
-        if (isNaN(unitPrice) || unitPrice <= 0) {
-          toast({
-            title: 'Hata',
-            description: 'Geçerli bir birim fiyat giriniz.',
-            variant: 'destructive',
-          });
-          return;
-        }
-      }
+  const formatCurrency = (amount: number, currency: Currency): string => {
+    if (typeof amount !== 'number' || isNaN(amount)) {
+      amount = 0;
+    }
+    try {
+      return amount.toLocaleString('tr-TR', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    } catch (e) {
+      console.error("Error formatting currency:", e);
+      return `${amount.toFixed(2)} ${currency}`;
+    }
+  };
 
-      const purchaseData: Purchase = {
-        id: editingPurchase?.id || crypto.randomUUID(),
-        supplierId: supplier.id,
-        amount,
-        date: formatISO(purchaseFormValues.date),
-        currency: purchaseFormValues.currency,
-        stockItemId: purchaseFormValues.stockItemId === 'none' ? null : purchaseFormValues.stockItemId,
-        quantityPurchased: purchaseFormValues.quantityPurchased ? (isNaN(parseFloat(purchaseFormValues.quantityPurchased)) ? null : parseFloat(purchaseFormValues.quantityPurchased)) : null,
-        unitPrice: purchaseFormValues.unitPrice ? (isNaN(parseFloat(purchaseFormValues.unitPrice)) ? null : parseFloat(purchaseFormValues.unitPrice)) : null,
-        description: purchaseFormValues.description || (purchaseFormValues.stockItemId && purchaseFormValues.stockItemId !== 'none'
-          ? `${getStockItemName(purchaseFormValues.stockItemId)} - ${purchaseFormValues.quantityPurchased} adet`
-          : 'Manuel alış'),
-        transactionType: 'purchase',
-        category: 'odeme',
-        tags: [],
-        createdAt: editingPurchase?.createdAt || formatISO(new Date()),
-        updatedAt: formatISO(new Date()),
-      };
+  const handleOpenAddPurchaseModal = useCallback(() => {
+    console.log("Opening Purchase Modal");
+    if (!supplier?.id) {
+      toast({
+        title: "Hata",
+        description: "Tedarikçi bilgisi bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEditingPurchase(null);
+    setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
+    setShowPurchaseModal(true);
+  }, [supplier?.id, toast]);
+
+  const handleOpenEditPurchaseModal = (purchase: Purchase) => {
+    console.log("handleOpenEditPurchaseModal called with purchase:", purchase);
+    setEditingPurchase(purchase);
+    setPurchaseFormValues({
+      amount: purchase.amount.toString(),
+      date: parseISO(purchase.date),
+      currency: purchase.currency,
+      stockItemId: purchase.stockItemId === '' ? undefined : purchase.stockItemId, // Eğer boş string ise undefined yap
+      description: purchase.description || '',
+      quantityPurchased: purchase.quantityPurchased?.toString(),
+      unitPrice: purchase.unitPrice?.toString(),
+    });
+    setShowPurchaseModal(true);
+  };
+
+  const handlePurchaseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      toast({
+        title: "Hata",
+        description: "Kullanıcı oturumu bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const amount = parseFloat(purchaseFormValues.amount);
+      const date = formatISO(purchaseFormValues.date);
 
       if (editingPurchase) {
-        await storageUpdatePurchase(user.uid, purchaseData);
-        setPurchases(purchases.map(p => p.id === editingPurchase.id ? purchaseData : p));
+        const updatedPurchase: Purchase = {
+          ...editingPurchase,
+          amount,
+          date,
+          currency: purchaseFormValues.currency,
+          stockItemId: purchaseFormValues.stockItemId === undefined ? null : purchaseFormValues.stockItemId, // undefined ise null yap
+          description: purchaseFormValues.description || '',
+          updatedAt: formatISO(new Date())
+        };
+
+        await storageUpdatePurchase(user.uid, updatedPurchase);
+        setPurchases(purchases.map(p => (p.id === editingPurchase.id ? updatedPurchase : p)));
         toast({
-          title: 'Başarılı',
-          description: 'Alış başarıyla güncellendi.',
+          title: "Başarılı",
+          description: "Satın alma güncellendi.",
         });
       } else {
-        const newPurchase = await addPurchase(user.uid, purchaseData);
-        setPurchases(prevPurchases => [...prevPurchases, newPurchase]);
+        const newPurchase: Omit<Purchase, 'id'> = {
+          supplierId: supplier.id,
+          amount,
+          date,
+          currency: purchaseFormValues.currency,
+          stockItemId: purchaseFormValues.stockItemId === undefined ? null : purchaseFormValues.stockItemId, // undefined ise null yap
+          description: purchaseFormValues.description || '',
+          transactionType: 'purchase',
+          category: 'satis',
+          tags: [],
+          createdAt: formatISO(new Date()),
+          updatedAt: formatISO(new Date())
+        };
+
+        const addedPurchase = await addPurchase(user.uid, newPurchase);
+        setPurchases(prev => [...prev, addedPurchase]);
         toast({
-          title: 'Başarılı',
-          description: 'Alış başarıyla eklendi.',
+          title: "Başarılı",
+          description: "Yeni satın alma eklendi.",
         });
       }
-
       setShowPurchaseModal(false);
       setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
       setEditingPurchase(null);
     } catch (error) {
-      console.error('Error saving purchase:', error);
+      console.error("Satın alma kaydedilirken hata oluştu:", error);
       toast({
-        title: 'Hata',
-        description: 'Alış kaydedilirken bir hata oluştu.',
-        variant: 'destructive',
+        title: "Hata",
+        description: "Satın alma kaydedilirken bir sorun oluştu.",
+        variant: "destructive",
       });
     }
   };
 
+  const handleDeletePurchase = useCallback(async () => {
+    if (!deletingPurchaseId || !user) return;
+    try {
+      await storageDeletePurchase(user.uid, deletingPurchaseId);
+      setPurchases(prev => prev.filter(p => p.id !== deletingPurchaseId));
+      toast({ title: "Satın Alma Silindi", description: "Satın alma başarıyla silindi." });
+      setDeletingPurchaseId(null);
+      await refreshSupplierData();
+    } catch (error) {
+      console.error("Satın alma silinirken hata:", error);
+      toast({ title: "Hata", description: "Satın alma silinirken bir sorun oluştu.", variant: "destructive" });
+    }
+  }, [deletingPurchaseId, toast, refreshSupplierData, user]);
+
+  const handleOpenAddPaymentToSupplierModal = useCallback(() => {
+    console.log("Opening Payment To Supplier Modal");
+    if (!supplier?.id) {
+      toast({
+        title: "Hata",
+        description: "Tedarikçi bilgisi bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEditingPaymentToSupplier(null);
+    setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
+    setShowPaymentToSupplierModal(true);
+  }, [supplier?.id, toast]);
+
+  const handleOpenEditPaymentToSupplierModal = useCallback((payment: PaymentToSupplier) => {
+    setEditingPaymentToSupplier(payment);
+    setPaymentToSupplierFormValues({
+      amount: payment.amount.toString(),
+      date: isValid(parseISO(payment.date)) ? parseISO(payment.date) : new Date(),
+      method: payment.method,
+      currency: payment.currency,
+      referenceNumber: payment.referenceNumber || '',
+      description: payment.description || '',
+      checkDate: payment.checkDate ? parseISO(payment.checkDate) : null,
+      checkSerialNumber: payment.checkSerialNumber || null,
+    });
+    setShowPaymentToSupplierModal(true);
+  }, []);
+
   const handlePaymentToSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !supplier.id) return;
+
+    if (!user) {
+      toast({
+        title: "Hata",
+        description: "Kullanıcı oturumu bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const amount = parseFloat(paymentToSupplierFormValues.amount);
-      if (isNaN(amount) || amount <= 0) {
-        toast({
-          title: 'Hata',
-          description: 'Geçerli bir tutar giriniz.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const paymentData: PaymentToSupplier = {
-        id: editingPaymentToSupplier?.id || crypto.randomUUID(),
-        supplierId: supplier.id,
-        amount,
-        date: formatISO(paymentToSupplierFormValues.date),
-        currency: paymentToSupplierFormValues.currency,
-        method: paymentToSupplierFormValues.method,
-        referenceNumber: paymentToSupplierFormValues.referenceNumber || null,
-        description: `${paymentToSupplierFormValues.method} ile ödeme`,
-        transactionType: 'paymentToSupplier',
-        category: 'odeme',
-        tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      const date = formatISO(paymentToSupplierFormValues.date);
 
       if (editingPaymentToSupplier) {
-        await storageUpdatePaymentToSupplier(user.uid, paymentData);
-        setPaymentsToSupplier(paymentsToSupplier.map(p => p.id === editingPaymentToSupplier.id ? paymentData : p));
+        const updatedPayment: PaymentToSupplier = {
+          ...editingPaymentToSupplier,
+          amount,
+          date,
+          method: paymentToSupplierFormValues.method,
+          currency: paymentToSupplierFormValues.currency,
+          referenceNumber: paymentToSupplierFormValues.referenceNumber || null,
+          description: paymentToSupplierFormValues.description || '',
+          checkDate: paymentToSupplierFormValues.method === 'cek' && paymentToSupplierFormValues.checkDate ? formatISO(paymentToSupplierFormValues.checkDate) : null,
+          checkSerialNumber: paymentToSupplierFormValues.method === 'cek' ? (paymentToSupplierFormValues.checkSerialNumber || null) : null,
+          updatedAt: formatISO(new Date())
+        };
+
+        await storageUpdatePaymentToSupplier(user.uid, updatedPayment);
+        setPaymentsToSupplier(paymentsToSupplier.map(p => (p.id === editingPaymentToSupplier.id ? updatedPayment : p)));
         toast({
-          title: 'Başarılı',
-          description: 'Ödeme başarıyla güncellendi.',
+          title: "Başarılı",
+          description: "Ödeme güncellendi.",
         });
       } else {
-        await addPaymentToSupplier(user.uid, paymentData);
-        setPaymentsToSupplier([...paymentsToSupplier, paymentData]);
+        const newPayment: Omit<PaymentToSupplier, 'id'> = {
+          supplierId: supplier.id,
+          amount,
+          date,
+          method: paymentToSupplierFormValues.method,
+          currency: paymentToSupplierFormValues.currency,
+          referenceNumber: paymentToSupplierFormValues.referenceNumber || null,
+          description: paymentToSupplierFormValues.description || '',
+          checkDate: paymentToSupplierFormValues.method === 'cek' && paymentToSupplierFormValues.checkDate ? formatISO(paymentToSupplierFormValues.checkDate) : null,
+          checkSerialNumber: paymentToSupplierFormValues.method === 'cek' ? (paymentToSupplierFormValues.checkSerialNumber || null) : null,
+          transactionType: 'paymentToSupplier',
+          category: 'odeme',
+          tags: [],
+          createdAt: formatISO(new Date()),
+          updatedAt: formatISO(new Date())
+        };
+
+        const addedPayment = await addPaymentToSupplier(user.uid, newPayment);
+        setPaymentsToSupplier(prev => [...prev, addedPayment]);
         toast({
-          title: 'Başarılı',
-          description: 'Ödeme başarıyla eklendi.',
+          title: "Başarılı",
+          description: "Yeni ödeme eklendi.",
         });
       }
-
       setShowPaymentToSupplierModal(false);
       setPaymentToSupplierFormValues(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
       setEditingPaymentToSupplier(null);
     } catch (error) {
-      console.error('Error saving payment:', error);
+      console.error("Ödeme kaydederken hata oluştu:", error);
       toast({
-        title: 'Hata',
-        description: 'Ödeme kaydedilirken bir hata oluştu.',
-        variant: 'destructive',
+        title: "Hata",
+        description: "Ödeme kaydedilirken bir sorun oluştu.",
+        variant: "destructive",
       });
     }
   };
 
-  const safeFormatDate = (dateString: string, formatString: string = "d MMMM yyyy, HH:mm") => {
+  const handleDeletePaymentToSupplier = useCallback(async () => {
+    if (!deletingPaymentToSupplierId || !user) return;
     try {
-      const date = parseISO(dateString);
-      if (!isValid(date)) {
-        return 'Geçersiz tarih';
-      }
-      return format(date, formatString, { locale: tr });
+      await storageDeletePaymentToSupplier(user.uid, deletingPaymentToSupplierId);
+      setPaymentsToSupplier(prev => prev.filter(p => p.id !== deletingPaymentToSupplierId));
+      toast({ title: "Ödeme Silindi", description: "Ödeme başarıyla silindi." });
+      setDeletingPaymentToSupplierId(null);
+      await refreshSupplierData();
     } catch (error) {
-      return 'Geçersiz tarih';
+      console.error("Ödeme silinirken hata:", error);
+      toast({ title: "Hata", description: "Ödeme silinirken bir sorun oluştu.", variant: "destructive" });
     }
+  }, [deletingPaymentToSupplierId, toast, refreshSupplierData, user]);
+
+  const safeFormatDate = (dateString: string, formatString: string) => {
+    if (!dateString) return '-';
+    const date = parseISO(dateString);
+    return isValid(date) ? format(date, formatString, { locale: tr }) : '-';
   };
+
+  const getStockItemNameForPurchaseForm = useCallback(async (stockItemId?: string): Promise<string> => {
+    if (!stockItemId || stockItemId === 'none' || !user) return ""; 
+    try {
+      const stockItem = await getStockItemById(user.uid, stockItemId);
+      return stockItem ? `${stockItem.name} (${stockItem.unit || 'Adet'})` : ""; 
+    } catch (error) {
+      console.error("Stok kalemi adı getirilirken hata:", error);
+      return "";
+    }
+  }, [user]);
+
+  const formatPriceForDisplay = useCallback((price?: Price): string => {
+    if (!price || typeof price.amount !== 'number' || !price.currency) return "-";
+    try {
+      return price.amount.toLocaleString('tr-TR', { style: "currency", currency: price.currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } catch (e) {
+      return `${price.amount.toFixed(2)} ${price.currency}`;
+    }
+  }, []);
 
   const renderTransactionDetail = (item: UnifiedTransactionClient) => {
     if (item.transactionType === 'purchase') {
-      const purchase = item as Purchase;
+      const purchaseItem = item as Purchase;
       return (
-        <div className="space-y-2">
-          <p className="font-medium">{purchase.description}</p>
-          {purchase.stockItemId && (
-            <div className="text-sm text-muted-foreground">
-              <p>Ürün: {getStockItemName(purchase.stockItemId)}</p>
-              <p>Miktar: {purchase.quantityPurchased}</p>
-              <p>Birim Fiyat: {formatCurrency(purchase.unitPrice || 0, purchase.currency)}</p>
-            </div>
+        <div className="flex flex-col">
+          {purchaseItem.stockItemId && (
+            <span className="text-sm text-muted-foreground">
+              Stok: {stockItemDisplayNames[purchaseItem.stockItemId] || 'Bilinmeyen Ürün'}
+            </span>
+          )}
+          <span className="text-sm text-muted-foreground">
+            Açıklama: {purchaseItem.description || '-'}
+          </span>
+        </div>
+      );
+    } else if (item.transactionType === 'paymentToSupplier') {
+      const paymentItem = item as PaymentToSupplier;
+      return (
+        <div className="flex flex-col">
+          <span className="text-sm text-muted-foreground">
+            Yöntem: {paymentItem.method}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            Referans: {paymentItem.referenceNumber || '-'}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            Açıklama: {paymentItem.description || '-'}
+          </span>
+          {paymentItem.method === 'cek' && paymentItem.checkDate && (
+            <span className="text-sm text-muted-foreground">
+              Çek Tarihi: {safeFormatDate(paymentItem.checkDate, 'dd.MM.yyyy')}
+            </span>
+          )}
+          {paymentItem.method === 'cek' && paymentItem.checkSerialNumber && (
+            <span className="text-sm text-muted-foreground">
+              Çek Seri No: {paymentItem.checkSerialNumber}
+            </span>
           )}
         </div>
       );
-    } else {
-      const payment = item as PaymentToSupplier;
-      return (
-        <div className="space-y-2">
-          <p className="font-medium">{payment.description}</p>
-          <div className="text-sm text-muted-foreground">
-            <p>Ödeme Yöntemi: {payment.method}</p>
-            {payment.referenceNumber && (
-              <p>Referans No: {payment.referenceNumber}</p>
-            )}
-          </div>
-        </div>
-      );
     }
+    return null;
   };
+
+  const handleSaveNotes = useCallback(async () => {
+    if (!user || !supplier?.id) return;
+    try {
+      const updatedSupplier: Supplier = { ...supplier, notes: notesContent };
+      await storageUpdateSupplier(user.uid, updatedSupplier);
+      setSupplier(updatedSupplier);
+      toast({
+        title: "Notlar Güncellendi",
+        description: "Tedarikçi notları başarıyla kaydedildi.",
+      });
+    } catch (error) {
+      console.error("Notlar kaydedilirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "Notlar kaydedilirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, supplier, notesContent, toast]);
+
+  const handleDeleteSupplier = useCallback(async () => {
+    if (!user || !deletingSupplier) return;
+    try {
+      await storageDeleteSupplier(user.uid, deletingSupplier);
+      toast({
+        title: "Tedarikçi Silindi",
+        description: "Tedarikçi başarıyla silindi.",
+      });
+      window.location.href = "/suppliers"; 
+    } catch (error) {
+      console.error("Tedarikçi silinirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "Tedarikçi silinirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingSupplier(null);
+    }
+  }, [user, deletingSupplier, toast]);
+
+  const handleContactHistorySubmit = useCallback(async (formValues: ContactHistoryItem) => {
+    if (!user || !supplier?.id) {
+      toast({
+        title: "Hata",
+        description: "Kullanıcı oturumu bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const newContactHistoryItem: ContactHistoryItem = {
+        id: crypto.randomUUID(),
+        date: formatISO(formValues.date),
+        type: formValues.type,
+        summary: formValues.summary,
+        notes: formValues.notes || undefined,
+        createdAt: formatISO(new Date()),
+        updatedAt: formatISO(new Date()),
+      };
+
+      const updatedSupplier = {
+        ...supplier,
+        contactHistory: [...(supplier.contactHistory || []), newContactHistoryItem],
+      };
+
+      await storageUpdateSupplier(user.uid, updatedSupplier);
+      setSupplier(updatedSupplier);
+      setShowContactHistoryModal(false);
+      setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+      toast({
+        title: "Başarılı",
+        description: "İletişim geçmişi eklendi.",
+      });
+    } catch (error) {
+      console.error("Error adding contact history:", error);
+      toast({
+        title: "Hata",
+        description: "İletişim geçmişi eklenirken bir hata oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, supplier, toast]);
+
+  const handleOpenAddContactHistoryModal = useCallback(() => {
+    setEditingContactHistoryItem(null);
+    setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
+    setShowContactHistoryModal(true);
+  }, []);
+
+  const handleOpenEditContactHistoryModal = useCallback((item: ContactHistoryItem) => {
+    setEditingContactHistoryItem(item);
+    setContactHistoryFormValues({
+      date: parseISO(item.date),
+      type: item.type,
+      summary: item.summary,
+      notes: item.notes || '',
+    });
+    setShowContactHistoryModal(true);
+  }, []);
+
+  const handleDeleteContactHistoryItem = useCallback(async (itemId: string) => {
+    if (!user || !supplier?.id) return;
+    try {
+      const updatedContactHistory = (supplier.contactHistory || []).filter(item => item.id !== itemId);
+      const updatedSupplier: Supplier = { ...supplier, contactHistory: updatedContactHistory };
+      await storageUpdateSupplier(user.uid, updatedSupplier);
+      setSupplier(updatedSupplier);
+      toast({
+        title: "İletişim Silindi",
+        description: "İletişim geçmişi kaydı başarıyla silindi.",
+      });
+    } catch (error) {
+      console.error("İletişim geçmişi silinirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "İletişim geçmişi silinirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, supplier, toast]);
+
+  const handleTaskFormSubmit = useCallback(async (formValues: SupplierTask) => {
+    if (!user || !supplier?.id) return;
+    try {
+      const taskToSave = {
+        ...formValues,
+        dueDate: formValues.dueDate ? formatISO(formValues.dueDate, { representation: 'date' }) : undefined,
+        id: editingTask?.id || crypto.randomUUID(),
+        createdAt: editingTask?.createdAt || formatISO(new Date()),
+        updatedAt: formatISO(new Date()),
+      };
+
+      let updatedTasks: SupplierTask[];
+
+      if (editingTask) {
+        updatedTasks = (supplier.tasks || []).map(task =>
+          task.id === editingTask.id ? (taskToSave as SupplierTask) : task
+        );
+        toast({
+          title: "Görev Güncellendi",
+          description: "Görev başarıyla güncellendi.",
+        });
+      } else {
+        updatedTasks = [...(supplier.tasks || []), (taskToSave as SupplierTask)];
+        toast({
+          title: "Görev Eklendi",
+          description: "Yeni görev başarıyla eklendi.",
+        });
+      }
+
+      const updatedSupplier: Supplier = { ...supplier, tasks: updatedTasks };
+      await storageUpdateSupplier(user.uid, updatedSupplier);
+      setSupplier(updatedSupplier);
+      setShowTaskModal(false);
+      setEditingTask(null);
+      setTaskFormValues(EMPTY_TASK_FORM_VALUES);
+    } catch (error) {
+      console.error("Görev kaydedilirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "Görev kaydedilirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, supplier, editingTask, toast]);
+
+  const handleOpenAddTaskModal = useCallback(() => {
+    setEditingTask(null);
+    setTaskFormValues(EMPTY_TASK_FORM_VALUES);
+    setShowTaskModal(true);
+  }, []);
+
+  const handleOpenEditTaskModal = useCallback((task: SupplierTask) => {
+    setEditingTask(task);
+    setTaskFormValues({
+      description: task.description,
+      dueDate: task.dueDate ? parseISO(task.dueDate) : undefined,
+      status: task.status,
+    });
+    setShowTaskModal(true);
+  }, []);
+
+  const handleDeleteTask = useCallback(async (taskId: string) => {
+    if (!user || !supplier?.id) return;
+    try {
+      const updatedTasks = (supplier.tasks || []).filter(task => task.id !== taskId);
+      const updatedSupplier: Supplier = { ...supplier, tasks: updatedTasks };
+      await storageUpdateSupplier(user.uid, updatedSupplier);
+      setSupplier(updatedSupplier);
+      toast({
+        title: "Görev Silindi",
+        description: "Görev başarıyla silindi.",
+      });
+    } catch (error) {
+      console.error("Görev silinirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "Görev silinirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, supplier, toast]);
 
   const exportToCSV = (transactions: UnifiedTransactionClient[], supplierName: string) => {
     const headers = ['Tarih', 'İşlem Tipi', 'Tutar', 'Para Birimi', 'Açıklama'];
-    const rows = transactions.map(t => [
-      safeFormatDate(t.date, 'dd.MM.yyyy'),
-      t.transactionType === 'purchase' ? 'Alış' : 'Ödeme',
+    const data = transactions.map(t => [
+      format(parseISO(t.date), 'dd.MM.yyyy'),
+      t.transactionType === 'purchase' ? 'Satın Alma' : 'Ödeme',
       t.amount.toString(),
       t.currency,
-      t.transactionType === 'purchase' ? (t as Purchase).description : (t as PaymentToSupplier).description,
+      t.description
     ]);
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.join(','))
+      ...data.map(row => row.join(','))
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -574,317 +954,275 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     document.body.removeChild(link);
   };
 
+  const monthlyStats = useMemo(() => {
+    const months = eachMonthOfInterval({
+      start: dateRange?.from || addDays(new Date(), -180),
+      end: dateRange?.to || new Date(),
+    });
+
+    return months.map(month => {
+      const monthStart = startOfMonth(month);
+      const monthEnd = endOfMonth(month);
+      
+      const monthPurchases = purchases.filter(purchase => {
+        const purchaseDate = new Date(purchase.date);
+        return purchaseDate >= monthStart && purchaseDate <= monthEnd;
+      });
+
+      const monthPayments = paymentsToSupplier.filter(payment => {
+        const paymentDate = new Date(payment.date);
+        return paymentDate >= monthStart && paymentDate <= monthEnd;
+      });
+
+      const totalPurchases = monthPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
+      const totalPayments = monthPayments.reduce((sum, payment) => sum + payment.amount, 0);
+
+      return {
+        month: format(month, 'MMM yyyy', { locale: tr }),
+        satınAlmalar: totalPurchases,
+        ödemeler: totalPayments,
+      };
+    });
+  }, [purchases, paymentsToSupplier, dateRange]);
+
+  const transactionTypeDistribution = useMemo(() => {
+    const total = filteredAndSortedTransactions.length;
+    if (total === 0) return [];
+
+    const purchasesCount = filteredAndSortedTransactions.filter(t => t.transactionType === 'purchase').length;
+    const paymentsCount = filteredAndSortedTransactions.filter(t => t.transactionType === 'paymentToSupplier').length;
+
+    return [
+      { name: 'Satın Almalar', value: purchasesCount, percentage: (purchasesCount / total) * 100 },
+      { name: 'Ödemeler', value: paymentsCount, percentage: (paymentsCount / total) * 100 },
+    ];
+  }, [filteredAndSortedTransactions]);
+
+  const editor = useEditor({
+    extensions: [StarterKit, Underline],
+    content: supplier.notes || '',
+    onUpdate: ({ editor }) => {
+      setSupplier(prev => ({ ...prev, notes: editor.getHTML() }));
+    },
+  });
+
+  const transactionCategories: { value: TransactionCategory; label: string }[] = [
+    { value: 'satis', label: 'Satış' },
+    { value: 'odeme', label: 'Ödeme' },
+    { value: 'iade', label: 'İade' },
+    { value: 'indirim', label: 'İndirim' },
+    { value: 'komisyon', label: 'Komisyon' },
+    { value: 'diger', label: 'Diğer' },
+  ];
+
+  const tagColors = [
+    'bg-blue-100 text-blue-800',
+    'bg-green-100 text-green-800',
+    'bg-yellow-100 text-yellow-800',
+    'bg-red-100 text-red-800',
+    'bg-purple-100 text-purple-800',
+    'bg-pink-100 text-pink-800',
+  ];
+
   const handleAddTag = (transactionId: string, tagName: string) => {
-    // Implementation for adding tags
+    const newTag: TransactionTag = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: tagName,
+      color: tagColors[Math.floor(Math.random() * tagColors.length)],
+    };
+
+    setPurchases(prevPurchases => 
+      prevPurchases.map(purchase => 
+        purchase.id === transactionId 
+          ? { ...purchase, tags: [...purchase.tags, newTag] } 
+          : purchase
+      )
+    );
+
+    setPaymentsToSupplier(prevPayments => 
+      prevPayments.map(payment => 
+        payment.id === transactionId 
+          ? { ...payment, tags: [...payment.tags, newTag] } 
+          : payment
+      )
+    );
   };
 
   const handleRemoveTag = (transactionId: string, tagId: string) => {
-    // Implementation for removing tags
+    setPurchases(prevPurchases => 
+      prevPurchases.map(purchase => 
+        purchase.id === transactionId 
+          ? { ...purchase, tags: purchase.tags.filter(tag => tag.id !== tagId) } 
+          : purchase
+      )
+    );
+
+    setPaymentsToSupplier(prevPayments => 
+      prevPayments.map(payment => 
+        payment.id === transactionId 
+          ? { ...payment, tags: payment.tags.filter(tag => tag.id !== tagId) } 
+          : payment
+      )
+    );
   };
 
-  const handleSupplierUpdate = async (updatedSupplier: Supplier) => {
-    if (!user) return;
-    await storageUpdateSupplier(user.uid, updatedSupplier);
-    setSupplier(updatedSupplier);
-    toast({
-      title: 'Başarılı',
-      description: 'Tedarikçi bilgileri güncellendi.',
-    });
-  };
-
-  const handleContactHistorySubmit = async (formValues: ContactHistoryFormValues) => {
-    if (!user || !supplier.id) return;
+  const handleAddPaymentToSupplier = async (values: PaymentToSupplierFormValues) => {
     try {
-      const contactHistoryData: ContactHistoryItem = {
-        id: editingContactHistoryItem?.id || crypto.randomUUID(),
+      const amount = parseFloat(values.amount);
+
+      const newPayment: PaymentToSupplier = {
+        id: Math.random().toString(36).substr(2, 9),
         supplierId: supplier.id,
-        date: formatISO(formValues.date),
-        type: formValues.type,
-        summary: formValues.summary,
-        notes: formValues.notes,
+        amount: amount,
+        date: formatISO(values.date),
+        currency: values.currency,
+        method: values.method,
+        description: values.description || `${values.method} ile ödeme`,
+        transactionType: 'paymentToSupplier',
+        category: 'odeme',
+        tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        ...(values.referenceNumber && { referenceNumber: values.referenceNumber }),
+        ...(values.checkDate && { checkDate: formatISO(values.checkDate) }),
+        ...(values.checkSerialNumber && { checkSerialNumber: values.checkSerialNumber }),
       };
 
-      if (editingContactHistoryItem) {
-        await storageUpdateContactHistory(user.uid, contactHistoryData);
-        setContactHistory(contactHistory.map(item => 
-          item.id === editingContactHistoryItem.id ? contactHistoryData : item
-        ));
-        toast({
-          title: 'Başarılı',
-          description: 'İletişim kaydı güncellendi.',
-        });
-      } else {
-        await storageAddContactHistory(user.uid, contactHistoryData);
-        setContactHistory([...contactHistory, contactHistoryData]);
-        toast({
-          title: 'Başarılı',
-          description: 'İletişim kaydı eklendi.',
-        });
-      }
-
-      setShowContactHistoryModal(false);
-      setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
-      setEditingContactHistoryItem(null);
-    } catch (error) {
-      console.error('Error saving contact history:', error);
+      setPaymentsToSupplier(prevPayments => [...prevPayments, newPayment]);
+      setShowPaymentToSupplierModal(false);
       toast({
-        title: 'Hata',
-        description: 'İletişim kaydı kaydedilirken bir hata oluştu.',
-        variant: 'destructive',
+        title: "Ödeme eklendi",
+        description: "Yeni ödeme başarıyla eklendi.",
       });
-    }
-  };
-
-  const handleTaskSubmit = async (formValues: SupplierTaskFormValues) => {
-    if (!user || !supplier.id) return;
-    try {
-      const taskData: SupplierTask = {
-        id: editingTask?.id || crypto.randomUUID(),
-        supplierId: supplier.id,
-        description: formValues.description,
-        dueDate: formValues.dueDate ? formatISO(formValues.dueDate, { representation: 'date' }) : undefined,
-        status: formValues.status,
-        createdAt: editingTask?.createdAt || formatISO(new Date()),
-        updatedAt: formatISO(new Date()),
-      };
-
-      if (editingTask) {
-        await updateSupplierTask(user.uid, taskData);
-        setTasks(tasks.map(task => 
-          task.id === editingTask.id ? taskData : task
-        ));
-        toast({
-          title: 'Başarılı',
-          description: 'Görev başarıyla güncellendi.',
-        });
-      } else {
-        const newTask = await addSupplierTask(user.uid, taskData);
-        setTasks([...tasks, newTask]);
-        toast({
-          title: 'Başarılı',
-          description: 'Görev başarıyla eklendi.',
-        });
-      }
-
-      setShowTaskModal(false);
-      setTaskFormValues(EMPTY_TASK_FORM_VALUES);
-      setEditingTask(null);
     } catch (error) {
-      console.error('Error saving task:', error);
-      toast({
-        title: 'Hata',
-        description: 'Görev kaydedilirken bir hata oluştu.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const loadData = useCallback(async () => {
-    if (!user) return;
-    setIsLoading(true);
-    try {
-      const [loadedPurchases, loadedPayments] = await Promise.all([
-        getPurchases(user.uid, supplier.id),
-        getPaymentsToSuppliers(user.uid, supplier.id)
-      ]);
-      setPurchases(loadedPurchases);
-      setPaymentsToSupplier(loadedPayments);
-    } catch (error) {
-      console.error("Error loading data:", error);
+      console.error('Ödeme eklenirken hata:', error);
       toast({
         title: "Hata",
-        description: "Veriler yüklenirken bir sorun oluştu.",
+        description: "Ödeme eklenirken bir sorun oluştu.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
-  }, [user, supplier.id, toast]);
-
-  const calculateBalancesForSupplier = (supplierId: string): Record<Currency, number> => {
-    const supplierPurchases = purchases.filter(p => p.supplierId === supplierId);
-    const supplierPayments = paymentsToSupplier.filter(p => p.supplierId === supplierId);
-    
-    const balances: Record<Currency, number> = { TRY: 0, USD: 0 };
-
-    supplierPurchases.forEach(purchase => {
-      balances[purchase.currency] = (balances[purchase.currency] || 0) + purchase.amount;
-    });
-    supplierPayments.forEach(payment => {
-      balances[payment.currency] = (balances[payment.currency] || 0) - payment.amount;
-    });
-    return balances;
   };
 
-  if (!supplier) {
-    return <div className="text-center py-8">Tedarikçi bulunamadı.</div>;
-  }
+  const handleEditSupplierSubmit = useCallback(async (updatedSupplier: Supplier) => {
+    if (!user) {
+      toast({
+        title: "Hata",
+        description: "Kullanıcı oturumu bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await storageUpdateSupplier(user.uid, updatedSupplier);
+      setSupplier(updatedSupplier);
+      setShowEditSupplierModal(false);
+      toast({
+        title: "Başarılı",
+        description: "Tedarikçi bilgileri güncellendi.",
+      });
+    } catch (error) {
+      console.error("Error updating supplier:", error);
+      toast({
+        title: "Hata",
+        description: "Tedarikçi bilgileri güncellenirken bir hata oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, toast]);
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">{supplier.name}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{supplier.name}</h1>
           <p className="text-muted-foreground mt-1">
-            {supplier.address && <span className="block">{supplier.address}</span>}
-            {supplier.phone && <span className="block">{supplier.phone}</span>}
             {supplier.email && <span className="block">{supplier.email}</span>}
+            {supplier.phone && <span className="block">{supplier.phone}</span>}
+            {supplier.address && <span className="block">{supplier.address}</span>}
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowEditSupplierModal(true)}
-          >
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => window.open(`/suppliers/${supplier.id}/extract`, '_blank')}>
+            <Receipt className="h-4 w-4 mr-2" />
+            Ekstre Görüntüle
+          </Button>
+          <Button variant="outline" onClick={() => setShowEditSupplierModal(true)}>
             <Edit3 className="h-4 w-4 mr-2" />
             Düzenle
           </Button>
-          <Button
-            variant="destructive"
-            onClick={() => setDeletingSupplier(supplier.id)}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Sil
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Sil
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Tedarikçiyi Sil</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Bu tedarikçiyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>İptal</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => setDeletingSupplier(supplier.id)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Sil
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Toplam Alış</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Toplam Satın Alma</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(totalPurchases, supplier.defaultCurrency || 'TRY')}
-            </div>
+            <div className="text-2xl font-bold">{formatCurrency(totalPurchases, 'TRY')}</div>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Toplam Ödeme</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Toplam Ödeme</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(totalPayments, supplier.defaultCurrency || 'TRY')}
-            </div>
+            <div className="text-2xl font-bold">{formatCurrency(totalPayments, 'TRY')}</div>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Bakiye</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Bakiye</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className={cn(
               "text-2xl font-bold",
-              balance > 0 ? "text-red-600" : balance < 0 ? "text-green-600" : ""
+              balance > 0 ? "text-red-500" : "text-green-500"
             )}>
-              {formatCurrency(balance, supplier.defaultCurrency || 'TRY')}
+              {formatCurrency(balance, 'TRY')}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>İşlemler</CardTitle>
-            <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowPurchaseModal(true)}
-              >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Alış Ekle
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowPaymentToSupplierModal(true)}
-              >
-                <DollarSign className="h-4 w-4 mr-2" />
-                Ödeme Ekle
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tarih</TableHead>
-                <TableHead>Tür</TableHead>
-                <TableHead>Açıklama</TableHead>
-                <TableHead className="text-right">Tutar</TableHead>
-                <TableHead className="text-right">İşlemler</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {unifiedTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell>
-                    {format(parseISO(transaction.date), 'dd.MM.yyyy')}
-                  </TableCell>
-                  <TableCell>
-                    {transaction.transactionType === 'purchase' ? 'Alış' : 'Ödeme'}
-                  </TableCell>
-                  <TableCell>{transaction.description}</TableCell>
-                  <TableCell className={cn(
-                    "text-right font-mono",
-                    transaction.transactionType === 'purchase' ? "text-red-600" : "text-green-600"
-                  )}>
-                    {formatCurrency(transaction.amount, transaction.currency)}
-                  </TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => {
-                        if (transaction.transactionType === 'purchase') {
-                          setEditingPurchase(transaction);
-                          setShowPurchaseModal(true);
-                        } else {
-                          setEditingPaymentToSupplier(transaction);
-                          setShowPaymentToSupplierModal(true);
-                        }
-                      }}
-                    >
-                      <Edit3 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => {
-                        if (transaction.transactionType === 'purchase') {
-                          setDeletingPurchaseId(transaction.id);
-                        } else {
-                          setDeletingPaymentToSupplierId(transaction.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Tabs defaultValue="transactions" className="mt-8">
+      <Tabs defaultValue="transactions">
         <TabsList>
           <TabsTrigger value="transactions">İşlemler</TabsTrigger>
           <TabsTrigger value="notes">Notlar</TabsTrigger>
           <TabsTrigger value="contact-history">İletişim Geçmişi</TabsTrigger>
           <TabsTrigger value="tasks">Görevler</TabsTrigger>
+          <TabsTrigger value="statement">Ekstre</TabsTrigger>
         </TabsList>
-
         <TabsContent value="transactions">
           <Card>
             <CardHeader>
@@ -893,14 +1231,14 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                 <div className="flex space-x-2">
                   <Button
                     variant="outline"
-                    onClick={() => setShowPurchaseModal(true)}
+                    onClick={handleOpenAddPurchaseModal}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Alış Ekle
+                    Satın Alma Ekle
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => setShowPaymentToSupplierModal(true)}
+                    onClick={handleOpenAddPaymentToSupplierModal}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Ödeme Ekle
@@ -909,7 +1247,144 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
               </div>
             </CardHeader>
             <CardContent>
-              {/* Transaction list content */}
+              <div className="flex justify-between items-center mb-4">
+                <Input
+                  placeholder="İşlem ara..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="max-w-sm"
+                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="date"
+                      variant={"outline"}
+                      className={cn(
+                        "w-[300px] justify-start text-left font-normal",
+                        !dateRange?.from && !dateRange?.to && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange?.from ? (
+                        dateRange.to ? (
+                          <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>
+                        ) : (
+                          format(dateRange.from, "LLL dd, y")
+                        )
+                      ) : (
+                        <span>Tarih aralığı seçin</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange?.from}
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      numberOfMonths={2}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Select
+                  value={sortOrder}
+                  onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Sıralama" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">En Yeniye Göre</SelectItem>
+                    <SelectItem value="asc">En Eskiye Göre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tarih</TableHead>
+                    <TableHead>İşlem Tipi</TableHead>
+                    <TableHead className="text-right">Tutar</TableHead>
+                    <TableHead>Açıklama</TableHead>
+                    <TableHead className="text-right">İşlemler</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedTransactions.length > 0 ? (
+                    paginatedTransactions.map((item) => (
+                      <TableRow key={`${item.transactionType}-${item.id}`}>
+                        <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
+                        <TableCell>{item.transactionType === 'purchase' ? (
+                          <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Satın Alma</Badge>
+                        ) : (
+                          <Badge variant="default" className="bg-green-500 hover:bg-green-600">Ödeme</Badge>
+                        )}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(item.amount, item.currency)}
+                        </TableCell>
+                        <TableCell>
+                          {renderTransactionDetail(item)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (item.transactionType === 'purchase') {
+                                setEditingPurchase(item as Purchase);
+                                setPurchaseFormValues({
+                                  amount: (item as Purchase).amount.toString(),
+                                  date: parseISO((item as Purchase).date),
+                                  currency: (item as Purchase).currency,
+                                  stockItemId: (item as Purchase).stockItemId === '' ? undefined : (item as Purchase).stockItemId,
+                                  description: (item as Purchase).description || '',
+                                });
+                                setShowPurchaseModal(true);
+                              } else {
+                                setEditingPaymentToSupplier(item as PaymentToSupplier);
+                                setPaymentToSupplierFormValues({
+                                  amount: (item as PaymentToSupplier).amount.toString(),
+                                  date: parseISO((item as PaymentToSupplier).date),
+                                  method: (item as PaymentToSupplier).method,
+                                  currency: (item as PaymentToSupplier).currency,
+                                  referenceNumber: (item as PaymentToSupplier).referenceNumber || '',
+                                  description: (item as PaymentToSupplier).description || '',
+                                  checkDate: (item as PaymentToSupplier).checkDate ? parseISO((item as PaymentToSupplier).checkDate) : null,
+                                  checkSerialNumber: (item as PaymentToSupplier).checkSerialNumber || null,
+                                });
+                                setShowPaymentToSupplierModal(true);
+                              }
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (item.transactionType === 'purchase') {
+                                setDeletingPurchaseId(item.id);
+                              } else {
+                                setDeletingPaymentToSupplierId(item.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">
+                        İşlem bulunamadı.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
@@ -932,7 +1407,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                 <CardTitle>İletişim Geçmişi</CardTitle>
                 <Button
                   variant="outline"
-                  onClick={() => setShowContactHistoryModal(true)}
+                  onClick={handleOpenAddContactHistoryModal}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   İletişim Ekle
@@ -952,7 +1427,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                 <CardTitle>Görevler</CardTitle>
                 <Button
                   variant="outline"
-                  onClick={() => setShowTaskModal(true)}
+                  onClick={handleOpenAddTaskModal}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Görev Ekle
@@ -961,6 +1436,17 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
             </CardHeader>
             <CardContent>
               {/* Tasks content */}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="statement">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ekstre</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Export to CSV content */}
             </CardContent>
           </Card>
         </TabsContent>
@@ -974,7 +1460,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
           setEditingPurchase(null);
         }}
-        onSubmit={handlePurchaseFormSubmit}
+        onSubmit={handlePurchaseSubmit}
         formValues={purchaseFormValues}
         setFormValues={setPurchaseFormValues}
         availableStockItems={availableStockItems}
@@ -997,19 +1483,13 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         isOpen={showEditSupplierModal}
         onClose={() => setShowEditSupplierModal(false)}
         supplier={supplier}
-        onSave={handleSupplierUpdate}
+        onSave={handleEditSupplierSubmit}
       />
 
       <DeleteConfirmationModal
         isOpen={!!deletingPurchaseId}
         onClose={() => setDeletingPurchaseId(null)}
-        onConfirm={async () => {
-          if (deletingPurchaseId && user) {
-            await storageDeletePurchase(user!.uid, deletingPurchaseId);
-            setPurchases(purchases.filter(p => p.id !== deletingPurchaseId));
-            setDeletingPurchaseId(null);
-          }
-        }}
+        onConfirm={handleDeletePurchase}
         title="Alışı Sil"
         description="Bu alışı silmek istediğinizden emin misiniz?"
       />
@@ -1017,13 +1497,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       <DeleteConfirmationModal
         isOpen={!!deletingPaymentToSupplierId}
         onClose={() => setDeletingPaymentToSupplierId(null)}
-        onConfirm={async () => {
-          if (deletingPaymentToSupplierId && user) {
-            await storageDeletePaymentToSupplier(user!.uid, deletingPaymentToSupplierId);
-            setPaymentsToSupplier(paymentsToSupplier.filter(p => p.id !== deletingPaymentToSupplierId));
-            setDeletingPaymentToSupplierId(null);
-          }
-        }}
+        onConfirm={handleDeletePaymentToSupplier}
         title="Ödemeyi Sil"
         description="Bu ödemeyi silmek istediğinizden emin misiniz?"
       />
@@ -1031,12 +1505,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       <DeleteConfirmationModal
         isOpen={!!deletingSupplier}
         onClose={() => setDeletingSupplier(null)}
-        onConfirm={async () => {
-          if (deletingSupplier && user) {
-            await storageDeleteSupplier(user!.uid, deletingSupplier);
-            window.location.href = '/suppliers';
-          }
-        }}
+        onConfirm={handleDeleteSupplier}
         title="Tedarikçiyi Sil"
         description="Bu tedarikçiyi silmek istediğinizden emin misiniz?"
       />
@@ -1060,7 +1529,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           setTaskFormValues(EMPTY_TASK_FORM_VALUES);
           setEditingTask(null);
         }}
-        onSubmit={handleTaskSubmit}
+        onSubmit={handleTaskFormSubmit}
         formValues={taskFormValues}
         setFormValues={setTaskFormValues}
       />
