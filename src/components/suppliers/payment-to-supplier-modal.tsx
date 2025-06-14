@@ -109,6 +109,7 @@ export function PaymentToSupplierModal({
                   <SelectItem value="nakit">Nakit</SelectItem>
                   <SelectItem value="krediKarti">Kredi Kartı</SelectItem>
                   <SelectItem value="havale">Havale/EFT</SelectItem>
+                  <SelectItem value="cek">Çek</SelectItem>
                   <SelectItem value="diger">Diğer</SelectItem>
                 </SelectContent>
               </Select>

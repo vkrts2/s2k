@@ -410,7 +410,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           amount: amount,
           date: formatISO(purchaseFormValues.date),
           currency: purchaseFormValues.currency,
-          stockItemId: purchaseFormValues.stockItemId === '' ? null : purchaseFormValues.stockItemId, // Convert empty string to null
+          stockItemId: purchaseFormValues.stockItemId === '' || purchaseFormValues.stockItemId === undefined ? null : purchaseFormValues.stockItemId,
           description: purchaseFormValues.description,
           quantityPurchased: quantityPurchased,
           unitPrice: unitPrice,
@@ -429,7 +429,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           amount: amount,
           date: formatISO(purchaseFormValues.date),
           currency: purchaseFormValues.currency,
-          stockItemId: purchaseFormValues.stockItemId === '' ? null : purchaseFormValues.stockItemId, // Convert empty string to null
+          stockItemId: purchaseFormValues.stockItemId === '' || purchaseFormValues.stockItemId === undefined ? null : purchaseFormValues.stockItemId,
           description: purchaseFormValues.description || 'Yeni satın alma',
           quantityPurchased: quantityPurchased,
           unitPrice: unitPrice,
