@@ -130,13 +130,9 @@ export interface PaymentFormValues {
   amount: string;
   date: Date;
   currency: Currency;
-  method: 'nakit' | 'krediKarti' | 'havale' | 'diger' | 'cek';
+  method: 'nakit' | 'krediKarti' | 'havale' | 'diger';
   referenceNumber?: string | null;
   description?: string;
-  checkDate?: Date | null;
-  checkInfo?: string | null;
-  checkImage1?: string | null;
-  checkImage2?: string | null;
 }
 
 export interface PaymentToSupplierFormValues {
@@ -177,7 +173,8 @@ export interface Sale {
   updatedAt: string;
 }
 
-export interface Payment extends BaseEntity {
+export interface Payment {
+  id: string;
   customerId: string;
   referenceNumber?: string | null;
   amount: number;
@@ -186,12 +183,10 @@ export interface Payment extends BaseEntity {
   category: 'odeme';
   tags: TransactionTag[];
   transactionType: 'payment';
-  method: 'nakit' | 'krediKarti' | 'havale' | 'diger' | 'cek';
+  method: 'nakit' | 'krediKarti' | 'havale' | 'diger';
   description?: string;
-  checkDate?: string | null;
-  checkInfo?: string | null;
-  checkImage1?: string | null;
-  checkImage2?: string | null;
+  createdAt: string; // ISO string format
+  updatedAt: string; // ISO string format
 }
 
 export type UnifiedTransaction = (Sale & { transactionType: 'sale' }) | 

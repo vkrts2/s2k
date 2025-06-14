@@ -72,7 +72,6 @@ import { format, parseISO, isValid, formatISO, startOfMonth, endOfMonth, eachMon
 import { tr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { CustomerForm } from './customer-form';
-import Link from "next/link";
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DateRange } from 'react-day-picker';
@@ -534,78 +533,69 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("handlePaymentSubmit çağrıldı. paymentFormValues:", paymentFormValues);
-    if (!user || !customer.id) return;
+
+    if (!user) {
+      toast({
+        title: "Hata",
+        description: "Kullanıcı oturumu bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const amount = parseFloat(paymentFormValues.amount);
-      if (isNaN(amount) || amount <= 0) {
-        toast({
-          title: 'Hata',
-          description: 'Geçerli bir tutar giriniz.',
-          variant: 'destructive',
-        });
-        console.error('Invalid amount:', amount);
-        return;
-      }
-
-      const paymentData: Payment = {
-        id: editingPayment?.id || crypto.randomUUID(),
-        customerId: customer.id,
-        amount,
-        date: formatISO(paymentFormValues.date),
-        currency: paymentFormValues.currency,
-        method: paymentFormValues.method,
-        description: paymentFormValues.description || `${paymentFormValues.method} ile ödeme`,
-        transactionType: 'payment',
-        category: 'odeme',
-        tags: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        ...(paymentFormValues.referenceNumber && { referenceNumber: paymentFormValues.referenceNumber }),
-      };
-
-      if (paymentFormValues.method === 'cek') {
-        if (paymentFormValues.checkDate) {
-          paymentData.checkDate = formatISO(paymentFormValues.checkDate);
-        } else {
-          paymentData.checkDate = null;
-        }
-
-        if (paymentFormValues.checkInfo) {
-          paymentData.checkInfo = paymentFormValues.checkInfo;
-        } else {
-          paymentData.checkInfo = null;
-        }
-
-        paymentData.checkImage1 = paymentFormValues.checkImage1 || null;
-        paymentData.checkImage2 = paymentFormValues.checkImage2 || null;
-      }
+      const date = paymentFormValues.date ? formatISO(paymentFormValues.date) : formatISO(new Date());
 
       if (editingPayment) {
-        await storageUpdatePayment(user.uid, paymentData);
-        setPayments(payments.map(p => p.id === editingPayment.id ? paymentData : p));
+        const updatedPayment: Payment = {
+          ...editingPayment,
+          amount,
+          date,
+          method: paymentFormValues.method,
+          currency: paymentFormValues.currency,
+          referenceNumber: paymentFormValues.referenceNumber || null,
+          description: paymentFormValues.description || '',
+          updatedAt: formatISO(new Date())
+        };
+
+        await storageUpdatePayment(user.uid, updatedPayment);
+        setPayments(payments.map(p => (p.id === editingPayment.id ? updatedPayment : p)));
         toast({
           title: "Başarılı",
-          description: "Ödeme başarıyla güncellendi.",
+          description: "Ödeme güncellendi.",
         });
       } else {
-        await addPayment(user.uid, paymentData);
-        setPayments([...payments, paymentData]);
+        const newPayment: Omit<Payment, 'id'> = {
+          customerId: customer.id,
+          amount,
+          date,
+          method: paymentFormValues.method,
+          currency: paymentFormValues.currency,
+          referenceNumber: paymentFormValues.referenceNumber || null,
+          description: paymentFormValues.description || '',
+          transactionType: 'payment',
+          category: 'odeme',
+          tags: [],
+          createdAt: formatISO(new Date()),
+          updatedAt: formatISO(new Date())
+        };
+
+        const addedPayment = await addPayment(user.uid, newPayment);
+        setPayments(prev => [...prev, addedPayment]);
         toast({
           title: "Başarılı",
-          description: "Yeni ödeme başarıyla eklendi.",
+          description: "Yeni ödeme eklendi.",
         });
       }
-
       setShowPaymentModal(false);
       setPaymentFormValues(EMPTY_PAYMENT_FORM_VALUES);
       setEditingPayment(null);
     } catch (error) {
-      console.error('Ödeme eklenirken hata:', error);
+      console.error("Ödeme kaydederken hata oluştu:", error);
       toast({
         title: "Hata",
-        description: "Ödeme eklenirken bir sorun oluştu.",
+        description: "Ödeme kaydedilirken bir sorun oluştu.",
         variant: "destructive",
       });
     }
@@ -626,13 +616,9 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
   }, [deletingPaymentId, toast, refreshCustomerData, user]);
 
   const safeFormatDate = (dateString: string, formatString: string) => {
-    try {
-      const date = parseISO(dateString);
-      return isValid(date) ? format(date, formatString) : 'Geçersiz Tarih';
-    } catch (e) {
-      // console.error("Invalid date string provided to safeFormatDate:", dateString, e); // Kaldırıldı
-      return 'Geçersiz Tarih';
-    }
+    if (!dateString) return '-';
+    const date = parseISO(dateString);
+    return isValid(date) ? format(date, formatString, { locale: tr }) : '-';
   };
 
   // Satış formu için Stok Kalemi adını ve birimini getiren yardımcı fonksiyon

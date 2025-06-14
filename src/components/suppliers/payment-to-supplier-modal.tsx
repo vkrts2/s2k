@@ -27,6 +27,15 @@ export function PaymentToSupplierModal({
   formValues,
   setFormValues,
 }: PaymentToSupplierModalProps) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await onSubmit(e);
+    } catch (error) {
+      console.error("Error submitting payment form:", error);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
@@ -34,10 +43,7 @@ export function PaymentToSupplierModal({
           <DialogTitle>Ödeme Ekle</DialogTitle>
           <DialogDescription>Yeni bir ödeme işlemi ekleyin veya mevcut bir ödemeyi düzenleyin.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={async (e) => {
-          e.preventDefault();
-          await onSubmit(e);
-        }} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="amount">Tutar</Label>
@@ -112,7 +118,7 @@ export function PaymentToSupplierModal({
               <Input
                 id="referenceNumber"
                 value={formValues.referenceNumber || ''}
-                onChange={(e) => setFormValues({ ...formValues, referenceNumber: e.target.value })}
+                onChange={(e) => setFormValues({ ...formValues, referenceNumber: e.target.value || null })}
                 placeholder="Opsiyonel"
               />
             </div>
