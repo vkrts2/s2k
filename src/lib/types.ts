@@ -110,7 +110,7 @@ export type SaleFormValues = {
   amount: string;
   date: Date;
   currency: Currency;
-  stockItemId?: string;
+  stockItemId?: string | null;
   description: string;
   quantity?: string;
   unitPrice?: string;
@@ -164,7 +164,7 @@ export interface Sale {
   amount: number;
   date: string;
   currency: Currency;
-  stockItemId?: string;
+  stockItemId?: string | null;
   description?: string;
   quantity?: number;
   unitPrice?: number;

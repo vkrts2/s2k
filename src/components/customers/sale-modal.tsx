@@ -115,8 +115,8 @@ export function SaleModal({
             <div className="grid gap-2">
               <Label htmlFor="stockItemId">Stok Kalemi</Label>
               <Select
-                value={formValues.stockItemId || "manual-entry"}
-                onValueChange={(value) => setFormValues({ ...formValues, stockItemId: value === 'manual-entry' ? undefined : value })}
+                value={formValues.stockItemId === null || formValues.stockItemId === undefined ? "manual-entry" : formValues.stockItemId}
+                onValueChange={(value) => setFormValues({ ...formValues, stockItemId: value === 'manual-entry' ? null : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Stok kalemi seçin" />

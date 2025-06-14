@@ -439,7 +439,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           amount,
           date,
           currency: saleFormValues.currency,
-          stockItemId: saleFormValues.stockItemId,
+          stockItemId: saleFormValues.stockItemId === undefined ? null : saleFormValues.stockItemId,
           description: saleFormValues.description || '',
           updatedAt: formatISO(new Date())
         };
@@ -456,7 +456,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
           amount,
           date,
           currency: saleFormValues.currency,
-          stockItemId: saleFormValues.stockItemId,
+          stockItemId: saleFormValues.stockItemId === undefined ? null : saleFormValues.stockItemId,
           description: saleFormValues.description || '',
           transactionType: 'sale',
           category: 'satis',
