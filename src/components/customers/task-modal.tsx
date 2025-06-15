@@ -18,6 +18,7 @@ interface TaskModalProps {
   onSubmit: (formValues: TaskFormValues) => Promise<void>;
   formValues: TaskFormValues;
   setFormValues: (values: TaskFormValues) => void;
+  isEditing?: boolean;
 }
 
 export function TaskModal({
@@ -26,14 +27,24 @@ export function TaskModal({
   onSubmit,
   formValues,
   setFormValues,
+  isEditing
 }: TaskModalProps) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await onSubmit(formValues);
+    } catch (error) {
+      console.error("Error submitting task form:", error);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Görev Ekle/Düzenle</DialogTitle>
+          <DialogTitle>Görev {isEditing ? "Düzenle" : "Ekle"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="grid gap-4 py-4">
+        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="description">Açıklama</Label>
             <Input

@@ -10,25 +10,22 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
+import type { ContactHistoryFormValues } from "@/lib/types";
 
 interface ContactHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => Promise<void>;
-  formValues: {
-    date: Date;
-    type: 'phone' | 'email' | 'meeting' | 'other';
-    summary: string;
-    notes?: string;
-  };
-  setFormValues: (values: any) => void;
+  onSubmit: (values: ContactHistoryFormValues) => Promise<void>;
+  formValues: ContactHistoryFormValues;
+  setFormValues: (values: ContactHistoryFormValues) => void;
+  isEditing?: boolean;
 }
 
-const EMPTY_CONTACT_HISTORY_FORM_VALUES = {
+const EMPTY_CONTACT_HISTORY_FORM_VALUES: ContactHistoryFormValues = {
   date: new Date(),
-  type: 'phone' as const,
+  type: 'phone',
   summary: '',
-  notes: ''
+  notes: '',
 };
 
 export function ContactHistoryModal({
@@ -36,15 +33,25 @@ export function ContactHistoryModal({
   onClose,
   onSubmit,
   formValues,
-  setFormValues
+  setFormValues,
+  isEditing
 }: ContactHistoryModalProps) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await onSubmit(formValues);
+    } catch (error) {
+      console.error("Error submitting contact history form:", error);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>İletişim Geçmişi Ekle</DialogTitle>
+          <DialogTitle>İletişim Geçmişi {isEditing ? "Düzenle" : "Ekle"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="date" className="text-right">Tarih</Label>
             <Popover>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, RefreshCcw, FileText, BarChart3, Package, Users, Receipt, TrendingUp, DollarSign, Archive, CircleDollarSign, ArrowRight, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Search, Filter, RefreshCcw, FileText, BarChart3, Package, Users, Receipt, TrendingUp, DollarSign, Archive, CircleDollarSign, ArrowRight, ArrowUpRight, ArrowDownRight, TrendingDown, Truck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { SalesTab } from "@/components/dashboard/sales-tab";
 import { StockTab } from "@/components/dashboard/stock-tab";
@@ -94,7 +94,7 @@ interface ProfitLossData {
 
 interface RecentTransaction {
   id: string;
-  type: 'Fatura' | 'Ödeme' | 'Stok Hareketi' | 'Gider';
+  type: 'Fatura' | 'Ödeme' | 'Stok Hareketi' | 'Gider' | 'Alış' | 'Ödeme (Gelen)' | 'Ödeme (Giden)';
   description: string;
   amount: number;
   date: Date;
@@ -126,6 +126,7 @@ export default function DashboardPage() {
   const [totalCustomers, setTotalCustomers] = useState(0);
   const [totalSuppliers, setTotalSuppliers] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [salesTrendData, setSalesTrendData] = useState<SalesDataPoint[]>([]);
   const [stockStatusData, setStockStatusData] = useState<StockDataPoint[]>([]);
@@ -229,126 +230,191 @@ export default function DashboardPage() {
 
   const fetchDashboardData = async () => {
     setLoading(true);
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const fetchedTransactions: RecentTransaction[] = [];
       let totalSalesAmount = 0;
       let totalPurchasesAmount = 0;
-      let totalCustomers = 0;
-      let totalProducts = 0;
-      let lowStockCount = 0;
-      let pendingPaymentsAmount = 0;
+      let totalCustomersCount = 0;
+      let totalSuppliersCount = 0;
+      let lowStockItemsCount = 0;
+      let totalProductsCount = 0;
 
       const salesByDate: { [key: string]: number } = {};
+      const purchasesByDate: { [key: string]: number } = {};
 
-      // Fetch recent invoices
-      const invoicesQuery = query(collection(db, "invoices"), orderBy("date", "desc"));
+      // Fetch recent invoices (Sales)
+      const invoicesQuery = query(
+        collection(db, `users/${user.uid}/invoices`),
+        orderBy("date", "desc"),
+        limit(10)
+      );
       const invoicesSnapshot = await getDocs(invoicesQuery);
       invoicesSnapshot.forEach(doc => {
         const data = doc.data();
         const invoiceDate = data.date.toDate();
+        totalSalesAmount += data.totalAmount;
         fetchedTransactions.push({
           id: doc.id,
           type: 'Fatura',
-          description: `Fatura Kesildi - ${data.customerName}`,
+          description: `Fatura No: ${data.invoiceNumber || doc.id}`,
           amount: data.totalAmount,
           date: invoiceDate,
           link: `/invoices/${doc.id}`,
         });
-        totalSalesAmount += data.totalAmount;
 
-        const formattedDate = format(invoiceDate, 'dd.MM');
-        salesByDate[formattedDate] = (salesByDate[formattedDate] || 0) + data.totalAmount;
+        const monthYear = format(invoiceDate, 'MMM yyyy', { locale: tr });
+        salesByDate[monthYear] = (salesByDate[monthYear] || 0) + data.totalAmount;
       });
 
-      // Fetch recent payment movements
-      const paymentsQuery = query(collection(db, "paymentMovements"), orderBy("date", "desc"), limit(5));
+      // Fetch recent purchases
+      const purchasesQuery = query(
+        collection(db, `users/${user.uid}/purchases`),
+        orderBy("date", "desc"),
+        limit(10)
+      );
+      const purchasesSnapshot = await getDocs(purchasesQuery);
+      purchasesSnapshot.forEach(doc => {
+        const data = doc.data();
+        const purchaseDate = data.date.toDate();
+        totalPurchasesAmount += data.amount;
+        fetchedTransactions.push({
+          id: doc.id,
+          type: 'Alış',
+          description: data.description || `Alış: ${doc.id}`,
+          amount: data.amount,
+          date: purchaseDate,
+          link: `/suppliers/${data.supplierId}/purchases`,
+        });
+        const monthYear = format(purchaseDate, 'MMM yyyy', { locale: tr });
+        purchasesByDate[monthYear] = (purchasesByDate[monthYear] || 0) + data.amount;
+      });
+
+      // Fetch recent payments (both to customers and suppliers)
+      const paymentsQuery = query(
+        collection(db, `users/${user.uid}/payments`),
+        orderBy("date", "desc"),
+        limit(5)
+      );
       const paymentsSnapshot = await getDocs(paymentsQuery);
       paymentsSnapshot.forEach(doc => {
         const data = doc.data();
+        const paymentDate = data.date.toDate();
         fetchedTransactions.push({
           id: doc.id,
-          type: 'Ödeme',
-          description: `${data.type === 'Gelen' ? 'Ödeme Alındı' : 'Ödeme Yapıldı'} - ${data.partyName}`,
+          type: 'Ödeme (Gelen)',
+          description: data.description || `Ödeme (Gelen): ${doc.id}`,
           amount: data.amount,
-          date: data.date.toDate(),
-          link: `/payment-movements`,
+          date: paymentDate,
+          link: `/customers/${data.customerId}/payments`,
         });
-        if (data.type === 'Giden') {
-          totalPurchasesAmount += data.amount;
-        }
       });
 
-      // Fetch recent stock movements
-      const stockMovementsQuery = query(collection(db, "stockMovements"), orderBy("date", "desc"), limit(5));
-      const stockMovementsSnapshot = await getDocs(stockMovementsQuery);
-      stockMovementsSnapshot.forEach(doc => {
+      const paymentsToSuppliersQuery = query(
+        collection(db, `users/${user.uid}/paymentsToSuppliers`),
+        orderBy("date", "desc"),
+        limit(5)
+      );
+      const paymentsToSuppliersSnapshot = await getDocs(paymentsToSuppliersQuery);
+      paymentsToSuppliersSnapshot.forEach(doc => {
         const data = doc.data();
+        const paymentDate = data.date.toDate();
         fetchedTransactions.push({
           id: doc.id,
-          type: 'Stok Hareketi',
-          description: `Ürün ${data.type} - ${data.productName} (${data.quantity} adet)`,
-          amount: 0, // Stock movements don't have a direct monetary amount
-          date: data.date.toDate(),
-          link: `/stock-movements`,
+          type: 'Ödeme (Giden)',
+          description: data.description || `Ödeme (Giden): ${doc.id}`,
+          amount: data.amount,
+          date: paymentDate,
+          link: `/suppliers/${data.supplierId}/payments`,
         });
       });
 
-      // Sort all fetched transactions by date
-      fetchedTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
-      setRecentTransactions(fetchedTransactions.slice(0, 5)); // Show only the latest 5
+      // Fetch customer count
+      const customersSnapshot = await getDocs(collection(db, `users/${user.uid}/customers`));
+      totalCustomersCount = customersSnapshot.size;
 
-      // Fetch total customers
-      const customersSnapshot = await getDocs(collection(db, "customers"));
-      totalCustomers = customersSnapshot.size;
+      // Fetch supplier count
+      const suppliersSnapshot = await getDocs(collection(db, `users/${user.uid}/suppliers`));
+      totalSuppliersCount = suppliersSnapshot.size;
 
-      // Fetch total products and low stock count
-      const productsSnapshot = await getDocs(collection(db, "products"));
-      totalProducts = productsSnapshot.size;
+      // Fetch product count and low stock items
+      const productsSnapshot = await getDocs(collection(db, `users/${user.uid}/stockItems`));
+      totalProductsCount = productsSnapshot.size;
       productsSnapshot.forEach(doc => {
         const data = doc.data();
-        if (data.quantity < 10) { // Assuming low stock threshold is 10
-          lowStockCount++;
+        if (data.quantity <= (data.minStockQuantity || 5)) { // Assuming a default min stock of 5 if not specified
+          lowStockItemsCount++;
         }
       });
 
-      // Fetch pending payments (simplified: assuming any invoice not fully paid)
-      const allInvoicesSnapshot = await getDocs(collection(db, "invoices"));
-      allInvoicesSnapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.status === 'Ödenmedi' || data.status === 'Kısmi Ödendi') {
-          pendingPaymentsAmount += data.totalAmount;
-        }
-      });
+      // Sort all transactions by date
+      fetchedTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
 
-      // Prepare daily sales data for chart
-      const sortedSalesData = Object.keys(salesByDate).map(date => ({
-        date,
-        sales: salesByDate[date],
-      })).sort((a, b) => {
-        // Split date string "dd.MM" into parts to create a comparable string "MM-dd"
-        const [dayA, monthA] = a.date.split('.');
-        const [dayB, monthB] = b.date.split('.');
-        const dateA = `2000-${monthA}-${dayA}`; // Use a dummy year since we only care about month/day order
-        const dateB = `2000-${monthB}-${dayB}`;
-        return parseISO(dateA).getTime() - parseISO(dateB).getTime();
-      });
-      setDailySales(sortedSalesData);
+      setTotalSales(totalSalesAmount);
+      setTotalPurchases(totalPurchasesAmount);
+      setTotalCustomers(totalCustomersCount);
+      setTotalSuppliers(totalSuppliersCount);
+      setTotalProducts(totalProductsCount);
+      setLowStockCount(lowStockItemsCount);
+      setRecentTransactions(fetchedTransactions.slice(0, 5)); // Show top 5 recent transactions
 
-      // Update statistics
-      setStatistics([
-        { title: "Toplam Satış", value: totalSalesAmount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }), icon: <DollarSign className="h-4 w-4 text-muted-foreground" />, description: "Tüm zamanların toplam satışları" },
-        { title: "Toplam Müşteri", value: totalCustomers.toString(), icon: <Users className="h-4 w-4 text-muted-foreground" />, description: "Sisteme kayıtlı müşteri sayısı" },
-        { title: "Toplam Ürün", value: totalProducts.toString(), icon: <Package className="h-4 w-4 text-muted-foreground" />, description: "Mevcut ürün çeşitliliği" },
-        { title: "Düşük Stok Ürün", value: lowStockCount.toString(), icon: <Archive className="h-4 w-4 text-muted-foreground" />, description: "Kritik stok seviyesindeki ürünler" },
-        { title: "Bekleyen Tahsilatlar", value: pendingPaymentsAmount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }), icon: <Receipt className="h-4 w-4 text-muted-foreground" />, description: "Vadesi geçmiş veya kısmi ödenmiş faturalar" },
-        { title: "Toplam Alış (Ödeme Hareketleri)", value: totalPurchasesAmount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' }), icon: <CircleDollarSign className="h-4 w-4 text-muted-foreground" />, description: "Yapılan toplam tedarikçi ödemeleri" },
-      ]);
+      // Prepare sales trend data for chart
+      const sortedSalesDates = Object.keys(salesByDate).sort((a, b) => {
+        const dateA = parseISO(format(new Date(a), 'yyyy-MM-01'));
+        const dateB = parseISO(format(new Date(b), 'yyyy-MM-01'));
+        return dateA.getTime() - dateB.getTime();
+      });
+      const formattedSalesTrendData = sortedSalesDates.map(date => ({ name: date, sales: salesByDate[date] }));
+      setSalesTrendData(formattedSalesTrendData);
+
+      const statisticsData: Statistic[] = [
+        {
+          title: "Toplam Satış",
+          value: `$${totalSalesAmount.toLocaleString()}`,
+          icon: <TrendingUp className="h-4 w-4 text-muted-foreground" />,
+          description: "Uygulama üzerinden yapılan toplam satış tutarı.",
+        },
+        {
+          title: "Toplam Alış",
+          value: `$${totalPurchasesAmount.toLocaleString()}`,
+          icon: <TrendingDown className="h-4 w-4 text-muted-foreground" />,
+          description: "Uygulama üzerinden yapılan toplam alış tutarı.",
+        },
+        {
+          title: "Müşteri Sayısı",
+          value: totalCustomersCount.toLocaleString(),
+          icon: <Users className="h-4 w-4 text-muted-foreground" />,
+          description: "Sistemdeki toplam müşteri sayısı.",
+        },
+        {
+          title: "Tedarikçi Sayısı",
+          value: totalSuppliersCount.toLocaleString(),
+          icon: <Truck className="h-4 w-4 text-muted-foreground" />,
+          description: "Sistemdeki toplam tedarikçi sayısı.",
+        },
+        {
+          title: "Toplam Ürün",
+          value: totalProductsCount.toLocaleString(),
+          icon: <Package className="h-4 w-4 text-muted-foreground" />,
+          description: "Sistemdeki toplam ürün sayısı.",
+        },
+        {
+          title: "Düşük Stoklu Ürün",
+          value: lowStockItemsCount.toLocaleString(),
+          icon: <Archive className="h-4 w-4 text-red-500" />,
+          description: "Stok seviyesi düşük olan ürün sayısı.",
+        },
+      ];
+      setStatistics(statisticsData);
 
     } catch (error) {
-      console.error("Gösterge paneli verileri yüklenirken hata oluştu:", error);
+      console.error("Error fetching dashboard data:", error);
       toast({
-        title: "Hata",
-        description: "Gösterge paneli verileri yüklenirken bir sorun oluştu.",
+        title: "Veri çekme hatası",
+        description: "Kontrol paneli verileri çekilirken bir hata oluştu.",
         variant: "destructive",
       });
     } finally {
@@ -424,6 +490,22 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {statistics.map((stat, index) => (
+              <Card key={index}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+                  {stat.icon}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {stat.description}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
             <Card className="col-span-4">
               <CardHeader>
@@ -431,47 +513,44 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentActivities.map((activity, index) => (
-                    <div key={index} className="flex items-center justify-between border-b pb-2">
-                      <div>
-                        <p className="font-medium">
-                          {activity.type === 'sale' ? 'Satış' : 
-                           activity.type === 'purchase' ? 'Alış' : 'Ödeme'}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {activity.type === 'sale' || activity.type === 'payment' 
-                            ? activity.customer 
-                            : activity.supplier}
-                        </p>
+                  {recentTransactions.length > 0 ? (
+                    recentTransactions.map((activity) => (
+                      <div key={activity.id} className="flex items-center">
+                        <div className="ml-4 space-y-1">
+                          <p className="text-sm font-medium leading-none">{activity.description}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {format(activity.date, 'dd MMMM yyyy HH:mm', { locale: tr })}
+                          </p>
+                        </div>
+                        <div className="ml-auto font-medium">{activity.amount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</div>
+                        <Link href={activity.link} className="ml-2">
+                          <Button variant="ghost" size="sm">
+                            <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        </Link>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium">₺{activity.amount.toLocaleString()}</p>
-                        <p className="text-sm text-muted-foreground">{activity.date}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Henüz bir işlem bulunmamaktadır.</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
             <Card className="col-span-3">
               <CardHeader>
-                <CardTitle>Hızlı İşlemler</CardTitle>
+                <CardTitle>Satış Trendi</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <button className="w-full p-2 text-left hover:bg-accent rounded-lg">
-                    Yeni Satış Oluştur
-                  </button>
-                  <button className="w-full p-2 text-left hover:bg-accent rounded-lg">
-                    Yeni Alış Oluştur
-                  </button>
-                  <button className="w-full p-2 text-left hover:bg-accent rounded-lg">
-                    Fatura Oluştur
-                  </button>
-                  <button className="w-full p-2 text-left hover:bg-accent rounded-lg">
-                    Stok Girişi
-                  </button>
-                </div>
+              <CardContent className="h-[350px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={salesTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip formatter={(value: number) => value.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })} />
+                    <Legend />
+                    <Line type="monotone" dataKey="sales" stroke="#8884d8" activeDot={{ r: 8 }} name="Satışlar" />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>

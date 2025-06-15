@@ -61,9 +61,9 @@ const navItems = [
     icon: <FileText className="h-8 w-8 mb-2 text-primary" />,
   },
   {
-    href: '/customer-search',
-    label: 'Müşteri Keşfi',
-    description: 'Yeni müşteriler keşfedin.',
+    href: '/advanced-search',
+    label: 'Gelişmiş Arama',
+    description: 'Müşteri, tedarikçi, ürün ve işlemler arasında arama yapın.',
     icon: <Search className="h-8 w-8 mb-2 text-primary" />,
   },
   {

@@ -219,9 +219,7 @@ export const getSales = async (uid: string, customerId?: string): Promise<Sale[]
     const sales: Sale[] = querySnapshot.docs.map(doc => {
       let description = doc.data().description;
       if (!description && doc.data().stockItemId) {
-        // Stok ürünü bilgisi Firestore'dan çekilmeli, ama burada senkron olarak yapamayız
-        // Bu kısım UI tarafında çözülmeli veya farklı bir yaklaşımla
-        description = "Stok Ürünü Satışı"; // Geçici olarak varsayılan değer
+        description = "Stok Ürünü Satışı";
       } else if (!description) {
         description = "Genel Satış";
       }
@@ -292,14 +290,16 @@ export const updateSale = async (uid: string, updatedSaleData: Sale): Promise<Sa
   return { ...dataForFirestore, id: updatedSaleData.id } as Sale;
 };
 
-export const deleteSale = async (uid: string, saleId: string): Promise<void> => {
+export const storageDeleteSale = async (uid: string, saleId: string): Promise<void> => {
+  if (!uid || !saleId) {
+    throw new Error("User ID or Sale ID is missing");
+  }
   const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), saleId);
   await deleteDoc(saleDocRef);
 };
 
 // Payment Functions
 export const getPayments = async (uid: string, customerId?: string): Promise<Payment[]> => {
-  console.log(`getPayments called with uid: ${uid}`);
   if (!uid) {
     console.error("getPayments: User ID (uid) is missing.");
     return [];
@@ -310,11 +310,12 @@ export const getPayments = async (uid: string, customerId?: string): Promise<Pay
       paymentsQuery = query(paymentsQuery, where("customerId", "==", customerId));
     }
     const querySnapshot = await getDocs(paymentsQuery);
-    return querySnapshot.docs.map(doc => ({
+    const payments: Payment[] = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data() as Omit<Payment, 'id'>,
-      currency: doc.data().currency || 'TRY',
+      currency: doc.data().currency || 'TRY'
     }));
+    return payments;
   } catch (error) {
     console.error("Error fetching payments:", error);
     return [];
@@ -356,7 +357,10 @@ export const updatePayment = async (uid: string, updatedPayment: Payment): Promi
   return finalPayment;
 };
 
-export const deletePayment = async (uid: string, paymentId: string): Promise<void> => {
+export const storageDeletePayment = async (uid: string, paymentId: string): Promise<void> => {
+  if (!uid || !paymentId) {
+    throw new Error("User ID or Payment ID is missing");
+  }
   const paymentDocRef = doc(_getUserCollectionRef(uid, "payments"), paymentId);
   await deleteDoc(paymentDocRef);
 };
