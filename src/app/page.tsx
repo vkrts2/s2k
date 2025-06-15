@@ -19,42 +19,6 @@ const navItems = [
     icon: <Truck className="h-8 w-8 mb-2 text-primary" />,
   },
   {
-    href: '/products',
-    label: 'Ürünler',
-    description: 'Ürün kalemlerinizi yönetin.',
-    icon: <Package className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
-    href: '/stock-movements',
-    label: 'Stok Hareketleri',
-    description: 'Ürün giriş ve çıkışlarını takip edin.',
-    icon: <TrendingUp className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
-    href: '/payment-movements',
-    label: 'Ödeme Hareketleri',
-    description: 'Gelen ve giden ödemeleri takip edin.',
-    icon: <DollarSign className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
-    href: '/sales',
-    label: 'Satışlar',
-    description: 'Satış işlemlerinizi yönetin ve takip edin.',
-    icon: <ReceiptText className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
-    href: '/purchases',
-    label: 'Alışlar',
-    description: 'Alış işlemlerinizi yönetin ve takip edin.',
-    icon: <ReceiptText className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
-    href: '/invoices',
-    label: 'Faturalar',
-    description: 'Fatura ve makbuzlarınızı oluşturun ve yönetin.',
-    icon: <FileText className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
     href: '/calculator',
     label: 'Hesap Makinesi',
     description: 'Basit maliyet hesaplamaları yapın.',
@@ -155,14 +119,6 @@ export default function HomePage() {
         <Link href="/suppliers" className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg">
           <Truck className="w-5 h-5" />
           <span>Tedarikçiler</span>
-        </Link>
-        <Link href="/products" className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg">
-          <Package className="w-5 h-5" />
-          <span>Ürünler</span>
-        </Link>
-        <Link href="/dashboard" className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg">
-          <BarChart3 className="w-5 h-5" />
-          <span>Dashboard</span>
         </Link>
         {navItems.map((item) => (
           <Link href={item.href} key={item.label} passHref>
