@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, Printer } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ExtractPageProps {
   params: {
@@ -37,7 +38,7 @@ const formatCurrency = (amount?: number, currency?: Currency): string => {
 };
 
 const safeFormatDate = (dateString?: string | null, formatString: string = 'dd.MM.yyyy') => {
-  if (!dateString) return 'Tarih Yok';
+  if (!dateString) return '-';
   const date = parseISO(dateString);
   return isValid(date) ? format(date, formatString, { locale: tr }) : 'Geçersiz Tarih';
 };
@@ -139,34 +140,67 @@ export default function ExtractPage({ params }: ExtractPageProps) {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto p-4 md:p-8 print:p-0 print:m-0 print:w-full print:max-w-none">
+      <style jsx global>{`
+        @media print {
+          body { margin: 0; padding: 0; }
+          .container { margin: 0; padding: 0; width: 100% !important; max-width: none !important; }
+          .print\:hidden { display: none !important; }
+          .print\:block { display: block !important; }
+          .print\:text-black { color: black !important; }
+          .print\:bg-white { background-color: white !important; }
+          h1, h2, h3, h4, h5, h6 { color: black !important; }
+          p, span, div, table, th, td { color: black !important; }
+          .bg-card, .bg-background { background-color: white !important; }
+          .text-muted-foreground, .text-gray-500 { color: #666 !important; }
+          .text-red-500 { color: #cc0000 !important; }
+          .text-green-500 { color: #008000 !important; }
+          .border { border: 1px solid #eee !important; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          thead { background-color: #f2f2f2; }
+          .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; display: inline-block; }
+          .badge.bg-blue-500 { background-color: #3b82f6 !important; color: white !important; }
+          .badge.bg-green-500 { background-color: #22c55e !important; color: white !important; }
+          .flex { display: flex; }
+          .justify-between { justify-content: space-between; }
+          .items-center { align-items: center; }
+          .space-y-4 > *:not(:last-child) { margin-bottom: 1rem; }
+          .mb-6 { margin-bottom: 1.5rem; }
+          .p-4 { padding: 1rem; }
+          .md\:p-8 { padding: 2rem; }
+        }
+      `}</style>
       <h1 className="text-3xl font-bold mb-6">Tedarikçi Ekstresi: {supplier.name}</h1>
 
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Genel Bilgiler</CardTitle>
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button variant="outline" onClick={() => window.print()} className="print:hidden">
             <Printer className="h-4 w-4 mr-2" />
             Yazdır
           </Button>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 text-sm">
           <p className="font-medium">Tedarikçi Adı:</p>
-          <p>{supplier.name}</p>
+          <p className="print:text-black">{supplier.name}</p>
           <p className="font-medium">E-posta:</p>
-          <p>{supplier.email || '-'}</p>
+          <p className="print:text-black">{supplier.email || '-'}</p>
           <p className="font-medium">Telefon:</p>
-          <p>{supplier.phone || '-'}</p>
+          <p className="print:text-black">{supplier.phone || '-'}</p>
           <p className="font-medium">Adres:</p>
-          <p>{supplier.address || '-'}</p>
+          <p className="print:text-black">{supplier.address || '-'}</p>
           <p className="font-medium">Vergi Numarası:</p>
-          <p>{supplier.taxNumber || '-'}</p>
+          <p className="print:text-black">{supplier.taxNumber || '-'}</p>
           <p className="font-medium">Toplam Satın Alma:</p>
-          <p>{formatCurrency(totalPurchases, 'TRY')}</p>
+          <p className="print:text-black">{formatCurrency(totalPurchases, 'TRY')}</p>
           <p className="font-medium">Toplam Ödeme:</p>
-          <p>{formatCurrency(totalPayments, 'TRY')}</p>
+          <p className="print:text-black">{formatCurrency(totalPayments, 'TRY')}</p>
           <p className="font-medium">Bakiye:</p>
-          <p className={balance > 0 ? "text-red-500 font-bold" : "text-green-500 font-bold"}>
+          <p className={cn(
+            balance > 0 ? "text-red-500 font-bold" : "text-green-500 font-bold",
+            "print:text-black"
+          )}>
             {formatCurrency(balance, 'TRY')}
           </p>
         </CardContent>
@@ -180,31 +214,31 @@ export default function ExtractPage({ params }: ExtractPageProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tarih</TableHead>
-                <TableHead>İşlem Tipi</TableHead>
-                <TableHead className="text-right">Tutar</TableHead>
-                <TableHead>Açıklama</TableHead>
-                <TableHead>Ödeme Yöntemi</TableHead>
-                <TableHead>Referans No / Çek No</TableHead>
+                <TableHead className="print:text-black">Tarih</TableHead>
+                <TableHead className="print:text-black">İşlem Tipi</TableHead>
+                <TableHead className="text-right print:text-black">Tutar</TableHead>
+                <TableHead className="print:text-black">Açıklama</TableHead>
+                <TableHead className="print:text-black">Ödeme Yöntemi</TableHead>
+                <TableHead className="print:text-black">Referans No / Çek No</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {unifiedTransactions.length > 0 ? (
                 unifiedTransactions.map((item) => (
                   <TableRow key={`${item.transactionType}-${item.id}`}>
-                    <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
-                    <TableCell>
+                    <TableCell className="print:text-black">{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
+                    <TableCell className="print:text-black">
                       {item.transactionType === 'purchase' ? (
-                        <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Satın Alma</Badge>
+                        <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 print:bg-blue-500 print:text-white">Satın Alma</Badge>
                       ) : (
-                        <Badge variant="default" className="bg-green-500 hover:bg-green-600">Ödeme</Badge>
+                        <Badge variant="default" className="bg-green-500 hover:bg-green-600 print:bg-green-500 print:text-white">Ödeme</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right font-medium">
+                    <TableCell className="text-right font-medium print:text-black">
                       {formatCurrency(item.amount, item.currency)}
                     </TableCell>
-                    <TableCell>{item.description || '-'}</TableCell>
-                    <TableCell>
+                    <TableCell className="print:text-black">{item.description || '-'}</TableCell>
+                    <TableCell className="print:text-black">
                       {'method' in item ? (
                         item.method === 'nakit' ? 'Nakit' :
                         item.method === 'banka' ? 'Banka Havalesi' :
@@ -212,7 +246,7 @@ export default function ExtractPage({ params }: ExtractPageProps) {
                         item.method === 'cek' ? 'Çek' : 'Diğer'
                       ) : '-'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="print:text-black">
                       {'referenceNumber' in item && item.referenceNumber ? item.referenceNumber :
                        'checkSerialNumber' in item && item.checkSerialNumber ? item.checkSerialNumber : '-'}
                     </TableCell>
@@ -220,7 +254,7 @@ export default function ExtractPage({ params }: ExtractPageProps) {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
+                  <TableCell colSpan={6} className="text-center py-4 print:text-black">
                     Bu tedarikçi için herhangi bir işlem bulunamadı.
                   </TableCell>
                 </TableRow>
