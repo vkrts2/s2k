@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LineChart, BarChart, PieChart } from "@/components/ui/charts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Filter, RefreshCcw, FileText, BarChart3, Package, Users, Receipt, TrendingUp, DollarSign, Archive, CircleDollarSign, ArrowRight, ArrowUpRight, ArrowDownRight } from 'lucide-react';
@@ -23,7 +22,7 @@ import { db } from "@/lib/firebase";
 import { format, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import {
-  LineChart as ChartLineChart,
+  LineChart,
   Line,
   XAxis,
   YAxis,
@@ -31,8 +30,12 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
-import { PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 
 interface Transaction {
   id: string;
@@ -511,7 +514,7 @@ export default function DashboardPage() {
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }: { name: string; percent: number }) => `${name} ${(percent * 100).toFixed(0)}%`}
                       >
                         {customerData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
