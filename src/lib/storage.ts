@@ -272,20 +272,12 @@ export const addSale = async (uid: string, saleData: Omit<Sale, 'id' | 'transact
 export const updateSale = async (uid: string, updatedSaleData: Sale): Promise<Sale> => {
   const now = formatISO(new Date());
   const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), updatedSaleData.id);
-
   const { id, ...restOfUpdatedData } = updatedSaleData;
-  const dataForFirestore: { [key: string]: any } = {
+  const dataForFirestore: any = {
     ...restOfUpdatedData,
     updatedAt: now,
   };
-
-  // Remove undefined fields to prevent Firebase errors
-  Object.keys(dataForFirestore).forEach(key => {
-    if (dataForFirestore[key] === undefined) {
-      delete dataForFirestore[key];
-    }
-  });
-
+  console.log("updateSale: Attempting to update doc at path:", saleDocRef.path, "with saleId:", updatedSaleData.id, "and data:", dataForFirestore);
   await updateDoc(saleDocRef, dataForFirestore);
   return { ...dataForFirestore, id: updatedSaleData.id } as Sale;
 };
@@ -295,6 +287,7 @@ export const storageDeleteSale = async (uid: string, saleId: string): Promise<vo
     throw new Error("User ID or Sale ID is missing");
   }
   const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), saleId);
+  console.log("storageDeleteSale: Attempting to delete doc at path:", saleDocRef.path, "with saleId:", saleId);
   await deleteDoc(saleDocRef);
 };
 
