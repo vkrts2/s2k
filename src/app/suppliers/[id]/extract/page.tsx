@@ -149,27 +149,27 @@ export default function ExtractPage({ params }: ExtractPageProps) {
           .print\:block { display: block !important; }
           .print\:text-black { color: black !important; }
           .print\:bg-white { background-color: white !important; }
-          h1 { font-size: 1.4rem !important; margin-bottom: 0.4rem !important; }
-          h2, h3, h4, h5, h6 { font-size: 1.1rem !important; color: black !important; }
-          p, span, div, table, th, td { color: black !important; font-size: 0.8rem !important; line-height: 1.1 !important; }
+          h1 { font-size: 1.2rem !important; margin-bottom: 0.2rem !important; }
+          h2, h3, h4, h5, h6 { font-size: 0.95rem !important; color: black !important; }
+          p, span, div, table, th, td { color: black !important; font-size: 0.7rem !important; line-height: 1.0 !important; }
           .bg-card, .bg-background { background-color: white !important; }
-          .text-muted-foreground, .text-gray-500 { color: #555 !important; }
+          .text-muted-foreground, .text-gray-500 { color: #333 !important; }
           .text-red-500 { color: #cc0000 !important; }
           .text-green-500 { color: #008000 !important; }
           .border { border: 1px solid #ddd !important; }
           table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #eee; padding: 4px; text-align: left; }
-          thead { background-color: #f7f7f7; }
-          .badge { padding: 2px 5px; border-radius: 2px; font-size: 0.65rem; display: inline-block; }
+          th, td { border: 1px solid #eee; padding: 2px; text-align: left; }
+          thead { background-color: #f9f9f9; }
+          .badge { padding: 0px 3px; border-radius: 1px; font-size: 0.55rem; display: inline-block; }
           .badge.bg-blue-500 { background-color: #3b82f6 !important; color: white !important; }
           .badge.bg-green-500 { background-color: #22c55e !important; color: white !important; }
           .flex { display: flex; }
           .justify-between { justify-content: space-between; }
           .items-center { align-items: center; }
-          .space-y-4 > *:not(:last-child) { margin-bottom: 0.3rem; }
-          .mb-6 { margin-bottom: 0.8rem; }
-          .p-4 { padding: 0.4rem; }
-          .md\:p-8 { padding: 0.8rem; }
+          .space-y-4 > *:not(:last-child) { margin-bottom: 0.1rem; }
+          .mb-6 { margin-bottom: 0.5rem; }
+          .p-4 { padding: 0.2rem; }
+          .md\:p-8 { padding: 0.5rem; }
         }
       `}</style>
       <h1 className="text-3xl font-bold mb-6">Tedarikçi Ekstresi: {supplier.name}</h1>
@@ -185,14 +185,6 @@ export default function ExtractPage({ params }: ExtractPageProps) {
         <CardContent className="grid grid-cols-2 gap-4 text-sm">
           <p className="font-medium">Tedarikçi Adı:</p>
           <p className="print:text-black">{supplier.name}</p>
-          <p className="font-medium">E-posta:</p>
-          <p className="print:text-black">{supplier.email || '-'}</p>
-          <p className="font-medium">Telefon:</p>
-          <p className="print:text-black">{supplier.phone || '-'}</p>
-          <p className="font-medium">Adres:</p>
-          <p className="print:text-black">{supplier.address || '-'}</p>
-          <p className="font-medium">Vergi Numarası:</p>
-          <p className="print:text-black">{supplier.taxNumber || '-'}</p>
           <p className="font-medium">Toplam Satın Alma:</p>
           <p className="print:text-black">{formatCurrency(totalPurchases, 'TRY')}</p>
           <p className="font-medium">Toplam Ödeme:</p>
@@ -220,7 +212,6 @@ export default function ExtractPage({ params }: ExtractPageProps) {
                 <TableHead className="text-right print:text-black">Tutar</TableHead>
                 <TableHead className="print:text-black">Açıklama</TableHead>
                 <TableHead className="print:text-black">Ödeme Yöntemi</TableHead>
-                <TableHead className="print:text-black">Referans No / Çek No</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -247,15 +238,11 @@ export default function ExtractPage({ params }: ExtractPageProps) {
                         item.method === 'cek' ? 'Çek' : 'Diğer'
                       ) : '-'}
                     </TableCell>
-                    <TableCell className="print:text-black">
-                      {'referenceNumber' in item && item.referenceNumber ? item.referenceNumber :
-                       'checkSerialNumber' in item && item.checkSerialNumber ? item.checkSerialNumber : '-'}
-                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4 print:text-black">
+                  <TableCell colSpan={5} className="text-center py-4 print:text-black">
                     Bu tedarikçi için herhangi bir işlem bulunamadı.
                   </TableCell>
                 </TableRow>
