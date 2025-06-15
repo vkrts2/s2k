@@ -1,135 +1,420 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { getPayments, getCustomerById } from '@/lib/storage';
-import type { Payment, Customer, Currency } from '@/lib/types';
-import { format, parseISO, isValid } from 'date-fns';
-import { tr } from 'date-fns/locale';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { PlusCircle, Edit, Trash2, CalendarIcon } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { tr } from "date-fns/locale";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
-// Currency formatting utility (reused from extract page)
-const formatCurrency = (amount?: number, currency?: Currency): string => {
-  if (typeof amount !== 'number' || isNaN(amount)) {
-    amount = 0;
-  }
-  const resolvedCurrency = currency || 'TRY';
-  try {
-    return amount.toLocaleString('tr-TR', { style: 'currency', currency: resolvedCurrency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  } catch (e) {
-    console.error("Error formatting currency:", amount, resolvedCurrency, e);
-    let symbol: string = resolvedCurrency;
-    if (resolvedCurrency === 'TRY') symbol = '₺';
-    else if (resolvedCurrency === 'USD') symbol = '$';
-    return `${symbol}${amount.toFixed(2)}`;
-  }
-};
-
-// Date formatting utility (reused from extract page)
-const safeFormatDate = (dateString?: string | null, formatString: string = 'dd.MM.yyyy') => {
-  if (!dateString) return '-';
-  const date = parseISO(dateString);
-  return isValid(date) ? format(date, formatString, { locale: tr }) : 'Geçersiz Tarih';
-};
+interface Check {
+  id: string;
+  checkNumber: string;
+  bankName: string;
+  branchName: string;
+  accountNumber: string;
+  amount: number;
+  issueDate: Date;
+  dueDate: Date;
+  status: 'pending' | 'cleared' | 'bounced' | 'cancelled';
+  partyName: string;
+  partyType: 'customer' | 'supplier';
+  description?: string;
+}
 
 export default function CheckManagementPage() {
-  const { user } = useAuth();
-  const [checkPayments, setCheckPayments] = useState<Array<Payment & { customerName: string }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [checks, setChecks] = useState<Check[]>([]);
+  const [showCheckModal, setShowCheckModal] = useState(false);
+  const [editingCheck, setEditingCheck] = useState<Check | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Form state
+  const [checkNumber, setCheckNumber] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [branchName, setBranchName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [amount, setAmount] = useState("");
+  const [issueDate, setIssueDate] = useState<Date>();
+  const [dueDate, setDueDate] = useState<Date>();
+  const [status, setStatus] = useState<Check['status']>('pending');
+  const [partyName, setPartyName] = useState("");
+  const [partyType, setPartyType] = useState<'customer' | 'supplier'>('customer');
+  const [description, setDescription] = useState("");
 
   useEffect(() => {
-    if (!user) {
-      setError("Kullanıcı oturumu bulunamadı. Lütfen giriş yapın.");
-      setLoading(false);
+    // Load checks from localStorage
+    const savedChecks = localStorage.getItem('ermay_checks');
+    if (savedChecks) {
+      setChecks(JSON.parse(savedChecks));
+    }
+  }, []);
+
+  const saveChecks = (newChecks: Check[]) => {
+    localStorage.setItem('ermay_checks', JSON.stringify(newChecks));
+    setChecks(newChecks);
+  };
+
+  const handleAddCheck = () => {
+    if (!checkNumber || !bankName || !amount || !issueDate || !dueDate || !partyName) {
+      toast({
+        title: "Hata",
+        description: "Lütfen tüm zorunlu alanları doldurun.",
+        variant: "destructive",
+      });
       return;
     }
 
-    const fetchCheckPayments = async () => {
-      try {
-        setLoading(true);
-        const allPayments = await getPayments(user.uid);
-        const filteredCheckPayments = allPayments.filter(payment => payment.method === 'cek');
-
-        const paymentsWithCustomerNames = await Promise.all(
-          filteredCheckPayments.map(async (payment) => {
-            const customer = await getCustomerById(user.uid, payment.customerId);
-            return {
-              ...payment,
-              customerName: customer ? customer.name : 'Bilinmeyen Müşteri',
-            };
-          })
-        );
-        setCheckPayments(paymentsWithCustomerNames);
-      } catch (err) {
-        console.error("Çek ödemeleri çekilirken hata oluştu:", err);
-        setError("Çek ödemeleri yüklenirken bir hata oluştu.");
-      } finally {
-        setLoading(false);
-      }
+    const newCheck: Check = {
+      id: Date.now().toString(),
+      checkNumber,
+      bankName,
+      branchName,
+      accountNumber,
+      amount: parseFloat(amount),
+      issueDate: issueDate,
+      dueDate: dueDate,
+      status,
+      partyName,
+      partyType,
+      description,
     };
 
-    fetchCheckPayments();
-  }, [user]);
+    saveChecks([...checks, newCheck]);
+    setShowCheckModal(false);
+    resetForm();
+    toast({
+      title: "Başarılı",
+      description: "Çek başarıyla eklendi.",
+    });
+  };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <p className="ml-2">Çek ödemeleri yükleniyor...</p>
-      </div>
-    );
-  }
+  const handleEditCheck = (check: Check) => {
+    setEditingCheck(check);
+    setCheckNumber(check.checkNumber);
+    setBankName(check.bankName);
+    setBranchName(check.branchName);
+    setAccountNumber(check.accountNumber);
+    setAmount(check.amount.toString());
+    setIssueDate(new Date(check.issueDate));
+    setDueDate(new Date(check.dueDate));
+    setStatus(check.status);
+    setPartyName(check.partyName);
+    setPartyType(check.partyType);
+    setDescription(check.description || "");
+    setShowCheckModal(true);
+  };
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen text-red-500">
-        <p>{error}</p>
-      </div>
+  const handleUpdateCheck = () => {
+    if (!editingCheck) return;
+
+    const updatedChecks = checks.map(check =>
+      check.id === editingCheck.id
+        ? {
+            ...check,
+            checkNumber,
+            bankName,
+            branchName,
+            accountNumber,
+            amount: parseFloat(amount),
+            issueDate: issueDate!,
+            dueDate: dueDate!,
+            status,
+            partyName,
+            partyType,
+            description,
+          }
+        : check
     );
-  }
+
+    saveChecks(updatedChecks);
+    setShowCheckModal(false);
+    resetForm();
+    toast({
+      title: "Başarılı",
+      description: "Çek başarıyla güncellendi.",
+    });
+  };
+
+  const handleDeleteCheck = (checkId: string) => {
+    const updatedChecks = checks.filter(check => check.id !== checkId);
+    saveChecks(updatedChecks);
+    toast({
+      title: "Başarılı",
+      description: "Çek başarıyla silindi.",
+    });
+  };
+
+  const resetForm = () => {
+    setEditingCheck(null);
+    setCheckNumber("");
+    setBankName("");
+    setBranchName("");
+    setAccountNumber("");
+    setAmount("");
+    setIssueDate(undefined);
+    setDueDate(undefined);
+    setStatus('pending');
+    setPartyName("");
+    setPartyType('customer');
+    setDescription("");
+  };
+
+  const filteredChecks = checks.filter(check =>
+    check.checkNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    check.bankName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    check.partyName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      <h1 className="text-3xl font-bold mb-6">Çek Yönetimi</h1>
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">Çek Yönetimi</h2>
+        <Dialog open={showCheckModal} onOpenChange={setShowCheckModal}>
+          <DialogTrigger asChild>
+            <Button onClick={() => { setEditingCheck(null); resetForm(); setShowCheckModal(true); }}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Yeni Çek
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>{editingCheck ? "Çek Düzenle" : "Yeni Çek Ekle"}</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="checkNumber">Çek Numarası</Label>
+                  <Input
+                    id="checkNumber"
+                    value={checkNumber}
+                    onChange={(e) => setCheckNumber(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bankName">Banka Adı</Label>
+                  <Input
+                    id="bankName"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="branchName">Şube Adı</Label>
+                  <Input
+                    id="branchName"
+                    value={branchName}
+                    onChange={(e) => setBranchName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="accountNumber">Hesap Numarası</Label>
+                  <Input
+                    id="accountNumber"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Tutar</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Durum</Label>
+                  <Select value={status} onValueChange={(value: Check['status']) => setStatus(value)}>
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Durum seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Beklemede</SelectItem>
+                      <SelectItem value="cleared">Tahsil Edildi</SelectItem>
+                      <SelectItem value="bounced">Karşılıksız</SelectItem>
+                      <SelectItem value="cancelled">İptal Edildi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="issueDate">Keşide Tarihi</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !issueDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {issueDate ? format(issueDate, "PPP", { locale: tr }) : "Tarih seçin"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={issueDate}
+                        onSelect={setIssueDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dueDate">Vade Tarihi</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !dueDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dueDate ? format(dueDate, "PPP", { locale: tr }) : "Tarih seçin"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={dueDate}
+                        onSelect={setDueDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="partyType">Taraf Tipi</Label>
+                  <Select value={partyType} onValueChange={(value: 'customer' | 'supplier') => setPartyType(value)}>
+                    <SelectTrigger id="partyType">
+                      <SelectValue placeholder="Taraf tipi seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="customer">Müşteri</SelectItem>
+                      <SelectItem value="supplier">Tedarikçi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="partyName">Taraf Adı</Label>
+                  <Input
+                    id="partyName"
+                    value={partyName}
+                    onChange={(e) => setPartyName(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Açıklama</Label>
+                <Input
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCheckModal(false)}>
+                İptal
+              </Button>
+              <Button onClick={editingCheck ? handleUpdateCheck : handleAddCheck}>
+                {editingCheck ? "Güncelle" : "Ekle"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Müşteri Çekleri</CardTitle>
+          <CardTitle>Çekler</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Müşteri Adı</TableHead>
-                <TableHead>Tutar</TableHead>
-                <TableHead>Tarih</TableHead>
-                <TableHead>Çek Tarihi</TableHead>
-                <TableHead>Çek Seri No</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {checkPayments.length > 0 ? (
-                checkPayments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{payment.customerName}</TableCell>
-                    <TableCell>{formatCurrency(payment.amount, payment.currency)}</TableCell>
-                    <TableCell>{safeFormatDate(payment.date)}</TableCell>
-                    <TableCell>{safeFormatDate(payment.checkDate)}</TableCell>
-                    <TableCell>{payment.checkSerialNumber || '-'}</TableCell>
-                  </TableRow>
-                ))
-              ) : (
+          <div className="mb-4">
+            <Input
+              placeholder="Çek ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-4">
-                    Henüz kaydedilmiş çek ödemesi bulunmamaktadır.
-                  </TableCell>
+                  <TableHead>Çek No</TableHead>
+                  <TableHead>Banka</TableHead>
+                  <TableHead>Tutar</TableHead>
+                  <TableHead>Vade Tarihi</TableHead>
+                  <TableHead>Durum</TableHead>
+                  <TableHead>Taraf</TableHead>
+                  <TableHead>İşlemler</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredChecks.map((check) => (
+                  <TableRow key={check.id}>
+                    <TableCell>{check.checkNumber}</TableCell>
+                    <TableCell>{check.bankName}</TableCell>
+                    <TableCell>{check.amount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</TableCell>
+                    <TableCell>{format(new Date(check.dueDate), "dd MMMM yyyy", { locale: tr })}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        check.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        check.status === 'cleared' ? 'bg-green-100 text-green-800' :
+                        check.status === 'bounced' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {check.status === 'pending' ? 'Beklemede' :
+                         check.status === 'cleared' ? 'Tahsil Edildi' :
+                         check.status === 'bounced' ? 'Karşılıksız' :
+                         'İptal Edildi'}
+                      </span>
+                    </TableCell>
+                    <TableCell>{check.partyName}</TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditCheck(check)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteCheck(check.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

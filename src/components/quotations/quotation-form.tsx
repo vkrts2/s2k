@@ -38,6 +38,7 @@ import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 
 // 1. Adım: Form Giriş Değerleri İçin Zod Şeması (string olarak tutulur)
 const quotationItemInputSchema = z.object({

@@ -1,7 +1,7 @@
 // src/lib/types.ts
 import type { LucideIcon } from "lucide-react";
 
-export type Currency = "USD" | "TRY";
+export type Currency = "USD" | "TRY" | "EUR";
 
 export interface Price {
   amount: number;
@@ -296,6 +296,11 @@ export interface StockItem {
   name: string;
   description?: string;
   unit?: string;
+  currentStock: number;
+  salePrice?: {
+    amount: number;
+    currency: Currency;
+  };
   createdAt: string;
   updatedAt: string;
 }

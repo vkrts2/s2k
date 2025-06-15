@@ -19,10 +19,23 @@ import {
 import { cn } from "@/lib/utils";
 import type { StockItem } from "@/lib/types";
 import { Save } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const stockItemFormSchema = z.object({
   name: z.string().min(2, "Ürün adı en az 2 karakter olmalıdır."),
   description: z.string().optional(),
+  unit: z.string().optional(),
+  currentStock: z.number().min(0, "Stok miktarı 0'dan küçük olamaz."),
+  salePrice: z.object({
+    amount: z.number().min(0, "Fiyat 0'dan küçük olamaz."),
+    currency: z.enum(["TRY", "USD", "EUR"]),
+  }).optional(),
 });
 
 type StockItemFormValues = z.infer<typeof stockItemFormSchema>;
@@ -42,9 +55,15 @@ export function StockForm({
 
   const form = useForm<StockItemFormValues>({
     resolver: zodResolver(stockItemFormSchema),
-    defaultValues: {
-      name: initialData?.name || "",
-      description: initialData?.description || "",
+    defaultValues: initialData || {
+      name: "",
+      description: "",
+      unit: "",
+      currentStock: 0,
+      salePrice: {
+        amount: 0,
+        currency: "TRY",
+      },
     },
   });
 
@@ -54,8 +73,9 @@ export function StockForm({
     const stockDataToSubmitBase: Omit<StockItem, 'id' | 'createdAt' | 'updatedAt'> = {
       name: data.name,
       description: data.description,
-      currentStock: 0,
-      unit: "adet",
+      currentStock: data.currentStock,
+      unit: data.unit,
+      salePrice: data.salePrice,
     };
 
     const stockDataToSubmit = initialData
@@ -68,6 +88,12 @@ export function StockForm({
         form.reset({
           name: "",
           description: "",
+          unit: "",
+          currentStock: 0,
+          salePrice: {
+            amount: 0,
+            currency: "TRY",
+          },
         });
       }
     } catch (error) {
@@ -90,25 +116,108 @@ export function StockForm({
             <FormItem>
               <FormLabel>Ürün Adı</FormLabel>
               <FormControl>
-                <Input placeholder="Örn: Kumaş A, Fermuar Tip B" {...field} />
+                <Input placeholder="Ürün adını girin" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Açıklama (İsteğe Bağlı)</FormLabel>
+              <FormLabel>Açıklama</FormLabel>
               <FormControl>
-                <Textarea placeholder="Ürün hakkında detaylı bilgi" {...field} rows={3}/>
+                <Textarea placeholder="Ürün açıklaması" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
+
+        <FormField
+          control={form.control}
+          name="unit"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Birim</FormLabel>
+              <FormControl>
+                <Input placeholder="Adet, kg, lt vb." {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="currentStock"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Mevcut Stok</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  min="0" 
+                  placeholder="0" 
+                  {...field} 
+                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Satış Fiyatı</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="salePrice.amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fiyat</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      placeholder="0.00" 
+                      {...field} 
+                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="salePrice.currency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Para Birimi</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Para birimi seçin" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="TRY">₺ - Türk Lirası</SelectItem>
+                      <SelectItem value="USD">$ - Amerikan Doları</SelectItem>
+                      <SelectItem value="EUR">€ - Euro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
 
         <div className="flex justify-end pt-2">
           <Button type="submit" disabled={isSubmitting}>

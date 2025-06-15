@@ -1,221 +1,221 @@
 // src/app/quotations/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import type { Quotation, PortfolioItem, Customer } from "@/lib/types";
-import {
-  getQuotations,
-  addQuotation as storageAddQuotation,
-  updateQuotation as storageUpdateQuotation,
-  deleteQuotation as storageDeleteQuotation,
-  getCustomers, // Müşteri seçmek için
-} from "@/lib/storage";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, FileText } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { PlusCircle, Edit, Trash2, CalendarIcon, FileText, Printer } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { QuotationList } from "@/components/quotations/quotation-list";
-import { QuotationForm, QuotationFormOutputValues } from "@/components/quotations/quotation-form";
-import { formatISO } from "date-fns";
+import { format } from "date-fns";
+import { tr } from "date-fns/locale";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { QuotationForm } from "@/components/quotations/quotation-form";
+
+interface Quotation {
+  id: string;
+  quotationNumber: string;
+  customerName: string;
+  customerId: string;
+  date: Date;
+  validUntil: Date;
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+  totalAmount: number;
+  currency: string;
+  items: QuotationItem[];
+  notes?: string;
+}
+
+interface QuotationItem {
+  id: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
 
 export default function QuotationsPage() {
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showFormModal, setShowFormModal] = useState(false);
-  const [editingQuotation, setEditingQuotation] = useState<Quotation | undefined>(undefined);
-  const [deletingQuotationId, setDeletingQuotationId] = useState<string | null>(null);
-
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
-
-  const loadData = useCallback(async () => {
-    console.log("loadData: Initializing. user:", user, "authLoading:", authLoading);
-    if (!user || authLoading) {
-      setIsLoading(false);
-      console.log("loadData: User not available or auth loading. Skipping data load.");
-      return;
-    }
-    setIsLoading(true);
-    try {
-      console.log("loadData: Attempting to fetch quotations for user.uid:", user.uid);
-      const loadedQuotations = await getQuotations(user.uid);
-      console.log("loadData: fetched quotations received:", loadedQuotations);
-      setQuotations(loadedQuotations);
-
-      console.log("loadData: Attempting to fetch customers for user.uid:", user.uid);
-      const loadedCustomers = await getCustomers(user.uid); // Müşteri seçimi için
-      console.log("loadData: fetched customers received:", loadedCustomers);
-      setCustomers(loadedCustomers);
-      document.title = "Fiyat Teklifleri | ERMAY";
-    } catch (error) {
-      console.error("Error loading quotations data:", error);
-      toast({
-        title: "Veri Yükleme Hatası",
-        description: "Fiyat teklifleri veya müşteri verileri yüklenirken bir sorun oluştu.",
-        variant: "destructive",
-      });
-      setQuotations([]);
-      setCustomers([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast, user, authLoading]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [showQuotationModal, setShowQuotationModal] = useState(false);
+  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-        loadData();
+    // Load quotations from localStorage
+    const savedQuotations = localStorage.getItem('ermay_quotations');
+    if (savedQuotations) {
+      setQuotations(JSON.parse(savedQuotations));
     }
-  }, [loadData, authLoading, user]);
+  }, []);
 
-  const handleFormSubmit = useCallback(
-    async (data: QuotationFormOutputValues) => {
-      if (!user) {
-        toast({
-          title: "Yetkilendirme Hatası",
-          description: "İşlem yapmak için giriş yapmış olmalısınız.",
-          variant: "destructive",
-        });
-        return;
-      }
+  const saveQuotations = (newQuotations: Quotation[]) => {
+    localStorage.setItem('ermay_quotations', JSON.stringify(newQuotations));
+    setQuotations(newQuotations);
+  };
 
-      // Tarihleri ISO string formatına dönüştür
-      const dataToSubmit = {
-        ...data,
-        date: formatISO(data.date), // Convert Date to ISO string
-        validUntilDate: data.validUntilDate ? formatISO(data.validUntilDate) : undefined, // Convert Date to ISO string if exists
-      };
+  const handleAddQuotation = (quotation: Quotation) => {
+    saveQuotations([...quotations, quotation]);
+    setShowQuotationModal(false);
+    toast({
+      title: "Başarılı",
+      description: "Fiyat teklifi başarıyla eklendi.",
+    });
+  };
 
-      let savedQuotation: Quotation;
-      if ('id' in dataToSubmit && dataToSubmit.id) { // Editing existing quotation
-        savedQuotation = await storageUpdateQuotation(user.uid, dataToSubmit as Quotation);
-      } else { // Adding new quotation
-        savedQuotation = await storageAddQuotation(user.uid, dataToSubmit as Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>);
-      }
-      setShowFormModal(false);
-      setEditingQuotation(undefined);
-      toast({
-        title: editingQuotation ? "Fiyat Teklifi Güncellendi" : "Fiyat Teklifi Eklendi",
-        description: `${savedQuotation.quotationNumber} numaralı teklif başarıyla ${editingQuotation ? 'güncellendi' : 'kaydedildi'}.`,
-      });
-      loadData(); 
-    },
-    [editingQuotation, toast, loadData, user]
+  const handleEditQuotation = (quotation: Quotation) => {
+    setEditingQuotation(quotation);
+    setShowQuotationModal(true);
+  };
+
+  const handleUpdateQuotation = (updatedQuotation: Quotation) => {
+    const newQuotations = quotations.map(quotation =>
+      quotation.id === updatedQuotation.id ? updatedQuotation : quotation
+    );
+    saveQuotations(newQuotations);
+    setShowQuotationModal(false);
+    toast({
+      title: "Başarılı",
+      description: "Fiyat teklifi başarıyla güncellendi.",
+    });
+  };
+
+  const handleDeleteQuotation = (quotationId: string) => {
+    const updatedQuotations = quotations.filter(quotation => quotation.id !== quotationId);
+    saveQuotations(updatedQuotations);
+    toast({
+      title: "Başarılı",
+      description: "Fiyat teklifi başarıyla silindi.",
+    });
+  };
+
+  const handlePrintQuotation = (quotation: Quotation) => {
+    // TODO: Implement print functionality
+    toast({
+      title: "Bilgi",
+      description: "Yazdırma özelliği yakında eklenecek.",
+    });
+  };
+
+  const filteredQuotations = quotations.filter(quotation =>
+    quotation.quotationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    quotation.customerName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const openAddModal = () => {
-    setEditingQuotation(undefined);
-    setShowFormModal(true);
-  };
-
-  const openEditModal = (quotation: Quotation) => {
-    setEditingQuotation(quotation);
-    setShowFormModal(true);
-  };
-
-  const openDeleteConfirmDialog = (quotationId: string) => {
-    setDeletingQuotationId(quotationId);
-  };
-
-  const handleDelete = useCallback(async () => {
-    if (!deletingQuotationId) return;
-    if (!user) {
-      toast({
-        title: "Yetkilendirme Hatası",
-        description: "İşlem yapmak için giriş yapmış olmalısınız.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const quotationToDelete = quotations.find(q => q.id === deletingQuotationId);
-    await storageDeleteQuotation(user.uid, deletingQuotationId);
-    toast({
-      title: "Fiyat Teklifi Silindi",
-      description: `"${quotationToDelete?.quotationNumber || 'Seçili'}" numaralı teklif başarıyla silindi.`,
-    });
-    setDeletingQuotationId(null);
-    loadData();
-  }, [deletingQuotationId, quotations, loadData, toast, user]);
-
-  if (isLoading || authLoading) {
-    return <div className="flex justify-center items-center h-full"><p>Fiyat teklifleri yükleniyor...</p></div>;
-  }
-
-  console.log("Rendering QuotationsPage. Current quotations state:", quotations);
-  console.log("Rendering QuotationsPage. Current customers state:", customers);
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight flex items-center">
-          <FileText className="mr-3 h-8 w-8 text-primary" />
-          Fiyat Teklifleri
-        </h1>
-        <Button onClick={openAddModal}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Yeni Fiyat Teklifi Oluştur
-        </Button>
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">Fiyat Teklifleri</h2>
+        <Dialog open={showQuotationModal} onOpenChange={setShowQuotationModal}>
+          <DialogTrigger asChild>
+            <Button onClick={() => { setEditingQuotation(null); setShowQuotationModal(true); }}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Yeni Teklif
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[800px]">
+            <DialogHeader>
+              <DialogTitle>{editingQuotation ? "Teklif Düzenle" : "Yeni Teklif"}</DialogTitle>
+            </DialogHeader>
+            <QuotationForm
+              onSubmit={editingQuotation ? handleUpdateQuotation : handleAddQuotation}
+              initialData={editingQuotation}
+              onCancel={() => setShowQuotationModal(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <Dialog open={showFormModal} onOpenChange={(isOpen) => {
-        setShowFormModal(isOpen);
-        if (!isOpen) setEditingQuotation(undefined);
-      }}>
-        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto"> {/* Form daha geniş olabilir ve kaydırılabilir */}
-          <DialogHeader>
-            <DialogTitle>{editingQuotation ? "Fiyat Teklifini Düzenle" : "Yeni Fiyat Teklifi Oluştur"}</DialogTitle>
-            <DialogDescription>
-              {editingQuotation ? "Teklif bilgilerini güncelleyin." : "Yeni teklif için bilgileri girin."}
-            </DialogDescription>
-          </DialogHeader>
-          <QuotationForm
-            onSubmit={handleFormSubmit}
-            initialData={editingQuotation}
-            customers={customers}
-            className="border-0 p-0 shadow-none"
-          />
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={!!deletingQuotationId} onOpenChange={(isOpen) => { if(!isOpen) setDeletingQuotationId(null);}}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Emin misiniz?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu işlem geri alınamaz. Bu fiyat teklifi kalıcı olarak silinecektir.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeletingQuotationId(null)}>İptal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-              Sil
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <QuotationList
-        quotations={quotations}
-        onEdit={openEditModal}
-        onDelete={openDeleteConfirmDialog}
-        isLoading={isLoading}
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Teklifler</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <Input
+              placeholder="Teklif ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Teklif No</TableHead>
+                  <TableHead>Müşteri</TableHead>
+                  <TableHead>Tarih</TableHead>
+                  <TableHead>Geçerlilik</TableHead>
+                  <TableHead>Tutar</TableHead>
+                  <TableHead>Durum</TableHead>
+                  <TableHead>İşlemler</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredQuotations.map((quotation) => (
+                  <TableRow key={quotation.id}>
+                    <TableCell>{quotation.quotationNumber}</TableCell>
+                    <TableCell>{quotation.customerName}</TableCell>
+                    <TableCell>{format(new Date(quotation.date), "dd MMMM yyyy", { locale: tr })}</TableCell>
+                    <TableCell>{format(new Date(quotation.validUntil), "dd MMMM yyyy", { locale: tr })}</TableCell>
+                    <TableCell>
+                      {quotation.totalAmount.toLocaleString('tr-TR', {
+                        style: 'currency',
+                        currency: quotation.currency
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        quotation.status === 'draft' ? 'bg-gray-100 text-gray-800' :
+                        quotation.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                        quotation.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                        quotation.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {quotation.status === 'draft' ? 'Taslak' :
+                         quotation.status === 'sent' ? 'Gönderildi' :
+                         quotation.status === 'accepted' ? 'Kabul Edildi' :
+                         quotation.status === 'rejected' ? 'Reddedildi' :
+                         'Süresi Doldu'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handlePrintQuotation(quotation)}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditQuotation(quotation)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteQuotation(quotation.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

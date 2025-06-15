@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import {
   Table,
@@ -11,10 +11,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Edit, Trash2 } from "lucide-react";
+import { Users, Edit, Trash2, Search } from "lucide-react";
 import type { Customer, Sale, Payment, Currency } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface CustomerListProps {
   customers: Customer[];
@@ -55,7 +56,9 @@ export function CustomerList({
   onDelete,
   title = "Tüm Müşteriler",
 }: CustomerListProps) {
-  if (customers.length === 0) {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  if (customers.length === 0 && !isLoading && searchTerm === "") {
     return (
       <Card>
         <CardHeader>
@@ -85,66 +88,95 @@ export function CustomerList({
     return balances;
   };
 
+  const filteredCustomers = customers.filter(customer =>
+    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.phone?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <Card className="shadow-sm">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="flex items-center space-x-2 mb-4">
+          <Input
+            placeholder="Müşteri ara..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
+          <Search className="h-4 w-4 text-muted-foreground" />
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Müşteri Adı</TableHead>
+              <TableHead>E-posta</TableHead>
+              <TableHead>Telefon</TableHead>
               <TableHead className="text-right">Bakiye (TRY)</TableHead>
               <TableHead className="text-right">Bakiye (USD)</TableHead>
               <TableHead className="text-right w-[150px]">Eylemler</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {customers.map((customer) => {
-              const balances = calculateBalancesForCustomer(customer.id);
-              return (
-                <TableRow key={customer.id}>
-                  <TableCell className="font-medium">
-                    <Link href={`/customers/${customer.id}`} className="hover:underline text-primary">
-                      {customer.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className={cn(
-                      "text-right font-mono",
-                      balances.TRY > 0 ? "text-green-600" : balances.TRY < 0 ? "text-red-600" : ""
-                    )}>
-                    {formatCurrency(balances.TRY, "TRY")}
-                  </TableCell>
-                  <TableCell className={cn(
-                      "text-right font-mono",
-                      balances.USD > 0 ? "text-green-600" : balances.USD < 0 ? "text-red-600" : ""
-                    )}>
-                    {formatCurrency(balances.USD, "USD")}
-                  </TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-primary"
-                      onClick={() => onEdit(customer)}
-                      title="Düzenle"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => onDelete(customer.id)}
-                      title="Sil"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center">Yükleniyor...</TableCell>
+              </TableRow>
+            ) : filteredCustomers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center">Müşteri bulunamadı.</TableCell>
+              </TableRow>
+            ) : (
+              filteredCustomers.map((customer) => {
+                const balances = calculateBalancesForCustomer(customer.id);
+                return (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">
+                      <Link href={`/customers/${customer.id}`} className="hover:underline text-primary">
+                        {customer.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{customer.email}</TableCell>
+                    <TableCell>{customer.phone}</TableCell>
+                    <TableCell className={cn(
+                        "text-right font-mono",
+                        balances.TRY > 0 ? "text-green-600" : balances.TRY < 0 ? "text-red-600" : ""
+                      )}>
+                      {formatCurrency(balances.TRY, "TRY")}
+                    </TableCell>
+                    <TableCell className={cn(
+                        "text-right font-mono",
+                        balances.USD > 0 ? "text-green-600" : balances.USD < 0 ? "text-red-600" : ""
+                      )}>
+                      {formatCurrency(balances.USD, "USD")}
+                    </TableCell>
+                    <TableCell className="text-right space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={() => onEdit(customer)}
+                        title="Düzenle"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => onDelete(customer.id)}
+                        title="Sil"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </CardContent>

@@ -2,7 +2,7 @@
 // src/app/page.tsx
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Truck, Settings, Calculator, AreaChart, CheckSquare, Briefcase, FolderArchive, LinkIcon, Package, FileText, ReceiptText, Search, BarChart3 } from 'lucide-react';
+import { Users, Truck, Settings, Calculator, AreaChart, CheckSquare, Briefcase, FolderArchive, LinkIcon, Package, FileText, ReceiptText, Search, BarChart3, TrendingUp, DollarSign } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
@@ -19,10 +19,40 @@ const navItems = [
     icon: <Truck className="h-8 w-8 mb-2 text-primary" />,
   },
   {
-    href: '/stock',
-    label: 'Stok Yönetimi',
-    description: 'Stok kalemlerinizi takip edin.',
+    href: '/products',
+    label: 'Ürünler',
+    description: 'Ürün kalemlerinizi yönetin.',
     icon: <Package className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
+    href: '/stock-movements',
+    label: 'Stok Hareketleri',
+    description: 'Ürün giriş ve çıkışlarını takip edin.',
+    icon: <TrendingUp className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
+    href: '/payment-movements',
+    label: 'Ödeme Hareketleri',
+    description: 'Gelen ve giden ödemeleri takip edin.',
+    icon: <DollarSign className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
+    href: '/sales',
+    label: 'Satışlar',
+    description: 'Satış işlemlerinizi yönetin ve takip edin.',
+    icon: <ReceiptText className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
+    href: '/purchases',
+    label: 'Alışlar',
+    description: 'Alış işlemlerinizi yönetin ve takip edin.',
+    icon: <ReceiptText className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
+    href: '/invoices',
+    label: 'Faturalar',
+    description: 'Fatura ve makbuzlarınızı oluşturun ve yönetin.',
+    icon: <FileText className="h-8 w-8 mb-2 text-primary" />,
   },
   {
     href: '/calculator',

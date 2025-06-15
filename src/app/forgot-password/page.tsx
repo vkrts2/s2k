@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,31 +8,30 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { auth } from "@/lib/firebase"; // Firebase auth instance
+import { sendPasswordResetEmail } from "firebase/auth";
 
-export default function RegisterPage() {
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { signUp } = useAuth();
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await signUp(email, password);
+      await sendPasswordResetEmail(auth, email);
       toast({
-        title: "Kayıt Başarılı",
-        description: "Hesabınız başarıyla oluşturuldu. Şimdi giriş yapabilirsiniz.",
+        title: "E-posta Gönderildi",
+        description: "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Lütfen gelen kutunuzu kontrol edin.",
       });
-      router.push('/login'); // Redirect to login page after successful registration
+      setEmail(''); // Clear email field after sending
     } catch (error: any) {
-      console.error("Kayıt hatası:", error);
+      console.error("Şifre sıfırlama hatası:", error);
       toast({
-        title: "Kayıt Başarısız",
-        description: error.message || "Kayıt olurken bir hata oluştu.",
+        title: "Hata",
+        description: error.message || "Şifre sıfırlama e-postası gönderilirken bir hata oluştu.",
         variant: "destructive",
       });
     } finally {
@@ -44,11 +43,11 @@ export default function RegisterPage() {
     <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Kayıt Ol</CardTitle>
-          <CardDescription>Yeni bir hesap oluşturmak için e-posta ve şifrenizi girin.</CardDescription>
+          <CardTitle className="text-2xl">Şifreyi Sıfırla</CardTitle>
+          <CardDescription>E-posta adresinizi girin ve size şifre sıfırlama bağlantısı göndereceğiz.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleRegister} className="grid gap-4">
+          <form onSubmit={handleResetPassword} className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email">E-posta</Label>
               <Input
@@ -60,25 +59,15 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Şifre</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Kaydolunuyor..." : "Kaydol"}
+              {loading ? "Gönderiliyor..." : "Şifre Sıfırlama E-postası Gönder"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
-            Zaten bir hesabınız var mı?{" "}
+            Giriş sayfasına geri dönmek için{" "}
             <Link href="/login" className="underline">
-              Giriş Yap
-            </Link>
+              tıklayın
+            </Link>.
           </div>
         </CardContent>
       </Card>

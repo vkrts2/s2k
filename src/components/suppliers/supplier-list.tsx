@@ -68,7 +68,10 @@ export function SupplierList({
 
   const filteredAndSortedSuppliers = React.useMemo(() => {
     let filtered = suppliers.filter(supplier =>
-      supplier.name.toLowerCase().includes(searchQuery.toLowerCase())
+      supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      supplier.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      supplier.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      supplier.address?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return filtered.sort((a, b) => {
@@ -82,7 +85,7 @@ export function SupplierList({
         return sortDirection === "asc" ? balanceA - balanceB : balanceB - balanceA;
       }
     });
-  }, [suppliers, searchQuery, sortField, sortDirection]);
+  }, [suppliers, searchQuery, sortField, sortDirection, calculateBalancesForSupplier]);
 
   if (isLoading) {
     return (
@@ -97,7 +100,7 @@ export function SupplierList({
     );
   }
 
-  if (suppliers.length === 0) {
+  if (suppliers.length === 0 && searchQuery === "") {
     return (
       <Card>
         <CardHeader>
@@ -145,6 +148,9 @@ export function SupplierList({
               >
                 Tedarikçi Adı {sortField === "name" && (sortDirection === "asc" ? "↑" : "↓")}
               </TableHead>
+              <TableHead>E-posta</TableHead>
+              <TableHead>Telefon</TableHead>
+              <TableHead>Adres</TableHead>
               <TableHead 
                 className="text-right cursor-pointer"
                 onClick={() => {
@@ -162,56 +168,65 @@ export function SupplierList({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAndSortedSuppliers.map((supplier) => {
-              const balances = calculateBalancesForSupplier(supplier.id);
-              const defaultCurrency = supplier.defaultCurrency || 'TRY';
-              const displayBalance = balances[defaultCurrency];
+            {filteredAndSortedSuppliers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center">Tedarikçi bulunamadı.</TableCell>
+              </TableRow>
+            ) : (
+              filteredAndSortedSuppliers.map((supplier) => {
+                const balances = calculateBalancesForSupplier(supplier.id);
+                const defaultCurrency = supplier.defaultCurrency || 'TRY';
+                const displayBalance = balances[defaultCurrency];
 
-              return (
-                <TableRow key={supplier.id}>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/suppliers/${supplier.id}`}
-                      className="text-primary hover:text-primary/80 transition-colors"
-                    >
-                      {supplier.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className={cn(
-                    "text-right font-mono",
-                    displayBalance > 0 ? "text-red-600" : displayBalance < 0 ? "text-green-600" : ""
-                  )}>
-                    {formatCurrency(displayBalance, defaultCurrency)}
-                  </TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-primary"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        onEdit(supplier);
-                      }}
-                      title="Düzenle"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        onDelete(supplier.id);
-                      }}
-                      title="Sil"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                return (
+                  <TableRow key={supplier.id}>
+                    <TableCell className="font-medium">
+                      <Link
+                        href={`/suppliers/${supplier.id}`}
+                        className="text-primary hover:text-primary/80 transition-colors"
+                      >
+                        {supplier.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{supplier.email}</TableCell>
+                    <TableCell>{supplier.phone}</TableCell>
+                    <TableCell>{supplier.address}</TableCell>
+                    <TableCell className={cn(
+                      "text-right font-mono",
+                      displayBalance > 0 ? "text-red-600" : displayBalance < 0 ? "text-green-600" : ""
+                    )}>
+                      {formatCurrency(displayBalance, defaultCurrency)}
+                    </TableCell>
+                    <TableCell className="text-right space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          onEdit(supplier);
+                        }}
+                        title="Düzenle"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          onDelete(supplier.id);
+                        }}
+                        title="Sil"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </CardContent>
