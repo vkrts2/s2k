@@ -62,10 +62,10 @@
     "zod": "^3.25.62"
   },
   "devDependencies": {
+    "@types/date-fns": "^2.6.0",
     "@types/node": "^20",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
-    "@types/date-fns": "^2.6.0",
     "@types/recharts": "^1.8.29",
     "genkit-cli": "^1.8.0",
     "postcss": "^8",

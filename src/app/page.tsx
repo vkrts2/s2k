@@ -2,7 +2,7 @@
 // src/app/page.tsx
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Truck, Settings, Calculator, AreaChart, CheckSquare, Briefcase, FolderArchive, LinkIcon, Package, FileText, ReceiptText } from 'lucide-react';
+import { Users, Truck, Settings, Calculator, AreaChart, CheckSquare, Briefcase, FolderArchive, LinkIcon, Package, FileText, ReceiptText, Search, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
@@ -67,6 +67,12 @@ const navItems = [
     icon: <FileText className="h-8 w-8 mb-2 text-primary" />,
   },
   {
+    href: '/customer-search',
+    label: 'Müşteri Keşfi',
+    description: 'Yeni müşteriler keşfedin.',
+    icon: <Search className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
     href: '/check-management',
     label: 'Çek Yönetimi',
     description: 'Çeklerinizi yönetin ve takip edin.',
@@ -112,6 +118,22 @@ export default function HomePage() {
         </button>
       </div>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 w-full max-w-7xl mt-12">
+        <Link href="/customers" className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg">
+          <Users className="w-5 h-5" />
+          <span>Müşteriler</span>
+        </Link>
+        <Link href="/suppliers" className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg">
+          <Truck className="w-5 h-5" />
+          <span>Tedarikçiler</span>
+        </Link>
+        <Link href="/products" className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg">
+          <Package className="w-5 h-5" />
+          <span>Ürünler</span>
+        </Link>
+        <Link href="/dashboard" className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg">
+          <BarChart3 className="w-5 h-5" />
+          <span>Dashboard</span>
+        </Link>
         {navItems.map((item) => (
           <Link href={item.href} key={item.label} passHref>
             <Card className="hover:shadow-lg transition-shadow duration-300 ease-in-out cursor-pointer h-full flex flex-col justify-between text-center bg-card hover:bg-accent/10">
