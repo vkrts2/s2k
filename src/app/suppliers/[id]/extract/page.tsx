@@ -211,37 +211,47 @@ export default function ExtractPage({ params }: ExtractPageProps) {
                 <TableHead className="print:text-black">İşlem Tipi</TableHead>
                 <TableHead className="print:text-black">Açıklama</TableHead>
                 <TableHead className="text-right print:text-black">Tutar</TableHead>
+                <TableHead className="text-right print:text-black">Toplam</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {unifiedTransactions.length > 0 ? (
-                unifiedTransactions.map((item) => (
-                  <TableRow key={`${item.transactionType}-${item.id}`}>
-                    <TableCell className="print:text-black">{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
-                    <TableCell className="print:text-black">
-                      {item.transactionType === 'purchase' ? (
-                        <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 print:bg-blue-500 print:text-white">Satın Alma</Badge>
-                      ) : (
-                        <Badge variant="default" className="bg-green-500 hover:bg-green-600 print:bg-green-500 print:text-white">Ödeme</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="print:text-black">
-                      {item.description || '-'}
-                      {'method' in item && item.method ? ` (${
-                        item.method === 'nakit' ? 'Nakit' :
-                        item.method === 'banka' ? 'Banka Havalesi' :
-                        item.method === 'krediKarti' ? 'Kredi Kartı' :
-                        item.method === 'cek' ? 'Çek' : 'Diğer'
-                      })` : ''}
-                    </TableCell>
-                    <TableCell className="text-right font-medium print:text-black">
-                      {formatCurrency(item.amount, item.currency)}
-                    </TableCell>
-                  </TableRow>
-                ))
+                (() => {
+                  let runningTotal = 0;
+                  return unifiedTransactions.map((item) => {
+                    runningTotal += item.amount;
+                    return (
+                      <TableRow key={`${item.transactionType}-${item.id}`}>
+                        <TableCell className="print:text-black">{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
+                        <TableCell className="print:text-black">
+                          {item.transactionType === 'purchase' ? (
+                            <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 print:bg-blue-500 print:text-white">Satın Alma</Badge>
+                          ) : (
+                            <Badge variant="default" className="bg-green-500 hover:bg-green-600 print:bg-green-500 print:text-white">Ödeme</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="print:text-black">
+                          {item.description || '-'}
+                          {'method' in item && item.method ? ` (${
+                            item.method === 'nakit' ? 'Nakit' :
+                            item.method === 'banka' ? 'Banka Havalesi' :
+                            item.method === 'krediKarti' ? 'Kredi Kartı' :
+                            item.method === 'cek' ? 'Çek' : 'Diğer'
+                          })` : ''}
+                        </TableCell>
+                        <TableCell className="text-right font-medium print:text-black">
+                          {formatCurrency(item.amount, item.currency)}
+                        </TableCell>
+                        <TableCell className="text-right font-bold print:text-black">
+                          {formatCurrency(runningTotal, 'TRY')}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  });
+                })()
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-4 print:text-black">
+                  <TableCell colSpan={5} className="text-center py-4 print:text-black">
                     Bu tedarikçi için herhangi bir işlem bulunamadı.
                   </TableCell>
                 </TableRow>
