@@ -14,6 +14,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from '@/contexts/AuthContext';
+import { getCustomers } from '@/lib/storage';
+import { storageDeleteSale } from '@/lib/storage';
 
 interface Sale {
   id: string;
@@ -54,6 +57,7 @@ export default function SalesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchSales();
@@ -207,7 +211,15 @@ export default function SalesPage() {
 
   const handleDeleteSale = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "sales", id));
+      if (!user?.uid) {
+        toast({
+          title: "Hata",
+          description: "Kullanıcı oturumu bulunamadı.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await storageDeleteSale(user.uid, id);
       toast({
         title: "Başarılı",
         description: "Satış başarıyla silindi.",

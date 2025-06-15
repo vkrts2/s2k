@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import type { Customer, Sale, Payment } from '@/lib/types';
 import { getCustomerById, getSales, getPayments } from '@/lib/storage';
 import { CustomerDetailPageClient } from '@/components/customers/customer-detail-page';
@@ -21,6 +21,8 @@ export default function CustomerDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isCustomerFound, setIsCustomerFound] = useState(true);
 
+  const router = useRouter();
+
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -36,6 +38,7 @@ export default function CustomerDetailPage() {
         setSales(await getSales(user.uid, customerId));
         setPayments(await getPayments(user.uid, customerId));
         document.title = `${fetchedCustomer.name} | Müşteri Detayları | ERMAY`;
+        router.refresh();
       } else {
         setIsCustomerFound(false);
       }
@@ -45,7 +48,7 @@ export default function CustomerDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [customerId, user]);
+  }, [customerId, user, router]);
 
   useEffect(() => {
     if (authLoading) return;

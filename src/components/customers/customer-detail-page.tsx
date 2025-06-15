@@ -3,25 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Customer, Sale, Payment, Currency, UnifiedTransaction as AppUnifiedTransaction, StockItem, Price, ContactHistoryItem, CustomerTask, SaleFormValues, PaymentFormValues, TransactionTag } from '@/lib/types';
-import {
-  updateSale,
-  addSale,
-  storageDeleteSale,
-  updatePayment,
-  addPayment,
-  storageDeletePayment,
-  getSales,
-  getPayments,
-  getCustomerById,
-  updateCustomer,
-  deleteCustomer,
-  getStockItems,
-  getStockItemById,
-  addContactHistory,
-  updateContactHistory,
-  deleteContactHistory,
-  getContactHistory,
-} from '@/lib/storage';
+import * as storage from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -289,7 +271,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
 
   const getStockItemName = useCallback(async (stockItemId?: string): Promise<string> => {
     if (!stockItemId || !user?.uid) return 'Bilinmeyen Stok Ürünü';
-    const item = await getStockItemById(user.uid, stockItemId);
+    const item = await storage.getStockItemById(user.uid, stockItemId);
     return item?.name || 'Bilinmeyen Stok Ürünü';
   }, [user?.uid]);
 
@@ -297,7 +279,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   useEffect(() => {
     const fetchStockItems = async () => {
       if (user?.uid) {
-        const items = await getStockItems(user.uid);
+        const items = await storage.getStockItems(user.uid);
         setAvailableStockItems(items);
         const names: Record<string, string> = {};
         items.forEach(item => {
@@ -316,7 +298,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   useEffect(() => {
     const fetchFreshCustomer = async () => {
       if (customer?.id && user?.uid) {
-        const freshCustomer = await getCustomerById(user.uid, customer.id);
+        const freshCustomer = await storage.getCustomerById(user.uid, customer.id);
         if (freshCustomer) {
           setCustomer(freshCustomer);
         }
@@ -331,7 +313,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   const fetchContactHistory = useCallback(async () => {
     if (!user?.uid || !customer?.id) return;
     try {
-      const history = await getContactHistory(user.uid, customer.id);
+      const history = await storage.getContactHistory(user.uid, customer.id);
       setContactHistory(history);
     } catch (error) {
       console.error("İletişim geçmişi yüklenirken hata:", error);
@@ -374,7 +356,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
           updatedAt: formatISO(new Date())
         };
 
-        await updateSale(user.uid, updatedSale);
+        await storage.updateSale(user.uid, updatedSale);
         toast({
           title: "Başarılı",
           description: "Satış güncellendi.",
@@ -394,7 +376,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
           updatedAt: formatISO(new Date())
         };
 
-        await addSale(user.uid, newSale);
+        await storage.addSale(user.uid, newSale);
         toast({
           title: "Başarılı",
           description: "Yeni satış eklendi.",
@@ -444,7 +426,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
           updatedAt: formatISO(new Date())
         };
 
-        await updatePayment(user.uid, updatedPayment);
+        await storage.updatePayment(user.uid, updatedPayment);
         toast({
           title: "Başarılı",
           description: "Ödeme güncellendi.",
@@ -466,7 +448,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
           updatedAt: formatISO(new Date())
         };
 
-        await addPayment(user.uid, newPayment);
+        await storage.addPayment(user.uid, newPayment);
         toast({
           title: "Başarılı",
           description: "Yeni ödeme eklendi.",
@@ -489,7 +471,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   const handleDeleteSale = useCallback(async (saleId: string) => {
     if (!user || !customer?.id) return;
     try {
-      await storageDeleteSale(user.uid, saleId);
+      await storage.storageDeleteSale(user.uid, saleId);
       setSales(prevSales => prevSales.filter(sale => sale.id !== saleId));
       toast({
         title: "Başarılı",
@@ -510,7 +492,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   const handleDeletePayment = useCallback(async (paymentId: string) => {
     if (!user || !customer?.id) return;
     try {
-      await storageDeletePayment(user.uid, paymentId);
+      await storage.storageDeletePayment(user.uid, paymentId);
       setPayments(prevPayments => prevPayments.filter(payment => payment.id !== paymentId));
       toast({
         title: "Başarılı",
@@ -608,7 +590,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
     if (!user || !customer?.id) return;
     try {
       const updatedCustomer: Customer = { ...customer, notes: notesContent };
-      await updateCustomer(user.uid, updatedCustomer);
+      await storage.updateCustomer(user.uid, updatedCustomer);
       setCustomer(updatedCustomer);
       toast({
         title: "Notlar Güncellendi",
@@ -643,13 +625,13 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
       };
 
       if (editingContactHistoryItem) {
-        await updateContactHistory(user.uid, { ...newHistoryItem, id: editingContactHistoryItem.id });
+        await storage.updateContactHistory(user.uid, { ...newHistoryItem, id: editingContactHistoryItem.id });
         toast({
           title: "Başarılı",
           description: "İletişim geçmişi güncellendi.",
         });
       } else {
-        await addContactHistory(user.uid, newHistoryItem);
+        await storage.addContactHistory(user.uid, newHistoryItem);
         toast({
           title: "Başarılı",
           description: "Yeni iletişim geçmişi eklendi.",
@@ -672,7 +654,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   const handleDeleteContactHistory = useCallback(async (historyId: string) => {
     if (!user || !customer?.id) return;
     try {
-      await deleteContactHistory(user.uid, historyId);
+      await storage.deleteContactHistory(user.uid, historyId);
       toast({
         title: "Başarılı",
         description: "İletişim geçmişi silindi.",
@@ -706,7 +688,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
             : task
         );
         updatedCustomer = { ...customer, tasks: updatedTasks };
-        await updateCustomer(user.uid, updatedCustomer);
+        await storage.updateCustomer(user.uid, updatedCustomer);
         toast({ title: "Görev Güncellendi", description: "Görev başarıyla güncellendi." });
       } else {
         // Add new task
@@ -719,7 +701,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         };
         const updatedTasks = [...(customer.tasks || []), newTask];
         updatedCustomer = { ...customer, tasks: updatedTasks };
-        await updateCustomer(user.uid, updatedCustomer);
+        await storage.updateCustomer(user.uid, updatedCustomer);
         toast({ title: "Görev Eklendi", description: "Yeni görev başarıyla eklendi." });
       }
       setCustomer(updatedCustomer);
@@ -747,7 +729,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
     try {
       const updatedTasks = (customer.tasks || []).filter(task => task.id !== taskId);
       const updatedCustomer: Customer = { ...customer, tasks: updatedTasks };
-      await updateCustomer(user.uid, updatedCustomer);
+      await storage.updateCustomer(user.uid, updatedCustomer);
       setCustomer(updatedCustomer);
       toast({
         title: "Görev Silindi",
@@ -876,14 +858,14 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         const saleToUpdate = sales.find((s: Sale) => s.id === transactionId);
         if (saleToUpdate) {
           const updatedSale: Sale = { ...saleToUpdate, tags: [...(saleToUpdate.tags || []), newTag], updatedAt: formatISO(new Date()) };
-          await updateSale(user.uid, updatedSale);
+          await storage.updateSale(user.uid, updatedSale);
           setSales(prev => prev.map(s => s.id === updatedSale.id ? updatedSale : s));
         }
       } else if (transactionType === 'payment') {
         const paymentToUpdate = payments.find((p: Payment) => p.id === transactionId);
         if (paymentToUpdate) {
           const updatedPayment: Payment = { ...paymentToUpdate, tags: [...(paymentToUpdate.tags || []), newTag], updatedAt: formatISO(new Date()) };
-          await updatePayment(user.uid, updatedPayment);
+          await storage.updatePayment(user.uid, updatedPayment);
           setPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
         }
       }
@@ -904,14 +886,14 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         const saleToUpdate = sales.find((s: Sale) => s.id === transactionId);
         if (saleToUpdate) {
           const updatedSale: Sale = { ...saleToUpdate, tags: (saleToUpdate.tags || []).filter((tag: TransactionTag) => tag.id !== tagId), updatedAt: formatISO(new Date()) };
-          await updateSale(user.uid, updatedSale);
+          await storage.updateSale(user.uid, updatedSale);
           setSales(prev => prev.map(s => s.id === updatedSale.id ? updatedSale : s));
         }
       } else if (transactionType === 'payment') {
         const paymentToUpdate = payments.find((p: Payment) => p.id === transactionId);
         if (paymentToUpdate) {
           const updatedPayment: Payment = { ...paymentToUpdate, tags: (paymentToUpdate.tags || []).filter((tag: TransactionTag) => tag.id !== tagId), updatedAt: formatISO(new Date()) };
-          await updatePayment(user.uid, updatedPayment);
+          await storage.updatePayment(user.uid, updatedPayment);
           setPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
         }
       }
@@ -926,7 +908,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   const handleCustomerUpdate = async (updatedCustomerData: Customer) => {
     if (!user) return;
     try {
-      await updateCustomer(user.uid, updatedCustomerData);
+      await storage.updateCustomer(user.uid, updatedCustomerData);
       setCustomer(updatedCustomerData);
       toast({
         title: "Başarılı",
@@ -946,7 +928,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   const handleDeleteCustomer = useCallback(async () => {
     if (!user || !deletingCustomer) return;
     try {
-      await deleteCustomer(user.uid, deletingCustomer.id);
+      await storage.deleteCustomer(user.uid, deletingCustomer.id);
       toast({
         title: "Müşteri Silindi",
         description: "Müşteri başarıyla silindi.",
@@ -1157,14 +1139,17 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
                           {renderTransactionDetail(item)}
                           <div className="flex flex-wrap gap-1 mt-1">
                             {(item.tags || []).map(tag => (
-                              <Badge key={tag.id} className={tag.color}>
+                              <Badge
+                                key={tag.id}
+                                className={`ml-2 px-2 py-1 rounded-full text-xs ${tag.color}`}
+                              >
                                 {tag.name}
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="ml-1 h-auto p-0 text-white hover:bg-transparent"
+                                <button
                                   onClick={() => handleRemoveTag(item.id, tag.id, item.transactionType)}
-                                >x</Button>
+                                  className="ml-1 text-white hover:text-gray-200"
+                                >
+                                  &times;
+                                </button>
                               </Badge>
                             ))}
                             <Input
