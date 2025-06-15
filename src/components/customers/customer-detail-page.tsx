@@ -1210,8 +1210,10 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
                             size="sm"
                             onClick={() => {
                               if (item.transactionType === 'sale') {
+                                console.log('Setting deletingSaleId to:', item.id);
                                 setDeletingSaleId(item.id);
                               } else {
+                                console.log('Setting deletingPaymentId to:', item.id);
                                 setDeletingPaymentId(item.id);
                               }
                             }}
