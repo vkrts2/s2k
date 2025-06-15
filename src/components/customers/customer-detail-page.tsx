@@ -1277,19 +1277,21 @@ export function CustomerDetailPageClient({ customer: initialCustomer, initialSal
                   {paginatedTransactions.length > 0 ? (
                     paginatedTransactions.map((item) => (
                       <TableRow key={`${item.transactionType}-${item.id}`}>
-                        <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
-                        <TableCell>{item.transactionType === 'sale' ? (
-                          <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Satış</Badge>
-                        ) : (
-                          <Badge variant="default" className="bg-green-500 hover:bg-green-600">Ödeme</Badge>
-                        )}</TableCell>
-                        <TableCell className="text-right font-medium">
+                        <TableCell className="py-2">{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
+                        <TableCell className="py-2">{
+                          item.transactionType === 'sale' ? (
+                            <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Satış</Badge>
+                          ) : (
+                            <Badge variant="default" className="bg-green-500 hover:bg-green-600">Ödeme</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2 text-right font-medium">
                           {formatCurrency(item.amount, item.currency)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-2">
                           {renderTransactionDetail(item)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="py-2 text-right">
                           <Button
                             variant="ghost"
                             size="sm"
