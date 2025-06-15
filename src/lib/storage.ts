@@ -214,7 +214,7 @@ export const getSales = async (uid: string, customerId?: string): Promise<Sale[]
     if (customerId) {
       salesQuery = query(salesQuery, where("customerId", "==", customerId));
     }
-    const querySnapshot = await getDocs(salesQuery);
+    const querySnapshot = await getDocs(salesQuery, { source: 'server' });
     console.log("getSales - querySnapshot.docs:", querySnapshot.docs);
     const sales: Sale[] = querySnapshot.docs.map(doc => {
       let description = doc.data().description;
@@ -309,7 +309,7 @@ export const getPayments = async (uid: string, customerId?: string): Promise<Pay
     if (customerId) {
       paymentsQuery = query(paymentsQuery, where("customerId", "==", customerId));
     }
-    const querySnapshot = await getDocs(paymentsQuery);
+    const querySnapshot = await getDocs(paymentsQuery, { source: 'server' });
     const payments: Payment[] = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data() as Omit<Payment, 'id'>,

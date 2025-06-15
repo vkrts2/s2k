@@ -32,6 +32,9 @@ export default function CustomerDetailPage() {
       return;
     }
     try {
+      setSales([]);
+      setPayments([]);
+
       const fetchedCustomer = await getCustomerById(user.uid, customerId);
       if (fetchedCustomer) {
         setCustomer(fetchedCustomer);
