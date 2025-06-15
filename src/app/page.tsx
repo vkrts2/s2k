@@ -2,7 +2,7 @@
 // src/app/page.tsx
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Truck, Settings, Calculator, AreaChart, CheckSquare, Briefcase, FolderArchive, LinkIcon, Package, FileText } from 'lucide-react';
+import { Users, Truck, Settings, Calculator, AreaChart, CheckSquare, Briefcase, FolderArchive, LinkIcon, Package, FileText, ReceiptText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
@@ -65,6 +65,12 @@ const navItems = [
     label: 'Fiyat Teklifi',
     description: 'Fiyat teklifleri oluşturun ve yönetin.',
     icon: <FileText className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
+    href: '/check-management',
+    label: 'Çek Yönetimi',
+    description: 'Çeklerinizi yönetin ve takip edin.',
+    icon: <ReceiptText className="h-8 w-8 mb-2 text-primary" />,
   },
   {
     href: '/settings',
