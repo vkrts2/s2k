@@ -211,7 +211,6 @@ export default function ExtractPage({ params }: ExtractPageProps) {
                 <TableHead className="print:text-black">İşlem Tipi</TableHead>
                 <TableHead className="text-right print:text-black">Tutar</TableHead>
                 <TableHead className="print:text-black">Açıklama</TableHead>
-                <TableHead className="print:text-black">Ödeme Yöntemi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -229,20 +228,20 @@ export default function ExtractPage({ params }: ExtractPageProps) {
                     <TableCell className="text-right font-medium print:text-black">
                       {formatCurrency(item.amount, item.currency)}
                     </TableCell>
-                    <TableCell className="print:text-black">{item.description || '-'}</TableCell>
                     <TableCell className="print:text-black">
-                      {'method' in item ? (
+                      {item.description || '-'}
+                      {'method' in item && item.method ? ` (${
                         item.method === 'nakit' ? 'Nakit' :
                         item.method === 'banka' ? 'Banka Havalesi' :
                         item.method === 'krediKarti' ? 'Kredi Kartı' :
                         item.method === 'cek' ? 'Çek' : 'Diğer'
-                      ) : '-'}
+                      })` : ''}
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-4 print:text-black">
+                  <TableCell colSpan={4} className="text-center py-4 print:text-black">
                     Bu tedarikçi için herhangi bir işlem bulunamadı.
                   </TableCell>
                 </TableRow>
