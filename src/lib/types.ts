@@ -16,6 +16,7 @@ export interface ContactHistoryItem {
   summary: string;
   notes?: string;
   supplierId?: string; // Tedarikçiye özel iletişim geçmişi için eklendi
+  customerId?: string; // Müşteriye özel iletişim geçmişi için eklendi
   createdAt: string; // ISO string format
   updatedAt: string; // ISO string format
 }

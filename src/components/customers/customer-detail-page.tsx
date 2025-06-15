@@ -4,23 +4,23 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Customer, Sale, Payment, Currency, UnifiedTransaction as AppUnifiedTransaction, StockItem, Price, ContactHistoryItem, CustomerTask, SaleFormValues, PaymentFormValues, TransactionTag } from '@/lib/types';
 import {
-  addPayment,
-  updatePayment as storageUpdatePayment,
-  deletePayment as storageDeletePayment,
+  updateSale,
   addSale,
-  updateSale as storageUpdateSale,
-  deleteSale as storageDeleteSale,
+  storageDeleteSale,
+  updatePayment,
+  addPayment,
+  storageDeletePayment,
+  getSales,
+  getPayments,
+  getCustomerById,
+  updateCustomer,
+  deleteCustomer,
   getStockItems,
   getStockItemById,
-  getCustomerById,
-  updateCustomer as storageUpdateCustomer,
-  deleteCustomer as storageDeleteCustomer,
-  getContactHistory,
   addContactHistory,
   updateContactHistory,
   deleteContactHistory,
-  getSales,
-  getPayments,
+  getContactHistory,
 } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -93,6 +93,7 @@ import { DeleteConfirmationModal } from "../common/delete-confirmation-modal";
 import { ContactHistoryModal } from "./contact-history-modal";
 import { TaskModal } from "./task-modal";
 import { PrintView } from "./print-view";
+import { useRouter } from 'next/navigation';
 
 interface CustomerDetailPageClientProps {
   customer: Customer;
@@ -150,6 +151,7 @@ type UnifiedTransactionClient = AppUnifiedTransaction; // AppUnifiedTransaction 
 
 export function CustomerDetailPageClient({ customer: initialCustomer, sales: initialSales, payments: initialPayments, user, onDataUpdated }: CustomerDetailPageClientProps) {
   const { toast } = useToast();
+  const router = useRouter();
   const [customer, setCustomer] = useState<Customer>(initialCustomer);
   const [sales, setSales] = useState<Sale[]>(initialSales);
   const [payments, setPayments] = useState<Payment[]>(initialPayments);
@@ -161,6 +163,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   const [paymentFormValues, setPaymentFormValues] = useState<PaymentFormValues>(EMPTY_PAYMENT_FORM_VALUES);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
 
+  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
   const [deletingSaleId, setDeletingSaleId] = useState<string | null>(null);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
 
@@ -173,7 +176,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskFormValues, setTaskFormValues] = useState<TaskFormValues>(EMPTY_TASK_FORM_VALUES);
   const [editingTask, setEditingTask] = useState<CustomerTask | null>(null);
-  const [deletingCustomer, setDeletingCustomer] = useState<string | null>(null);
 
   const [stockItemDisplayNames, setStockItemDisplayNames] = useState<Record<string, string>>({});
 
@@ -188,6 +190,8 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   const [showPrintView, setShowPrintView] = useState(false);
 
   const [availableStockItems, setAvailableStockItems] = useState<StockItem[]>([]);
+
+  const [contactHistory, setContactHistory] = useState<ContactHistoryItem[]>([]);
 
   // Calculate totals with memoization
   const totalSales = useMemo(() => {
@@ -324,6 +328,25 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
     }
   }, [customer?.id, customer?.name, user]);
 
+  const fetchContactHistory = useCallback(async () => {
+    if (!user?.uid || !customer?.id) return;
+    try {
+      const history = await getContactHistory(user.uid, customer.id);
+      setContactHistory(history);
+    } catch (error) {
+      console.error("İletişim geçmişi yüklenirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "İletişim geçmişi yüklenirken bir sorun oluştu.",
+        variant: "destructive",
+      });
+    }
+  }, [user, customer?.id, toast]);
+
+  useEffect(() => {
+    fetchContactHistory();
+  }, [fetchContactHistory]);
+
   const handleSaleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -351,7 +374,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
           updatedAt: formatISO(new Date())
         };
 
-        await storageUpdateSale(user.uid, updatedSale);
+        await updateSale(user.uid, updatedSale);
         toast({
           title: "Başarılı",
           description: "Satış güncellendi.",
@@ -421,7 +444,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
           updatedAt: formatISO(new Date())
         };
 
-        await storageUpdatePayment(user.uid, updatedPayment);
+        await updatePayment(user.uid, updatedPayment);
         toast({
           title: "Başarılı",
           description: "Ödeme güncellendi.",
@@ -467,7 +490,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
     if (!user || !customer?.id) return;
     try {
       await storageDeleteSale(user.uid, saleId);
-      // Yerel state'i güncelle
       setSales(prevSales => prevSales.filter(sale => sale.id !== saleId));
       toast({
         title: "Başarılı",
@@ -489,7 +511,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
     if (!user || !customer?.id) return;
     try {
       await storageDeletePayment(user.uid, paymentId);
-      // Yerel state'i güncelle
       setPayments(prevPayments => prevPayments.filter(payment => payment.id !== paymentId));
       toast({
         title: "Başarılı",
@@ -587,7 +608,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
     if (!user || !customer?.id) return;
     try {
       const updatedCustomer: Customer = { ...customer, notes: notesContent };
-      await storageUpdateCustomer(user.uid, updatedCustomer);
+      await updateCustomer(user.uid, updatedCustomer);
       setCustomer(updatedCustomer);
       toast({
         title: "Notlar Güncellendi",
@@ -611,55 +632,61 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
 
   const handleContactHistorySubmit = useCallback(async (values: ContactHistoryFormValues) => {
     if (!user || !customer?.id) return;
+
     try {
-      let updatedCustomer: Customer;
+      const newHistoryItem: Omit<ContactHistoryItem, 'id'> = {
+        ...values,
+        customerId: customer.id,
+        date: formatISO(values.date),
+        createdAt: formatISO(new Date()),
+        updatedAt: formatISO(new Date()),
+      };
+
       if (editingContactHistoryItem) {
-        // Update existing contact history item
-        const updatedHistory = (customer.contactHistory || []).map(item => 
-          item.id === editingContactHistoryItem.id
-            ? { ...item, ...values, date: formatISO(values.date), updatedAt: formatISO(new Date()) }
-            : item
-        );
-        updatedCustomer = { ...customer, contactHistory: updatedHistory };
-        await updateContactHistory(user.uid, updatedHistory, customer.id);
-        toast({ title: "İletişim Geçmişi Güncellendi", description: "İletişim geçmişi başarıyla güncellendi." });
+        await updateContactHistory(user.uid, { ...newHistoryItem, id: editingContactHistoryItem.id });
+        toast({
+          title: "Başarılı",
+          description: "İletişim geçmişi güncellendi.",
+        });
       } else {
-        // Add new contact history item
-        const newHistoryItem = {
-          id: crypto.randomUUID(),
-          ...values,
-          date: formatISO(values.date),
-          createdAt: formatISO(new Date()),
-          updatedAt: formatISO(new Date()),
-        };
-        const updatedHistory = [...(customer.contactHistory || []), newHistoryItem];
-        updatedCustomer = { ...customer, contactHistory: updatedHistory };
-        await addContactHistory(user.uid, newHistoryItem, customer.id);
-        toast({ title: "İletişim Geçmişi Eklendi", description: "Yeni iletişim geçmişi kaydı eklendi." });
+        await addContactHistory(user.uid, newHistoryItem);
+        toast({
+          title: "Başarılı",
+          description: "Yeni iletişim geçmişi eklendi.",
+        });
       }
-      setCustomer(updatedCustomer);
       setShowContactHistoryModal(false);
       setContactHistoryFormValues(EMPTY_CONTACT_HISTORY_FORM_VALUES);
       setEditingContactHistoryItem(null);
+      fetchContactHistory();
     } catch (error) {
       console.error("İletişim geçmişi kaydedilirken hata:", error);
-      toast({ title: "Hata", description: "İletişim geçmişi kaydedilirken bir sorun oluştu.", variant: "destructive" });
+      toast({
+        title: "Hata",
+        description: "İletişim geçmişi kaydedilirken bir sorun oluştu.",
+        variant: "destructive",
+      });
     }
-  }, [user, customer, editingContactHistoryItem, toast]);
+  }, [user, customer?.id, editingContactHistoryItem, toast, fetchContactHistory]);
 
-  const handleDeleteContactHistory = useCallback(async (itemId: string) => {
+  const handleDeleteContactHistory = useCallback(async (historyId: string) => {
     if (!user || !customer?.id) return;
     try {
-      const updatedHistory = (customer.contactHistory || []).filter(item => item.id !== itemId);
-      const updatedCustomer: Customer = { ...customer, contactHistory: updatedHistory };
-      await deleteContactHistory(user.uid, itemId, customer.id);
-      setCustomer(updatedCustomer);
-      toast({ title: "İletişim Geçmişi Silindi", description: "İletişim geçmişi kaydı başarıyla silindi." });
+      await deleteContactHistory(user.uid, historyId);
+      toast({
+        title: "Başarılı",
+        description: "İletişim geçmişi silindi.",
+      });
+      fetchContactHistory();
     } catch (error) {
       console.error("İletişim geçmişi silinirken hata:", error);
-      toast({ title: "Hata", description: "İletişim geçmişi silinirken bir sorun oluştu.", variant: "destructive" });
+      toast({
+        title: "Hata",
+        description: "İletişim geçmişi silinirken bir sorun oluştu.",
+        variant: "destructive",
+      });
     }
-  }, [user, customer, toast]);
+  }, [user, customer?.id, toast, fetchContactHistory]);
 
   const handleOpenAddTaskModal = useCallback(() => {
     setEditingTask(null);
@@ -679,7 +706,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
             : task
         );
         updatedCustomer = { ...customer, tasks: updatedTasks };
-        await storageUpdateCustomer(user.uid, updatedCustomer);
+        await updateCustomer(user.uid, updatedCustomer);
         toast({ title: "Görev Güncellendi", description: "Görev başarıyla güncellendi." });
       } else {
         // Add new task
@@ -692,7 +719,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         };
         const updatedTasks = [...(customer.tasks || []), newTask];
         updatedCustomer = { ...customer, tasks: updatedTasks };
-        await storageUpdateCustomer(user.uid, updatedCustomer);
+        await updateCustomer(user.uid, updatedCustomer);
         toast({ title: "Görev Eklendi", description: "Yeni görev başarıyla eklendi." });
       }
       setCustomer(updatedCustomer);
@@ -720,7 +747,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
     try {
       const updatedTasks = (customer.tasks || []).filter(task => task.id !== taskId);
       const updatedCustomer: Customer = { ...customer, tasks: updatedTasks };
-      await storageUpdateCustomer(user.uid, updatedCustomer);
+      await updateCustomer(user.uid, updatedCustomer);
       setCustomer(updatedCustomer);
       toast({
         title: "Görev Silindi",
@@ -838,27 +865,26 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   ];
 
   // Yeni etiket oluşturma
-  const handleAddTag = useCallback(async (transactionId: string, tagName: string, transactionType: 'sale' | 'payment') => {
+  const handleAddTag = useCallback(async (transactionId: string, transactionType: 'sale' | 'payment', newTagText: string) => {
     if (!user || !customer?.id) return;
 
-    const newTag: TransactionTag = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: tagName,
-      color: tagColors[Math.floor(Math.random() * tagColors.length)],
-    };
-
     try {
+      const tagColor = tagColors[Math.floor(Math.random() * tagColors.length)];
+      const newTag: TransactionTag = { id: Date.now().toString(), name: newTagText, color: tagColor };
+
       if (transactionType === 'sale') {
         const saleToUpdate = sales.find((s: Sale) => s.id === transactionId);
         if (saleToUpdate) {
           const updatedSale: Sale = { ...saleToUpdate, tags: [...(saleToUpdate.tags || []), newTag], updatedAt: formatISO(new Date()) };
-          await storageUpdateSale(user.uid, updatedSale);
+          await updateSale(user.uid, updatedSale);
+          setSales(prev => prev.map(s => s.id === updatedSale.id ? updatedSale : s));
         }
       } else if (transactionType === 'payment') {
         const paymentToUpdate = payments.find((p: Payment) => p.id === transactionId);
         if (paymentToUpdate) {
           const updatedPayment: Payment = { ...paymentToUpdate, tags: [...(paymentToUpdate.tags || []), newTag], updatedAt: formatISO(new Date()) };
-          await storageUpdatePayment(user.uid, updatedPayment);
+          await updatePayment(user.uid, updatedPayment);
+          setPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
         }
       }
       toast({ title: "Etiket Eklendi", description: "Etiket başarıyla eklendi." });
@@ -878,13 +904,15 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         const saleToUpdate = sales.find((s: Sale) => s.id === transactionId);
         if (saleToUpdate) {
           const updatedSale: Sale = { ...saleToUpdate, tags: (saleToUpdate.tags || []).filter((tag: TransactionTag) => tag.id !== tagId), updatedAt: formatISO(new Date()) };
-          await storageUpdateSale(user.uid, updatedSale);
+          await updateSale(user.uid, updatedSale);
+          setSales(prev => prev.map(s => s.id === updatedSale.id ? updatedSale : s));
         }
       } else if (transactionType === 'payment') {
         const paymentToUpdate = payments.find((p: Payment) => p.id === transactionId);
         if (paymentToUpdate) {
           const updatedPayment: Payment = { ...paymentToUpdate, tags: (paymentToUpdate.tags || []).filter((tag: TransactionTag) => tag.id !== tagId), updatedAt: formatISO(new Date()) };
-          await storageUpdatePayment(user.uid, updatedPayment);
+          await updatePayment(user.uid, updatedPayment);
+          setPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
         }
       }
       toast({ title: "Etiket Silindi", description: "Etiket başarıyla silindi." });
@@ -895,26 +923,16 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
     }
   }, [user, customer, sales, payments, onDataUpdated, toast]);
 
-  const handleCustomerUpdate = useCallback(async (data: Customer) => {
-    if (!user) {
-      toast({
-        title: "Hata",
-        description: "Müşteri bilgileri güncellenirken bir sorun oluştu: Kullanıcı girişi yapılmamış.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const handleCustomerUpdate = async (updatedCustomerData: Customer) => {
+    if (!user) return;
     try {
-      const updatedCustomer: Customer = { ...data, updatedAt: formatISO(new Date()) };
-      await storageUpdateCustomer(user.uid, updatedCustomer);
-      setCustomer(updatedCustomer);
+      await updateCustomer(user.uid, updatedCustomerData);
+      setCustomer(updatedCustomerData);
       toast({
-        title: "Müşteri Güncellendi",
-        description: `${updatedCustomer.name} müşteri bilgileri güncellendi.`,
+        title: "Başarılı",
+        description: "Müşteri bilgileri güncellendi.",
       });
-      setShowEditCustomerModal(false);
-      onDataUpdated(); // Müşteri verisi güncellendiğinde üst bileşeni bilgilendir
+      onDataUpdated();
     } catch (error) {
       console.error("Müşteri güncellenirken hata:", error);
       toast({
@@ -923,18 +941,17 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         variant: "destructive",
       });
     }
-  }, [user, toast, onDataUpdated]);
+  };
 
   const handleDeleteCustomer = useCallback(async () => {
     if (!user || !deletingCustomer) return;
     try {
-      await storageDeleteCustomer(user.uid, deletingCustomer);
+      await deleteCustomer(user.uid, deletingCustomer.id);
       toast({
         title: "Müşteri Silindi",
         description: "Müşteri başarıyla silindi.",
       });
-      // Müşteri silindikten sonra ana müşteri listesi sayfasına yönlendir
-      window.location.href = "/customers"; 
+      router.push('/customers'); // Müşteri silindikten sonra ana müşteri listesi sayfasına yönlendir
     } catch (error) {
       console.error("Müşteri silinirken hata:", error);
       toast({
@@ -945,7 +962,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
     } finally {
       setDeletingCustomer(null);
     }
-  }, [user, deletingCustomer, toast]);
+  }, [user, deletingCustomer, toast, router]);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -983,7 +1000,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>İptal</AlertDialogCancel>
-                <AlertDialogAction onClick={() => setDeletingCustomer(customer.id)}>Sil</AlertDialogAction>
+                <AlertDialogAction onClick={() => setDeletingCustomer(customer)}>Sil</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -1156,7 +1173,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
                               className="h-6 w-28 text-xs px-2 py-1"
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' && e.currentTarget.value.trim() !== '') {
-                                  handleAddTag(item.id, e.currentTarget.value.trim(), item.transactionType);
+                                  handleAddTag(item.id, item.transactionType, e.currentTarget.value.trim());
                                   e.currentTarget.value = '';
                                 }
                               }}
@@ -1278,47 +1295,39 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(customer.contactHistory || []).length > 0 ? (
-                    (customer.contactHistory || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(item => (
-                      <TableRow key={item.id}>
-                        <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
-                        <TableCell>{item.type}</TableCell>
-                        <TableCell>{item.summary}</TableCell>
-                        <TableCell>{item.notes || '-'}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                               setEditingContactHistoryItem(item);
-                               setContactHistoryFormValues({
-                                 date: parseISO(item.date),
-                                 type: item.type,
-                                 summary: item.summary,
-                                 notes: item.notes || '',
-                               });
-                               setShowContactHistoryModal(true);
-                             }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteContactHistory(item.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center">
-                        İletişim geçmişi bulunamadı.
+                  {contactHistory.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>
+                      <TableCell>{item.type}</TableCell>
+                      <TableCell>{item.summary}</TableCell>
+                      <TableCell>{item.notes || '-'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                             setEditingContactHistoryItem(item);
+                             setContactHistoryFormValues({
+                               date: parseISO(item.date),
+                               type: item.type,
+                               summary: item.summary,
+                               notes: item.notes || '',
+                             });
+                             setShowContactHistoryModal(true);
+                           }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteContactHistory(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  )}
+                  ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -1467,7 +1476,12 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
       <DeleteConfirmationModal
         isOpen={deletingSaleId !== null}
         onClose={() => setDeletingSaleId(null)}
-        onConfirm={() => handleDeleteSale(deletingSaleId as string)}
+        onConfirm={() => {
+          if (deletingSaleId) {
+            const saleId = deletingSaleId as string;
+            handleDeleteSale(saleId);
+          }
+        }}
         title="Satışı Sil"
         description="Bu satışı silmek istediğinizden emin misiniz?"
       />
@@ -1475,7 +1489,12 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
       <DeleteConfirmationModal
         isOpen={deletingPaymentId !== null}
         onClose={() => setDeletingPaymentId(null)}
-        onConfirm={() => handleDeletePayment(deletingPaymentId as string)}
+        onConfirm={() => {
+          if (deletingPaymentId) {
+            const paymentId = deletingPaymentId as string;
+            handleDeletePayment(paymentId);
+          }
+        }}
         title="Ödemeyi Sil"
         description="Bu ödemeyi silmek istediğinizden emin misiniz?"
       />
