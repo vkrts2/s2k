@@ -474,7 +474,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       currency: payment.currency,
       referenceNumber: payment.referenceNumber || '',
       description: payment.description || '',
-      checkDate: payment.checkDate ? parseISO(payment.checkDate as string) : null,
+      checkDate: payment.checkDate ? parseISO(payment.checkDate) : null,
       checkSerialNumber: payment.checkSerialNumber || null,
     });
     setShowPaymentToSupplierModal(true);
@@ -545,14 +545,20 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   };
 
   const handleDeletePurchase = useCallback(async (purchaseId: string) => {
-    if (!user || !supplier?.id) return;
+    console.log('handleDeletePurchase called with purchaseId:', purchaseId);
+    if (!user || !supplier?.id) {
+      console.log('handleDeletePurchase: User or supplier ID missing.');
+      return;
+    }
     try {
+      console.log('Attempting to delete purchase with uid:', user.uid, 'and purchaseId:', purchaseId);
       await storageDeletePurchase(user.uid, purchaseId);
       setPurchases(prev => prev.filter(p => p.id !== purchaseId));
       toast({
         title: "Satın alma silindi",
         description: "Satın alma kaydı başarıyla silindi.",
       });
+      setDeletingPurchaseId(null);
     } catch (error) {
       console.error("Satın alma silinirken hata:", error);
       toast({
@@ -561,17 +567,23 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         variant: "destructive",
       });
     }
-  }, [user, supplier, toast]);
+  }, [user, supplier?.id, toast]);
 
   const handleDeletePaymentToSupplier = useCallback(async (paymentId: string) => {
-    if (!user || !supplier?.id) return;
+    console.log('handleDeletePaymentToSupplier called with paymentId:', paymentId);
+    if (!user || !supplier?.id) {
+      console.log('handleDeletePaymentToSupplier: User or supplier ID missing.');
+      return;
+    }
     try {
+      console.log('Attempting to delete payment with uid:', user.uid, 'and paymentId:', paymentId);
       await storageDeletePaymentToSupplier(user.uid, paymentId);
       setPaymentsToSupplier(prev => prev.filter(p => p.id !== paymentId));
       toast({
         title: "Ödeme silindi",
         description: "Ödeme başarıyla silindi.",
       });
+      setDeletingPaymentToSupplierId(null);
     } catch (error) {
       console.error("Ödeme silinirken hata:", error);
       toast({
@@ -580,7 +592,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         variant: "destructive",
       });
     }
-  }, [user, supplier, toast]);
+  }, [user, supplier?.id, toast]);
 
   const safeFormatDate = useCallback((dateString?: string | null, formatString: string = 'dd.MM.yyyy') => {
     if (!dateString) return 'Tarih Yok';
@@ -1224,10 +1236,10 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                                   amount: (item as Purchase).amount.toString(),
                                   date: parseISO((item as Purchase).date),
                                   currency: (item as Purchase).currency,
-                                  stockItemId: (item as Purchase).stockItemId === '' ? undefined : (item as Purchase).stockItemId,
+                                  stockItemId: (item as Purchase).stockItemId || undefined,
                                   description: (item as Purchase).description || '',
-                                  quantityPurchased: (item as Purchase).quantityPurchased?.toString() || undefined,
-                                  unitPrice: (item as Purchase).unitPrice?.toString() || undefined,
+                                  quantityPurchased: (item as Purchase).quantityPurchased?.toString(),
+                                  unitPrice: (item as Purchase).unitPrice?.toString(),
                                 });
                                 setShowPurchaseModal(true);
                               } else {
@@ -1253,8 +1265,10 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                             size="sm"
                             onClick={() => {
                               if (item.transactionType === 'purchase') {
+                                console.log('Setting deletingPurchaseId to:', item.id);
                                 setDeletingPurchaseId(item.id);
                               } else {
+                                console.log('Setting deletingPaymentToSupplierId to:', item.id);
                                 setDeletingPaymentToSupplierId(item.id);
                               }
                             }}
@@ -1524,23 +1538,33 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       />
 
       <DeleteConfirmationModal
-        isOpen={!!deletingPurchaseId}
+        isOpen={deletingPurchaseId !== null}
         onClose={() => setDeletingPurchaseId(null)}
-        onConfirm={() => handleDeletePurchase(deletingPurchaseId!)}
-        title="Satın Alışı Sil"
+        onConfirm={() => {
+          console.log('DeleteConfirmationModal: Confirming purchase deletion for ID:', deletingPurchaseId);
+          if (deletingPurchaseId) {
+            handleDeletePurchase(deletingPurchaseId!); // Non-null assertion
+          }
+        }}
+        title="Satın Alma Sil"
         description="Bu satın alışı silmek istediğinizden emin misiniz?"
       />
 
       <DeleteConfirmationModal
-        isOpen={!!deletingPaymentToSupplierId}
+        isOpen={deletingPaymentToSupplierId !== null}
         onClose={() => setDeletingPaymentToSupplierId(null)}
-        onConfirm={() => handleDeletePaymentToSupplier(deletingPaymentToSupplierId!)}
+        onConfirm={() => {
+          console.log('DeleteConfirmationModal: Confirming payment deletion for ID:', deletingPaymentToSupplierId);
+          if (deletingPaymentToSupplierId) {
+            handleDeletePaymentToSupplier(deletingPaymentToSupplierId!); // Non-null assertion
+          }
+        }}
         title="Ödemeyi Sil"
         description="Bu ödemeyi silmek istediğinizden emin misiniz?"
       />
 
       <DeleteConfirmationModal
-        isOpen={!!deletingSupplier}
+        isOpen={deletingSupplier !== null}
         onClose={() => setDeletingSupplier(null)}
         onConfirm={handleDeleteSupplier}
         title="Tedarikçiyi Sil"
