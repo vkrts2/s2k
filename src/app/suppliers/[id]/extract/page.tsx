@@ -10,7 +10,8 @@ import { tr } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Printer } from 'lucide-react';
 
 interface ExtractPageProps {
   params: {
@@ -142,8 +143,12 @@ export default function ExtractPage({ params }: ExtractPageProps) {
       <h1 className="text-3xl font-bold mb-6">Tedarikçi Ekstresi: {supplier.name}</h1>
 
       <Card className="mb-6">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Genel Bilgiler</CardTitle>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-2" />
+            Yazdır
+          </Button>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 text-sm">
           <p className="font-medium">Tedarikçi Adı:</p>
