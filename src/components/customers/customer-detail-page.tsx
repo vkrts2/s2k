@@ -469,8 +469,13 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
   };
 
   const handleDeleteSale = useCallback(async (saleId: string) => {
-    if (!user || !customer?.id) return;
+    console.log('handleDeleteSale called with saleId:', saleId);
+    if (!user || !customer?.id) {
+      console.log('handleDeleteSale: User or customer ID missing.');
+      return;
+    }
     try {
+      console.log('Attempting to delete sale with uid:', user.uid, 'and saleId:', saleId);
       await storage.storageDeleteSale(user.uid, saleId);
       setSales(prevSales => prevSales.filter(sale => sale.id !== saleId));
       toast({
@@ -1462,9 +1467,9 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         isOpen={deletingSaleId !== null}
         onClose={() => setDeletingSaleId(null)}
         onConfirm={() => {
+          console.log('DeleteConfirmationModal: Confirming sale deletion for ID:', deletingSaleId);
           if (deletingSaleId) {
-            const saleId = deletingSaleId as string;
-            handleDeleteSale(saleId);
+            handleDeleteSale(deletingSaleId!);
           }
         }}
         title="Satışı Sil"
@@ -1475,9 +1480,9 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         isOpen={deletingPaymentId !== null}
         onClose={() => setDeletingPaymentId(null)}
         onConfirm={() => {
+          console.log('DeleteConfirmationModal: Confirming payment deletion for ID:', deletingPaymentId);
           if (deletingPaymentId) {
-            const paymentId = deletingPaymentId as string;
-            handleDeletePayment(paymentId);
+            handleDeletePayment(deletingPaymentId!);
           }
         }}
         title="Ödemeyi Sil"
