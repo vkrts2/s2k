@@ -209,8 +209,8 @@ export default function ExtractPage({ params }: ExtractPageProps) {
               <TableRow>
                 <TableHead className="print:text-black">Tarih</TableHead>
                 <TableHead className="print:text-black">İşlem Tipi</TableHead>
-                <TableHead className="text-right print:text-black">Tutar</TableHead>
                 <TableHead className="print:text-black">Açıklama</TableHead>
+                <TableHead className="text-right print:text-black">Tutar</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -225,9 +225,6 @@ export default function ExtractPage({ params }: ExtractPageProps) {
                         <Badge variant="default" className="bg-green-500 hover:bg-green-600 print:bg-green-500 print:text-white">Ödeme</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right font-medium print:text-black">
-                      {formatCurrency(item.amount, item.currency)}
-                    </TableCell>
                     <TableCell className="print:text-black">
                       {item.description || '-'}
                       {'method' in item && item.method ? ` (${
@@ -236,6 +233,9 @@ export default function ExtractPage({ params }: ExtractPageProps) {
                         item.method === 'krediKarti' ? 'Kredi Kartı' :
                         item.method === 'cek' ? 'Çek' : 'Diğer'
                       })` : ''}
+                    </TableCell>
+                    <TableCell className="text-right font-medium print:text-black">
+                      {formatCurrency(item.amount, item.currency)}
                     </TableCell>
                   </TableRow>
                 ))
