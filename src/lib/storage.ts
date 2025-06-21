@@ -834,7 +834,6 @@ export const generateQuotationNumber = async (uid: string): Promise<string> => {
     }
   }
   const newNumber = lastNumber + 1;
-  return `QT${String(newNumber).padStart(4, '0')}`; = lastNumber + 1;
   return `QT${String(newNumber).padStart(4, '0')}`;
 };
 
@@ -1092,7 +1091,6 @@ export const generateQuotationNumber = async (uid: string): Promise<string> => {
     }
   }
   const newNumber = lastNumber + 1;
-  return `QT${String(newNumber).padStart(4, '0')}`; = lastNumber + 1;
   return `QT${String(newNumber).padStart(4, '0')}`;
 };
 
@@ -1350,7 +1348,6 @@ export const generateQuotationNumber = async (uid: string): Promise<string> => {
     }
   }
   const newNumber = lastNumber + 1;
-  return `QT${String(newNumber).padStart(4, '0')}`; = lastNumber + 1;
   return `QT${String(newNumber).padStart(4, '0')}`;
 };
 
