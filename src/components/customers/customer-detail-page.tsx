@@ -299,12 +299,14 @@ export function CustomerDetailPageClient({
     setEditingPayment(null);
   };
 
-  const handleDeleteSale = async (saleId: string) => {
-    await onSaleDelete(saleId);
-  };
-
-  const handleDeletePayment = async (paymentId: string) => {
-    await onPaymentDelete(paymentId);
+  const handleDeleteConfirm = () => {
+    if (deletingSaleId) {
+      onSaleDelete(deletingSaleId);
+      setDeletingSaleId(null);
+    } else if (deletingPaymentId) {
+      onPaymentDelete(deletingPaymentId);
+      setDeletingPaymentId(null);
+    }
   };
 
   const handleCustomerDelete = async () => {
@@ -622,14 +624,13 @@ export function CustomerDetailPageClient({
                                                 setShowPaymentModal(true);
                                             }
                                        }}> <Pencil className="h-4 w-4" /> </Button>
-                                      <DeleteConfirmationModal
-                                          isOpen={deletingSaleId === item.id || deletingPaymentId === item.id}
-                                          onClose={() => { setDeletingSaleId(null); setDeletingPaymentId(null); }}
-                                          onConfirm={() => item.transactionType === 'sale' ? handleDeleteSale(item.id) : handleDeletePayment(item.id)}
-                                          title={item.transactionType === 'sale' ? "Satışı Sil" : "Ödemeyi Sil"}
-                                          description={`Bu ${item.transactionType === 'sale' ? 'satışı' : 'ödemeyi'} silmek istediğinizden emin misiniz?`}
-                                      />
-                                      <Button variant="ghost" size="sm" onClick={() => item.transactionType === 'sale' ? setDeletingSaleId(item.id) : setDeletingPaymentId(item.id)}> <Trash2 className="h-4 w-4" /> </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => {
+                                        if (item.transactionType === 'sale') {
+                                          setDeletingSaleId(item.id);
+                                        } else {
+                                          setDeletingPaymentId(item.id);
+                                        }
+                                      }}> <Trash2 className="h-4 w-4" /> </Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -796,6 +797,17 @@ export function CustomerDetailPageClient({
         </TabsContent>
       </Tabs>
     </div>
+
+    <DeleteConfirmationModal
+      isOpen={deletingSaleId !== null || deletingPaymentId !== null}
+      onClose={() => {
+        setDeletingSaleId(null);
+        setDeletingPaymentId(null);
+      }}
+      onConfirm={handleDeleteConfirm}
+      title={deletingSaleId ? "Satışı Sil" : "Ödemeyi Sil"}
+      description={`Bu ${deletingSaleId ? 'satışı' : 'ödemeyi'} silmek istediğinizden emin misiniz?`}
+    />
 
     <EditCustomerModal
       isOpen={showEditCustomerModal}
