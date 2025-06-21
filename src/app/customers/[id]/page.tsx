@@ -82,8 +82,14 @@ export default function CustomerDetailPage() {
     // Olay Yöneticileri (Event Handlers) with OPTIMISTIC UPDATES
     const handleSaleSubmit = async (values: SaleFormValues, editingSale: Sale | null) => {
         if (!user || !customer) return;
+        // amount alanı kontrolü
+        const parsedAmount = parseFloat(values.amount.toString());
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            toast({ title: "Hata", description: "Lütfen geçerli bir tutar girin.", variant: "destructive" });
+            return;
+        }
         try {
-            const saleData = { ...values, customerId: customer.id, date: formatISO(values.date), amount: parseFloat(values.amount.toString()), quantity: values.quantity ? parseFloat(values.quantity.toString()) : undefined, unitPrice: values.unitPrice ? parseFloat(values.unitPrice.toString()) : undefined, category: 'satis' as const, tags: [] };
+            const saleData = { ...values, customerId: customer.id, date: formatISO(values.date), amount: parsedAmount, quantity: values.quantity ? parseFloat(values.quantity.toString()) : undefined, unitPrice: values.unitPrice ? parseFloat(values.unitPrice.toString()) : undefined, category: 'satis' as const, tags: [] };
             if (editingSale) {
                 const updatedSale: Sale = { ...editingSale, ...saleData, updatedAt: formatISO(new Date()) };
                 await storage.updateSale(user.uid, updatedSale);
