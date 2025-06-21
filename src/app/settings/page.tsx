@@ -183,11 +183,20 @@ export default function SettingsPage() {
   };
 
   const handleClearLocalSalesPayments = () => {
+    const salesBefore = localStorage.getItem('ermay_sales');
+    const paymentsBefore = localStorage.getItem('ermay_payments');
     localStorage.removeItem('ermay_sales');
     localStorage.removeItem('ermay_payments');
+    const salesAfter = localStorage.getItem('ermay_sales');
+    const paymentsAfter = localStorage.getItem('ermay_payments');
+    console.log('Yerel satışlar (önce):', salesBefore);
+    console.log('Yerel ödemeler (önce):', paymentsBefore);
+    console.log('Yerel satışlar (sonra):', salesAfter);
+    console.log('Yerel ödemeler (sonra):', paymentsAfter);
     toast({
       title: 'Yerel Satış ve Ödeme Verileri Silindi',
       description: 'Localda tutulan eski satış ve ödeme kayıtları temizlendi.',
+      duration: 5000,
     });
   };
 
