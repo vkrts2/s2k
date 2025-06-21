@@ -99,7 +99,6 @@ export default function CustomerDetailPage() {
                   amount: parsedAmount,
                   date: formatISO(values.date),
                   currency: values.currency,
-                  stockItemId: values.stockItemId || undefined,
                   description: values.description || '',
                   category: 'satis' as const,
                   tags: [],
@@ -109,6 +108,9 @@ export default function CustomerDetailPage() {
                 }
                 if (values.unitPrice && !isNaN(Number(values.unitPrice))) {
                   newSaleData.unitPrice = parseFloat(values.unitPrice.toString());
+                }
+                if (values.stockItemId) {
+                  newSaleData.stockItemId = values.stockItemId;
                 }
                 const newSale = await storage.addSale(user.uid, newSaleData);
                 setSales(prev => [newSale, ...prev]);
