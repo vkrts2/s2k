@@ -3,7 +3,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { getFirestore, enablePersistence } from "firebase/firestore";
 
 // TEMPORARY DEBUGGING: Hardcoding the config to bypass .env file issues
 const firebaseConfig = {
@@ -23,26 +23,6 @@ console.log("Connecting to Firebase Project ID:", firebaseConfig.projectId);
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-
-// Enable offline persistence
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('Çoklu sekme açık olduğu için offline persistence etkinleştirilemedi');
-  } else if (err.code === 'unimplemented') {
-    console.warn('Tarayıcı offline persistence desteklemiyor');
-  }
-});
-
-// Enable offline persistence
-enablePersistence(db, {
-  synchronizeTabs: true
-}).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('Çoklu sekme açık olduğu için offline persistence etkinleştirilemedi');
-  } else if (err.code === 'unimplemented') {
-    console.warn('Tarayıcı offline persistence desteklemiyor');
-  }
-});
 
 // Enable offline persistence
 enablePersistence(db, {

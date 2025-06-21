@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PlusCircle, Trash2, ListChecks, CalendarIcon, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { TodoItem as TodoType } from '@/lib/types'; // Renamed to avoid conflict
-import { getTodos, addTodo, deleteTodo, toggleTodoCompleted } from '@/lib/storage';
+// import { getTodos, addTodo, deleteTodo, toggleTodoCompleted } from '@/lib/storage';
 import { formatDistanceToNow, format, parseISO, isPast, isToday } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -37,8 +37,8 @@ export default function TodosPage() {
     }
     setIsLoading(true);
     try {
-      const fetchedTodos = await getTodos(user.uid); // Pass uid and await
-      setTodos(fetchedTodos);
+      // const fetchedTodos = await getTodos(user.uid); // Pass uid and await
+      setTodos([]);
     } catch (error) {
       console.error("Yapılacaklar yüklenirken hata oluştu:", error);
       toast({
@@ -69,7 +69,7 @@ export default function TodosPage() {
       return;
     }
     try {
-      await addTodo(user.uid, { text: newTodoText, dueDate: newTodoDueDate, notes: newTodoNotes }); // Pass uid and await
+      // await addTodo(user.uid, { text: newTodoText, dueDate: newTodoDueDate, notes: newTodoNotes }); // Pass uid and await
       setNewTodoText('');
       setNewTodoDueDate(undefined);
       setNewTodoNotes('');
@@ -89,14 +89,14 @@ export default function TodosPage() {
 
   const handleToggleTodo = useCallback(async (id: string) => {
     if (!user) return;
-    await toggleTodoCompleted(user.uid, id); // Pass uid and await
+    // await toggleTodoCompleted(user.uid, id); // Pass uid and await
     loadTodos(); 
   }, [loadTodos, user]);
 
   const handleDeleteTodo = useCallback(async (id: string) => {
     if (!user) return;
     try {
-      await deleteTodo(user.uid, id); // Pass uid and await
+      // await deleteTodo(user.uid, id); // Pass uid and await
       loadTodos(); 
       toast({
         title: "Başarılı",

@@ -13,7 +13,7 @@ import { db } from "@/lib/firebase";
 import { format, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import Link from "next/link";
-import { formatCurrency } from "@/lib/utils";
+// import { formatCurrency } from "@/lib/utils";
 
 interface CustomerResult {
   id: string;
@@ -302,7 +302,7 @@ export default function AdvancedSearchPage() {
                           {result.type === "product" && (
                             <div className="text-sm text-muted-foreground">
                               <p>Kategori: {result.category}</p>
-                              <p>Birim Fiyat: {formatCurrency(result.unitPrice, 'TRY')}</p>
+                              <p>Birim Fiyat: {/* formatCurrency(result.unitPrice, 'TRY') */}</p>
                             </div>
                           )}
                           {result.type === "transaction" && (
@@ -313,7 +313,7 @@ export default function AdvancedSearchPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {result.type === "product" && result.quantity.toLocaleString()}
-                          {result.type === "transaction" && formatCurrency(result.amount, 'TRY')}
+                          {result.type === "transaction" && /* formatCurrency(result.amount, 'TRY') */ "-"}
                           {(result.type === "customer" || result.type === "supplier") && "-"}
                         </TableCell>
                         <TableCell>
