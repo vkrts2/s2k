@@ -124,12 +124,33 @@ export default function CustomerDetailPage() {
     const handleSaleDelete = async (saleId: string) => {
         if (!user) return;
         try {
-            await storage.storageDeleteSale(user.uid, saleId);
+            // Önce UI'ı güncelle
             setSales(prev => prev.filter(s => s.id !== saleId));
+            
+            // Silme işlemini gerçekleştir
+            await storage.storageDeleteSale(user.uid, saleId);
+            
+            // Kısa bir gecikme sonrası Firestore'dan tekrar kontrol et
+            setTimeout(async () => {
+                try {
+                    const verifySnap = await storage.getSales(user.uid, customerId);
+                    setSales(verifySnap);
+                } catch (verifyError) {
+                    console.error("Veri doğrulama hatası:", verifyError);
+                }
+            }, 1000);
+    
             toast({ title: "Başarılı", description: "Satış başarıyla silindi." });
         } catch (error) {
             console.error("Satış silinirken hata:", error);
-            toast({ title: "Hata", description: "Satış silinemedi.", variant: "destructive" });
+            // Hata durumunda silinen veriyi geri al
+            const currentSales = await storage.getSales(user.uid, customerId);
+            setSales(currentSales);
+            toast({ 
+                title: "Hata", 
+                description: "Satış silinemedi. Lütfen tekrar deneyin.", 
+                variant: "destructive" 
+            });
         }
     };
 
