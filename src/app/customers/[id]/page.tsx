@@ -41,7 +41,6 @@ export default function CustomerDetailPage() {
         setSales(await getSales(user.uid, customerId));
         setPayments(await getPayments(user.uid, customerId));
         document.title = `${fetchedCustomer.name} | Müşteri Detayları | ERMAY`;
-        router.refresh();
       } else {
         setIsCustomerFound(false);
       }
@@ -51,7 +50,7 @@ export default function CustomerDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [customerId, user, router]);
+  }, [customerId, user]);
 
   useEffect(() => {
     if (authLoading) return;

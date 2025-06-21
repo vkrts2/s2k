@@ -470,29 +470,70 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
 
   const handleDeleteSale = useCallback(async (saleId: string) => {
     console.log('handleDeleteSale called with saleId:', saleId);
-    if (!user || !customer?.id) {
-      console.log('handleDeleteSale: User or customer ID missing.');
+    console.log('Current user:', user);
+    console.log('Current customer:', customer);
+    
+    if (!user) {
+      console.error('handleDeleteSale: User is null or undefined');
+      toast({
+        title: "Hata",
+        description: "Kullanıcı bilgisi bulunamadı. Lütfen tekrar giriş yapın.",
+        variant: "destructive",
+      });
       return;
     }
+    
+    if (!customer?.id) {
+      console.error('handleDeleteSale: Customer ID is null or undefined');
+      toast({
+        title: "Hata",
+        description: "Müşteri bilgisi bulunamadı.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       console.log('Attempting to delete sale with uid:', user.uid, 'and saleId:', saleId);
+      
+      // Önce satışın mevcut olup olmadığını kontrol et
+      const currentSale = sales.find(sale => sale.id === saleId);
+      if (!currentSale) {
+        console.error('Sale not found in current sales array:', saleId);
+        toast({
+          title: "Hata",
+          description: "Silinecek satış bulunamadı.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       await storage.storageDeleteSale(user.uid, saleId);
-      setSales(prevSales => prevSales.filter(sale => sale.id !== saleId));
+      console.log('Sale deleted successfully from storage');
+      
+      // State'i güncelle
+      setSales(prevSales => {
+        const updatedSales = prevSales.filter(sale => sale.id !== saleId);
+        console.log('Updated sales array length:', updatedSales.length);
+        return updatedSales;
+      });
+      
       toast({
         title: "Başarılı",
         description: "Satış başarıyla silindi.",
       });
+      
       setDeletingSaleId(null);
       onDataUpdated();
     } catch (error) {
       console.error("Satış silinirken hata:", error);
       toast({
         title: "Hata",
-        description: "Satış silinirken bir sorun oluştu.",
+        description: `Satış silinirken bir sorun oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`,
         variant: "destructive",
       });
     }
-  }, [user, customer?.id, onDataUpdated, toast]);
+  }, [user, customer?.id, sales, onDataUpdated, toast]);
 
   const handleDeletePayment = useCallback(async (paymentId: string) => {
     if (!user || !customer?.id) return;
@@ -1471,7 +1512,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         onConfirm={() => {
           console.log('DeleteConfirmationModal: Confirming sale deletion for ID:', deletingSaleId);
           if (deletingSaleId) {
-            handleDeleteSale(deletingSaleId!);
+            handleDeleteSale(deletingSaleId);
           }
         }}
         title="Satışı Sil"

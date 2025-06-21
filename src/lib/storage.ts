@@ -214,7 +214,7 @@ export const getSales = async (uid: string, customerId?: string): Promise<Sale[]
     if (customerId) {
       salesQuery = query(salesQuery, where("customerId", "==", customerId));
     }
-    const querySnapshot = await getDocs(salesQuery, { source: 'server' });
+    const querySnapshot = await getDocs(salesQuery);
     console.log("getSales - querySnapshot.docs:", querySnapshot.docs);
     const sales: Sale[] = querySnapshot.docs.map(doc => {
       let description = doc.data().description;
@@ -283,12 +283,22 @@ export const updateSale = async (uid: string, updatedSaleData: Sale): Promise<Sa
 };
 
 export const storageDeleteSale = async (uid: string, saleId: string): Promise<void> => {
+  console.log('storageDeleteSale called with uid:', uid, 'saleId:', saleId);
+  
   if (!uid || !saleId) {
     throw new Error("User ID or Sale ID is missing");
   }
+  
   const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), saleId);
   console.log("storageDeleteSale: Attempting to delete doc at path:", saleDocRef.path, "with saleId:", saleId);
-  await deleteDoc(saleDocRef);
+  
+  try {
+    await deleteDoc(saleDocRef);
+    console.log("storageDeleteSale: Document deleted successfully");
+  } catch (error) {
+    console.error("storageDeleteSale: Error occurred:", error);
+    throw error;
+  }
 };
 
 // Payment Functions
@@ -302,7 +312,7 @@ export const getPayments = async (uid: string, customerId?: string): Promise<Pay
     if (customerId) {
       paymentsQuery = query(paymentsQuery, where("customerId", "==", customerId));
     }
-    const querySnapshot = await getDocs(paymentsQuery, { source: 'server' });
+    const querySnapshot = await getDocs(paymentsQuery);
     const payments: Payment[] = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data() as Omit<Payment, 'id'>,
