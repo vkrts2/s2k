@@ -834,8 +834,7 @@ export const generateQuotationNumber = async (uid: string): Promise<string> => {
     }
   }
   const newNumber = lastNumber + 1;
-  const year = new Date().getFullYear();
-  return `TEKLIF-${year}-${String(newNumber).padStart(3, '0')}`;
+  return `QT${String(newNumber).padStart(4, '0')}`;
 };
 
 export const addQuotation = async (uid: string, quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation> => {
@@ -1092,8 +1091,7 @@ export const generateQuotationNumber = async (uid: string): Promise<string> => {
     }
   }
   const newNumber = lastNumber + 1;
-  const year = new Date().getFullYear();
-  return `TEKLIF-${year}-${String(newNumber).padStart(3, '0')}`;
+  return `QT${String(newNumber).padStart(4, '0')}`;
 };
 
 export const addQuotation = async (uid: string, quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation> => {
@@ -1350,8 +1348,7 @@ export const generateQuotationNumber = async (uid: string): Promise<string> => {
     }
   }
   const newNumber = lastNumber + 1;
-  const year = new Date().getFullYear();
-  return `TEKLIF-${year}-${String(newNumber).padStart(3, '0')}`;
+  return `QT${String(newNumber).padStart(4, '0')}`;
 };
 
 export const addQuotation = async (uid: string, quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation> => {
