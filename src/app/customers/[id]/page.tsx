@@ -94,18 +94,22 @@ export default function CustomerDetailPage() {
                 setSales(prev => prev.map(s => s.id === saleData.id ? saleData : s));
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla güncellendi.' });
             } else {
-                const newSaleData = {
+                const newSaleData: any = {
                   customerId: customer.id,
                   amount: parsedAmount,
                   date: formatISO(values.date),
                   currency: values.currency,
                   stockItemId: values.stockItemId || undefined,
                   description: values.description || '',
-                  quantity: values.quantity ? parseFloat(values.quantity.toString()) : undefined,
-                  unitPrice: values.unitPrice ? parseFloat(values.unitPrice.toString()) : undefined,
                   category: 'satis' as const,
                   tags: [],
                 };
+                if (values.quantity && !isNaN(Number(values.quantity))) {
+                  newSaleData.quantity = parseFloat(values.quantity.toString());
+                }
+                if (values.unitPrice && !isNaN(Number(values.unitPrice))) {
+                  newSaleData.unitPrice = parseFloat(values.unitPrice.toString());
+                }
                 const newSale = await storage.addSale(user.uid, newSaleData);
                 setSales(prev => [newSale, ...prev]);
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla eklendi.' });
@@ -119,14 +123,26 @@ export default function CustomerDetailPage() {
     const handlePaymentSubmit = async (values: PaymentFormValues, editingPayment: Payment | null) => {
         if (!user || !customer) return;
         try {
-            const paymentData = { ...values, customerId: customer.id, date: formatISO(values.date), amount: parseFloat(values.amount.toString()), checkDate: values.checkDate ? formatISO(values.checkDate) : null, category: 'odeme' as const, tags: [] };
+            const paymentData: any = {
+              customerId: customer.id,
+              date: formatISO(values.date),
+              amount: parseFloat(values.amount.toString()),
+              currency: values.currency,
+              method: values.method,
+              category: 'odeme' as const,
+              tags: [],
+            };
+            if (values.checkDate) paymentData.checkDate = formatISO(values.checkDate);
+            if (values.checkSerialNumber) paymentData.checkSerialNumber = values.checkSerialNumber;
+            if (values.referenceNumber) paymentData.referenceNumber = values.referenceNumber;
+            if (values.description) paymentData.description = values.description;
             if (editingPayment) {
                 const updatedPayment: Payment = { ...editingPayment, ...paymentData, updatedAt: formatISO(new Date()) };
                 await storage.updatePayment(user.uid, updatedPayment);
                 setPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
                 toast({ title: 'Başarılı!', description: 'Ödeme başarıyla güncellendi.' });
             } else {
-                const newPaymentData: Omit<Payment, 'id' | 'transactionType'> = { ...paymentData, createdAt: formatISO(new Date()), updatedAt: formatISO(new Date()) };
+                const newPaymentData: any = { ...paymentData, createdAt: formatISO(new Date()), updatedAt: formatISO(new Date()) };
                 const newPayment = await storage.addPayment(user.uid, newPaymentData);
                 setPayments(prev => [newPayment, ...prev]);
                 toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
