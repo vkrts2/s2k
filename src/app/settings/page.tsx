@@ -182,6 +182,14 @@ export default function SettingsPage() {
     reader.readAsText(selectedFile);
   };
 
+  const handleClearLocalSalesPayments = () => {
+    localStorage.removeItem('ermay_sales');
+    localStorage.removeItem('ermay_payments');
+    toast({
+      title: 'Yerel Satış ve Ödeme Verileri Silindi',
+      description: 'Localda tutulan eski satış ve ödeme kayıtları temizlendi.',
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -279,6 +287,14 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Separator className="my-6" />
+      <div className="mb-4">
+        <h3 className="font-semibold mb-2">Yerel Satış ve Ödeme Verilerini Temizle</h3>
+        <Button variant="destructive" onClick={handleClearLocalSalesPayments}>
+          Yerel Satış ve Ödeme Kayıtlarını Sil
+        </Button>
+      </div>
 
     </div>
   );
