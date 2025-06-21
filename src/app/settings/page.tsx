@@ -20,6 +20,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
+import * as storage from '@/lib/storage';
 
 const LOCALSTORAGE_KEYS = [
   "ermay_customers",
@@ -36,8 +38,10 @@ const LOCALSTORAGE_KEYS = [
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
 
   const handleBackupData = () => {
     try {
@@ -200,6 +204,49 @@ export default function SettingsPage() {
     });
   };
 
+  const handleDeleteAllTransactions = async () => {
+    if (!user) {
+      toast({
+        title: "Hata",
+        description: "Lütfen önce giriş yapın.",
+        variant: "destructive",
+      });
+      setShowDeleteAllConfirm(false);
+      return;
+    }
+
+    toast({
+      title: "İşlem Başlatıldı",
+      description: "Tüm satış ve ödeme kayıtları siliniyor... Bu işlem biraz sürebilir.",
+    });
+
+    try {
+      const allSales = await storage.getSales(user.uid);
+      const allPayments = await storage.getPayments(user.uid);
+
+      const deleteSalePromises = allSales.map(sale => storage.storageDeleteSale(user.uid, sale.id));
+      const deletePaymentPromises = allPayments.map(payment => storage.storageDeletePayment(user.uid, payment.id));
+
+      await Promise.all([...deleteSalePromises, ...deletePaymentPromises]);
+
+      toast({
+        title: "İşlem Tamamlandı",
+        description: `Toplam ${allSales.length} satış ve ${allPayments.length} ödeme kaydı başarıyla veritabanından silindi.`,
+        variant: "default",
+        duration: 7000,
+      });
+    } catch (error) {
+      console.error("Tüm işlemler silinirken hata:", error);
+      toast({
+        title: "Hata",
+        description: "İşlemler silinirken bir sorun oluştu. Lütfen konsolu kontrol edin.",
+        variant: "destructive",
+      });
+    } finally {
+      setShowDeleteAllConfirm(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -307,6 +354,49 @@ export default function SettingsPage() {
           </Button>
         </div>
       </div>
+
+      <Card className="mt-8 border-destructive">
+        <CardHeader>
+          <CardTitle className="text-destructive">Tehlikeli Alan</CardTitle>
+          <CardDescription>
+            Bu alandaki işlemler kalıcıdır ve geri alınamaz. Lütfen dikkatli olun.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-lg border border-destructive bg-destructive/5 p-4">
+            <div>
+              <h3 className="font-semibold text-destructive">Tüm İşlem Verilerini Sıfırla</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Bu işlem, hesabınıza ait tüm satış ve ödeme kayıtlarını Firestore veritabanından kalıcı olarak siler.
+              </p>
+            </div>
+            <Button variant="destructive" onClick={() => setShowDeleteAllConfirm(true)}>
+              Tüm İşlemleri Sil
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={showDeleteAllConfirm} onOpenChange={setShowDeleteAllConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Emin misiniz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu eylem geri alınamaz. Bu, hesabınıza ait <strong>tüm satış ve ödeme kayıtlarını</strong> veritabanından kalıcı olarak silecek. 
+              Verileriniz sonsuza kadar kaybolacak.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAllTransactions}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Evet, Hepsini Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );
