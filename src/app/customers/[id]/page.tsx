@@ -31,26 +31,26 @@ export default function CustomerDetailPage() {
       setError("Kullanıcı veya müşteri bilgisi eksik.");
       return;
     }
-    try {
+      try {
       setSales([]);
       setPayments([]);
 
-      const fetchedCustomer = await getCustomerById(user.uid, customerId);
-      if (fetchedCustomer) {
-        setCustomer(fetchedCustomer);
-        setSales(await getSales(user.uid, customerId));
-        setPayments(await getPayments(user.uid, customerId));
-        document.title = `${fetchedCustomer.name} | Müşteri Detayları | ERMAY`;
-      } else {
-        setIsCustomerFound(false);
+        const fetchedCustomer = await getCustomerById(user.uid, customerId);
+        if (fetchedCustomer) {
+          setCustomer(fetchedCustomer);
+          setSales(await getSales(user.uid, customerId));
+          setPayments(await getPayments(user.uid, customerId));
+          document.title = `${fetchedCustomer.name} | Müşteri Detayları | ERMAY`;
+        } else {
+          setIsCustomerFound(false);
+        }
+      } catch (e) {
+        console.error("Error fetching customer data:", e);
+        setError("Müşteri verileri yüklenirken bir hata oluştu.");
+      } finally {
+        setIsLoading(false);
       }
-    } catch (e) {
-      console.error("Error fetching customer data:", e);
-      setError("Müşteri verileri yüklenirken bir hata oluştu.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [customerId, user]);
+  }, [customerId, user?.uid]);
 
   useEffect(() => {
     if (authLoading) return;

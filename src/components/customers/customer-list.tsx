@@ -131,50 +131,50 @@ export function CustomerList({
               </TableRow>
             ) : (
               filteredCustomers.map((customer) => {
-                const balances = calculateBalancesForCustomer(customer.id);
-                return (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/customers/${customer.id}`} className="hover:underline text-primary">
-                        {customer.name}
-                      </Link>
-                    </TableCell>
+              const balances = calculateBalancesForCustomer(customer.id);
+              return (
+                <TableRow key={customer.id}>
+                  <TableCell className="font-medium">
+                    <Link href={`/customers/${customer.id}`} className="hover:underline text-primary">
+                      {customer.name}
+                    </Link>
+                  </TableCell>
                     <TableCell>{customer.email}</TableCell>
                     <TableCell>{customer.phone}</TableCell>
-                    <TableCell className={cn(
-                        "text-right font-mono",
-                        balances.TRY > 0 ? "text-green-600" : balances.TRY < 0 ? "text-red-600" : ""
-                      )}>
-                      {formatCurrency(balances.TRY, "TRY")}
-                    </TableCell>
-                    <TableCell className={cn(
-                        "text-right font-mono",
-                        balances.USD > 0 ? "text-green-600" : balances.USD < 0 ? "text-red-600" : ""
-                      )}>
-                      {formatCurrency(balances.USD, "USD")}
-                    </TableCell>
-                    <TableCell className="text-right space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-primary"
-                        onClick={() => onEdit(customer)}
-                        title="Düzenle"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => onDelete(customer.id)}
-                        title="Sil"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
+                  <TableCell className={cn(
+                      "text-right font-mono",
+                      balances.TRY > 0 ? "text-green-600" : balances.TRY < 0 ? "text-red-600" : ""
+                    )}>
+                    {formatCurrency(balances.TRY, "TRY")}
+                  </TableCell>
+                  <TableCell className={cn(
+                      "text-right font-mono",
+                      balances.USD > 0 ? "text-green-600" : balances.USD < 0 ? "text-red-600" : ""
+                    )}>
+                    {formatCurrency(balances.USD, "USD")}
+                  </TableCell>
+                  <TableCell className="text-right space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={() => onEdit(customer)}
+                      title="Düzenle"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => onDelete(customer.id)}
+                      title="Sil"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
               })
             )}
           </TableBody>

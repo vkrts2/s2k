@@ -174,57 +174,57 @@ export function SupplierList({
               </TableRow>
             ) : (
               filteredAndSortedSuppliers.map((supplier) => {
-                const balances = calculateBalancesForSupplier(supplier.id);
-                const defaultCurrency = supplier.defaultCurrency || 'TRY';
-                const displayBalance = balances[defaultCurrency];
+              const balances = calculateBalancesForSupplier(supplier.id);
+              const defaultCurrency = supplier.defaultCurrency || 'TRY';
+              const displayBalance = balances[defaultCurrency];
 
-                return (
-                  <TableRow key={supplier.id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={`/suppliers/${supplier.id}`}
-                        className="text-primary hover:text-primary/80 transition-colors"
-                      >
-                        {supplier.name}
-                      </Link>
-                    </TableCell>
+              return (
+                <TableRow key={supplier.id}>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/suppliers/${supplier.id}`}
+                      className="text-primary hover:text-primary/80 transition-colors"
+                    >
+                      {supplier.name}
+                    </Link>
+                  </TableCell>
                     <TableCell>{supplier.email}</TableCell>
                     <TableCell>{supplier.phone}</TableCell>
                     <TableCell>{supplier.address}</TableCell>
-                    <TableCell className={cn(
-                      "text-right font-mono",
-                      displayBalance > 0 ? "text-red-600" : displayBalance < 0 ? "text-green-600" : ""
-                    )}>
-                      {formatCurrency(displayBalance, defaultCurrency)}
-                    </TableCell>
-                    <TableCell className="text-right space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-primary"
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          onEdit(supplier);
-                        }}
-                        title="Düzenle"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive"
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          onDelete(supplier.id);
-                        }}
-                        title="Sil"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
+                  <TableCell className={cn(
+                    "text-right font-mono",
+                    displayBalance > 0 ? "text-red-600" : displayBalance < 0 ? "text-green-600" : ""
+                  )}>
+                    {formatCurrency(displayBalance, defaultCurrency)}
+                  </TableCell>
+                  <TableCell className="text-right space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        onEdit(supplier);
+                      }}
+                      title="Düzenle"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        onDelete(supplier.id);
+                      }}
+                      title="Sil"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
               })
             )}
           </TableBody>

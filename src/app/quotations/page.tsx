@@ -63,10 +63,10 @@ export default function QuotationsPage() {
   const handleAddQuotation = (quotation: Quotation) => {
     saveQuotations([...quotations, quotation]);
     setShowQuotationModal(false);
-    toast({
+      toast({
       title: "Başarılı",
       description: "Fiyat teklifi başarıyla eklendi.",
-    });
+      });
   };
 
   const handleEditQuotation = (quotation: Quotation) => {
@@ -89,7 +89,7 @@ export default function QuotationsPage() {
   const handleDeleteQuotation = (quotationId: string) => {
     const updatedQuotations = quotations.filter(quotation => quotation.id !== quotationId);
     saveQuotations(updatedQuotations);
-    toast({
+      toast({
       title: "Başarılı",
       description: "Fiyat teklifi başarıyla silindi.",
     });
@@ -116,19 +116,19 @@ export default function QuotationsPage() {
           <DialogTrigger asChild>
             <Button onClick={() => { setEditingQuotation(null); setShowQuotationModal(true); }}>
               <PlusCircle className="mr-2 h-4 w-4" /> Yeni Teklif
-            </Button>
+        </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[800px]">
-            <DialogHeader>
+          <DialogHeader>
               <DialogTitle>{editingQuotation ? "Teklif Düzenle" : "Yeni Teklif"}</DialogTitle>
-            </DialogHeader>
-            <QuotationForm
+          </DialogHeader>
+          <QuotationForm
               onSubmit={editingQuotation ? handleUpdateQuotation : handleAddQuotation}
-              initialData={editingQuotation}
+            initialData={editingQuotation}
               onCancel={() => setShowQuotationModal(false)}
-            />
-          </DialogContent>
-        </Dialog>
+          />
+        </DialogContent>
+      </Dialog>
       </div>
 
       <Card>

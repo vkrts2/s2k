@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { 
   User,
   signInWithEmailAndPassword,
@@ -34,25 +34,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
-  };
+  }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string) => {
     await createUserWithEmailAndPassword(auth, email, password);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await signOut(auth);
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     loading,
     signIn,
     signUp,
     logout
-  };
+  }), [user, loading, signIn, signUp, logout]);
 
   return (
     <AuthContext.Provider value={value}>

@@ -97,10 +97,10 @@ export default function PortfolioPage() {
     savePortfolioItems([...portfolioItems, newItem]);
     setShowItemModal(false);
     resetForm();
-    toast({
+        toast({
       title: "Başarılı",
       description: "Portföy kaydı başarıyla eklendi.",
-    });
+      });
   };
 
   const handleEditItem = (item: PortfolioItem) => {
@@ -155,10 +155,10 @@ export default function PortfolioPage() {
   const handleDeleteItem = (itemId: string) => {
     const updatedItems = portfolioItems.filter(item => item.id !== itemId);
     savePortfolioItems(updatedItems);
-    toast({
+      toast({
       title: "Başarılı",
       description: "Portföy kaydı başarıyla silindi.",
-    });
+      });
   };
 
   const resetForm = () => {
@@ -353,7 +353,7 @@ export default function PortfolioPage() {
               </Button>
               <Button onClick={editingItem ? handleUpdateItem : handleAddItem}>
                 {editingItem ? "Güncelle" : "Ekle"}
-              </Button>
+        </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
