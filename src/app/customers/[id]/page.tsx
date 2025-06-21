@@ -36,7 +36,7 @@ export default function CustomerDetailPage() {
       console.error("Stok kalemleri getirilirken hata oluştu:", error);
       toast({ title: "Hata", description: "Stok kalemleri getirilemedi.", variant: "destructive" });
     }
-  }, [user, toast]);
+  }, [user?.uid, toast]);
 
   const fetchContactHistory = useCallback(async () => {
     if (!user || !customerId) return;
@@ -47,7 +47,7 @@ export default function CustomerDetailPage() {
       console.error("İletişim geçmişi getirilirken hata oluştu:", error);
       toast({ title: "Hata", description: "İletişim geçmişi getirilemedi.", variant: "destructive" });
     }
-  }, [user, customerId, toast]);
+  }, [user?.uid, customerId, toast]);
 
   const fetchData = useCallback(async () => {
     if (!user || !customerId) return;
@@ -71,7 +71,7 @@ export default function CustomerDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [customerId, user, fetchStockItems, fetchContactHistory]);
+  }, [customerId, user?.uid, fetchStockItems, fetchContactHistory]);
 
   useEffect(() => {
     if (!authLoading && user?.uid) {
