@@ -156,6 +156,12 @@ export interface ContactHistoryFormValues {
   notes: string;
 }
 
+export type TaskFormValues = {
+  description: string;
+  dueDate?: Date;
+  status: 'pending' | 'completed' | 'in-progress';
+};
+
 export interface SupplierTaskFormValues {
   description: string;
   dueDate?: Date;

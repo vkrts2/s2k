@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo, FormEvent } from 'react';
 import type { Customer, Sale, Payment, Currency, UnifiedTransaction as AppUnifiedTransaction, StockItem, Price, ContactHistoryItem, CustomerTask, SaleFormValues, PaymentFormValues, TransactionTag } from '@/lib/types';
-import * as storage from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -82,7 +81,20 @@ interface CustomerDetailPageClientProps {
   sales: Sale[];
   payments: Payment[];
   user: { uid: string } | null;
-  onDataUpdated: () => void;
+  availableStockItems: StockItem[];
+  contactHistory: ContactHistoryItem[];
+  onSaleSubmit: (values: SaleFormValues, editingSale: Sale | null) => Promise<void>;
+  onPaymentSubmit: (values: PaymentFormValues, editingPayment: Payment | null) => Promise<void>;
+  onSaleDelete: (saleId: string) => Promise<void>;
+  onPaymentDelete: (paymentId: string) => Promise<void>;
+  onCustomerDelete: () => Promise<void>;
+  onCustomerUpdate: (updatedData: Partial<Customer>) => Promise<void>;
+  onNotesSave: (notes: string) => Promise<void>;
+  onContactHistorySubmit: (values: Omit<ContactHistoryItem, 'id'>, editingItem: ContactHistoryItem | null) => Promise<void>;
+  onContactHistoryDelete: (itemId: string) => Promise<void>;
+  onTaskSubmit: (values: TaskFormValues, editingTask: CustomerTask | null) => Promise<void>;
+  onTaskDelete: (taskId: string) => Promise<void>;
+  fetchContactHistory: () => void;
 }
 
 type ContactHistoryFormValues = {
@@ -131,7 +143,26 @@ const EMPTY_TASK_FORM_VALUES: TaskFormValues = {
 
 type UnifiedTransactionClient = AppUnifiedTransaction;
 
-export function CustomerDetailPageClient({ customer, sales, payments, user, onDataUpdated }: CustomerDetailPageClientProps) {
+export function CustomerDetailPageClient({ 
+    customer, 
+    sales, 
+    payments, 
+    user, 
+    availableStockItems,
+    contactHistory,
+    onSaleSubmit,
+    onPaymentSubmit,
+    onSaleDelete,
+    onPaymentDelete,
+    onCustomerDelete,
+    onCustomerUpdate,
+    onNotesSave,
+    onContactHistorySubmit,
+    onContactHistoryDelete,
+    onTaskSubmit,
+    onTaskDelete,
+    fetchContactHistory
+}: CustomerDetailPageClientProps) {
   const { toast } = useToast();
   const router = useRouter();
 
@@ -156,7 +187,12 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
   const [taskFormValues, setTaskFormValues] = useState<TaskFormValues>(EMPTY_TASK_FORM_VALUES);
   const [editingTask, setEditingTask] = useState<CustomerTask | null>(null);
 
-  const [stockItemDisplayNames, setStockItemDisplayNames] = useState<Record<string, string>>({});
+  const stockItemDisplayNames = useMemo(() => {
+    return availableStockItems.reduce((acc, item) => {
+        acc[item.id] = item.name;
+        return acc;
+      }, {} as Record<string, string>);
+  }, [availableStockItems]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -167,10 +203,6 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [showPrintView, setShowPrintView] = useState(false);
-
-  const [availableStockItems, setAvailableStockItems] = useState<StockItem[]>([]);
-
-  const [contactHistory, setContactHistory] = useState<ContactHistoryItem[]>([]);
 
   const totalSales = useMemo(() => {
     return sales.reduce((sum: number, sale: Sale) => sum + sale.amount, 0);
@@ -255,140 +287,30 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
     return Math.ceil(filteredAndSortedTransactions.length / itemsPerPage);
   }, [filteredAndSortedTransactions.length, itemsPerPage]);
 
-
-  const fetchStockItems = useCallback(async () => {
-    if (!user) return;
-    try {
-      const items = await storage.getStockItems(user.uid);
-      setAvailableStockItems(items);
-      const displayNames = items.reduce((acc, item) => {
-        acc[item.id] = item.name;
-        return acc;
-      }, {} as Record<string, string>);
-      setStockItemDisplayNames(displayNames);
-    } catch (error) {
-      console.error("Stok kalemleri getirilirken hata oluştu:", error);
-      toast({
-        title: "Hata",
-        description: "Stok kalemleri getirilemedi.",
-        variant: "destructive",
-      });
-    }
-  }, [user, toast]);
-
-  const fetchContactHistory = useCallback(async () => {
-    if (!user || !customer?.id) return;
-    try {
-      const history = await storage.getContactHistory(user.uid, customer.id);
-      setContactHistory(history);
-    } catch (error) {
-      console.error("İletişim geçmişi getirilirken hata oluştu:", error);
-      toast({
-        title: "Hata",
-        description: "İletişim geçmişi getirilemedi.",
-        variant: "destructive",
-      });
-    }
-  }, [user, customer?.id, toast]);
-
-  useEffect(() => {
-    fetchStockItems();
-    fetchContactHistory();
-  }, [fetchStockItems, fetchContactHistory]);
-
   const handleSaleSubmit = async (values: SaleFormValues) => {
-    if (!user) return;
-    try {
-      const saleData: Omit<Sale, 'id' | 'transactionType' | 'createdAt' | 'updatedAt'> = {
-        ...values,
-        customerId: customer.id,
-        date: formatISO(values.date),
-        amount: parseFloat(values.amount.toString()),
-        quantity: values.quantity ? parseFloat(values.quantity.toString()) : undefined,
-        unitPrice: values.unitPrice ? parseFloat(values.unitPrice.toString()) : undefined,
-        category: 'satis', 
-        tags: [],
-      };
-      if (editingSale) {
-        await storage.updateSale(user.uid, { ...saleData, id: editingSale.id } as Sale);
-        toast({ title: 'Başarılı!', description: 'Satış başarıyla güncellendi.' });
-      } else {
-        await storage.addSale(user.uid, saleData);
-        toast({ title: 'Başarılı!', description: 'Satış başarıyla eklendi.' });
-      }
-      onDataUpdated();
-      setShowSaleModal(false);
-      setEditingSale(null);
-    } catch (error) {
-      console.error("Satış kaydedilirken hata:", error);
-      toast({ title: "Hata", description: "Satış kaydedilemedi.", variant: "destructive" });
-    }
+    await onSaleSubmit(values, editingSale);
+    setShowSaleModal(false);
+    setEditingSale(null);
   };
 
   const handlePaymentSubmit = async (values: PaymentFormValues) => {
-    if (!user) return;
-    try {
-      const paymentData: Omit<Payment, 'id' | 'transactionType'> = {
-        ...values,
-        customerId: customer.id,
-        date: formatISO(values.date),
-        amount: parseFloat(values.amount.toString()),
-        checkDate: values.checkDate ? formatISO(values.checkDate) : null,
-        createdAt: formatISO(new Date()),
-        updatedAt: formatISO(new Date()),
-        category: 'odeme',
-        tags: [],
-      };
-      if (editingPayment) {
-        await storage.updatePayment(user.uid, { ...paymentData, id: editingPayment.id } as Payment);
-        toast({ title: 'Başarılı!', description: 'Ödeme başarıyla güncellendi.' });
-      } else {
-        await storage.addPayment(user.uid, paymentData);
-        toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
-      }
-      onDataUpdated();
-      setShowPaymentModal(false);
-      setEditingPayment(null);
-    } catch (error) {
-      console.error("Ödeme kaydedilirken hata:", error);
-      toast({ title: "Hata", description: "Ödeme kaydedilemedi.", variant: "destructive" });
-    }
+    await onPaymentSubmit(values, editingPayment);
+    setShowPaymentModal(false);
+    setEditingPayment(null);
   };
 
   const handleDeleteSale = async (saleId: string) => {
-    if (!user) return;
-    try {
-      await storage.storageDeleteSale(user.uid, saleId);
-      toast({ title: "Başarılı", description: "Satış başarıyla silindi." });
-      onDataUpdated();
-      setDeletingSaleId(null);
-    } catch (error) {
-      console.error("Satış silinirken hata:", error);
-      toast({ title: "Hata", description: "Satış silinemedi.", variant: "destructive" });
-    }
+    await onSaleDelete(saleId);
   };
 
   const handleDeletePayment = async (paymentId: string) => {
-    if (!user) return;
-    try {
-      await storage.storageDeletePayment(user.uid, paymentId);
-      toast({ title: "Başarılı", description: "Ödeme başarıyla silindi." });
-      onDataUpdated();
-      setDeletingPaymentId(null);
-    } catch (error) {
-      console.error("Ödeme silinirken hata:", error);
-      toast({ title: "Hata", description: "Ödeme silinemedi.", variant: "destructive" });
-    }
+    await onPaymentDelete(paymentId);
   };
 
   const handleCustomerDelete = async () => {
     if (!user || !customer) return;
     try {
-      await storage.deleteCustomer(user.uid, customer.id);
-      toast({
-        title: "Başarılı",
-        description: "Müşteri başarıyla silindi."
-      });
+      await onCustomerDelete();
       router.push('/customers');
     } catch (error) {
       console.error("Müşteri silinirken hata:", error);
@@ -401,19 +323,7 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
   };
 
   const handleSaveNotes = async () => {
-    if (!user) return;
-    try {
-      await storage.updateCustomer(user.uid, { ...customer, notes: notesContent });
-      toast({ title: 'Başarılı!', description: 'Notlar kaydedildi.' });
-      onDataUpdated();
-    } catch (error) {
-      console.error('Failed to save notes:', error);
-      toast({
-        title: 'Hata',
-        description: 'Notlar kaydedilemedi.',
-        variant: 'destructive',
-      });
-    }
+    await onNotesSave(notesContent);
   };
 
   const handleContactHistorySubmit = async (values: ContactHistoryFormValues) => {
@@ -432,7 +342,7 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
                 createdAt: editingContactHistoryItem.createdAt,
                 updatedAt: formatISO(new Date()),
             };
-            await storage.updateContactHistory(user.uid, itemToUpdate);
+            await onContactHistorySubmit(itemToUpdate, editingContactHistoryItem);
             toast({ title: "Başarılı", description: "İletişim kaydı güncellendi." });
         } else {
             const newItem: Omit<ContactHistoryItem, 'id'> = {
@@ -440,7 +350,7 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
                 createdAt: formatISO(new Date()),
                 updatedAt: formatISO(new Date()),
             };
-            await storage.addContactHistory(user.uid, newItem);
+            await onContactHistorySubmit(newItem, null);
             toast({ title: "Başarılı", description: "İletişim kaydı eklendi." });
         }
         fetchContactHistory();
@@ -454,7 +364,7 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
   const handleDeleteContactHistoryItem = async (itemId: string) => {
     if (!user) return;
     try {
-      await storage.deleteContactHistory(user.uid, itemId);
+      await onContactHistoryDelete(itemId);
       toast({ title: "Başarılı", description: "İletişim kaydı silindi." });
       fetchContactHistory();
     } catch (error) {
@@ -467,9 +377,8 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
     if (!user) return;
     try {
       const updatedCustomer = { ...customer, ...updatedData };
-      await storage.updateCustomer(user.uid, updatedCustomer as Customer);
+      await onCustomerUpdate(updatedCustomer);
       toast({ title: 'Başarılı!', description: 'Müşteri bilgileri güncellendi.' });
-      onDataUpdated();
       setShowEditCustomerModal(false);
     } catch (error) {
       console.error("Müşteri güncellenirken hata oluştu:", error);
@@ -486,7 +395,7 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
                     task.id === editingTask.id ? { ...task, ...values, updatedAt: formatISO(new Date()), dueDate: values.dueDate ? formatISO(values.dueDate) : undefined } : task
                 );
                 updatedCustomer = { ...customer, tasks: updatedTasks };
-                await storage.updateCustomer(user.uid, updatedCustomer);
+                await onTaskSubmit(values, editingTask);
                 toast({ title: "Görev Güncellendi", description: "Görev başarıyla güncellendi." });
             } else {
                 const newTask: CustomerTask = {
@@ -498,10 +407,9 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
                 };
                 const updatedTasks = [...(customer.tasks || []), newTask];
                 updatedCustomer = { ...customer, tasks: updatedTasks };
-                await storage.updateCustomer(user.uid, updatedCustomer);
+                await onTaskSubmit(values, null);
                 toast({ title: "Görev Eklendi", description: "Yeni görev başarıyla eklendi." });
             }
-            onDataUpdated();
             setShowTaskModal(false);
             setTaskFormValues(EMPTY_TASK_FORM_VALUES);
             setEditingTask(null);
@@ -516,8 +424,7 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
         try {
             const updatedTasks = (customer.tasks || []).filter(task => task.id !== taskId);
             const updatedCustomer: Customer = { ...customer, tasks: updatedTasks };
-            await storage.updateCustomer(user.uid, updatedCustomer);
-            onDataUpdated();
+            await onTaskDelete(taskId);
             toast({
                 title: "Görev Silindi",
                 description: "Görev başarıyla listeden kaldırıldı.",
@@ -903,6 +810,7 @@ export function CustomerDetailPageClient({ customer, sales, payments, user, onDa
       formValues={saleFormValues}
       setFormValues={setSaleFormValues}
       availableStockItems={availableStockItems}
+      stockItemDisplayNames={stockItemDisplayNames}
     />
     <PaymentModal
       isOpen={showPaymentModal}
