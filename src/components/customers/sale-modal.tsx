@@ -17,9 +17,9 @@ import { tr } from 'date-fns/locale';
 interface SaleModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => Promise<void>;
+  onSubmit: (values: SaleFormValues) => Promise<void>;
   formValues: SaleFormValues;
-  setFormValues: (values: SaleFormValues) => void;
+  setFormValues: Dispatch<SetStateAction<SaleFormValues>>;
   availableStockItems: StockItem[];
   stockItemDisplayNames: Record<string, string>;
 }
@@ -46,7 +46,7 @@ export function SaleModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await onSubmit(e);
+      await onSubmit(formValues);
     } catch (error) {
       console.error("Error submitting sale form:", error);
     }

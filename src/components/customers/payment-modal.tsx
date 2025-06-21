@@ -17,9 +17,9 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (e: React.FormEvent) => Promise<void>;
+  onSubmit: (values: PaymentFormValues) => Promise<void>;
   formValues: PaymentFormValues;
-  setFormValues: (values: PaymentFormValues) => void;
+  setFormValues: Dispatch<SetStateAction<PaymentFormValues>>;
 }
 
 const EMPTY_PAYMENT_FORM_VALUES: PaymentFormValues = {
@@ -40,7 +40,7 @@ export function PaymentModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await onSubmit(e);
+      await onSubmit(formValues);
     } catch (error) {
       console.error("Error submitting payment form:", error);
     }

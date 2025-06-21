@@ -54,8 +54,10 @@ export default function CustomerDetailPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    fetchData();
-  }, [fetchData, authLoading]);
+    if (user?.uid) {
+        fetchData();
+    }
+  }, [fetchData, authLoading, user?.uid]);
 
   if (isLoading) {
     return (
