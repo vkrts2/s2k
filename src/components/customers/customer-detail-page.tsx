@@ -106,22 +106,19 @@ export function CustomerDetailPageClient({
       ...filteredSales.map(s => ({ ...s, transactionType: 'sale' as const })),
       ...filteredPayments.map(p => ({ ...p, transactionType: 'payment' as const }))
     ];
-    
     return all
       .filter(item => {
+        if (typeof item.amount !== 'number' || isNaN(item.amount)) return false;
         const itemDate = parseISO(item.date);
         const fromDate = dateRange?.from ? startOfDay(dateRange.from) : null;
         const toDate = dateRange?.to ? endOfDay(dateRange.to) : null;
         if (fromDate && itemDate < fromDate) return false;
         if (toDate && itemDate > toDate) return false;
-        
         const searchQueryLower = searchQuery.toLowerCase();
         if(searchQueryLower === "") return true;
-
         const descriptionMatch = item.description?.toLowerCase().includes(searchQueryLower);
         const amountMatch = item.amount && item.amount.toString().includes(searchQueryLower);
         const typeMatch = 'method' in item && item.method.toLowerCase().includes(searchQueryLower);
-        
         return descriptionMatch || amountMatch || typeMatch;
       })
       .sort((a, b) => {
