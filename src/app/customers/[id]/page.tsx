@@ -82,21 +82,35 @@ export default function CustomerDetailPage() {
     // Olay Yöneticileri (Event Handlers) with OPTIMISTIC UPDATES
     const handleSaleSubmit = async (values: SaleFormValues, editingSale: Sale | null) => {
         if (!user || !customer) return;
-        // amount alanı kontrolü
         const parsedAmount = parseFloat(values.amount.toString());
         if (isNaN(parsedAmount) || parsedAmount <= 0) {
             toast({ title: "Hata", description: "Lütfen geçerli bir tutar girin.", variant: "destructive" });
             return;
         }
         try {
-            const saleData = { ...values, customerId: customer.id, date: formatISO(values.date), amount: parsedAmount, quantity: values.quantity ? parseFloat(values.quantity.toString()) : undefined, unitPrice: values.unitPrice ? parseFloat(values.unitPrice.toString()) : undefined, category: 'satis' as const, tags: [] };
             if (editingSale) {
-                const updatedSale: Sale = { ...editingSale, ...saleData, updatedAt: formatISO(new Date()) };
-                await storage.updateSale(user.uid, updatedSale);
-                setSales(prev => prev.map(s => s.id === updatedSale.id ? updatedSale : s));
+                const saleData = { ...editingSale, ...values, amount: parsedAmount, date: formatISO(values.date), quantity: values.quantity ? parseFloat(values.quantity.toString()) : undefined, unitPrice: values.unitPrice ? parseFloat(values.unitPrice.toString()) : undefined, updatedAt: new Date().toISOString() };
+                await storage.updateSale(user.uid, saleData);
+                setSales(prev => prev.map(s => s.id === saleData.id ? saleData : s));
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla güncellendi.' });
             } else {
-                const newSale = await storage.addSale(user.uid, saleData);
+                const newSale: Sale = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    customerId: customer.id,
+                    amount: parsedAmount,
+                    date: formatISO(values.date),
+                    currency: values.currency,
+                    stockItemId: values.stockItemId || undefined,
+                    description: values.description || '',
+                    quantity: values.quantity ? parseFloat(values.quantity.toString()) : undefined,
+                    unitPrice: values.unitPrice ? parseFloat(values.unitPrice.toString()) : undefined,
+                    transactionType: 'sale',
+                    category: 'satis',
+                    tags: [],
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                };
+                await storage.addSale(user.uid, newSale);
                 setSales(prev => [newSale, ...prev]);
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla eklendi.' });
             }
