@@ -66,8 +66,24 @@ export function CustomerDetailPageClient({
   // Modal States
   const [isSaleModalOpen, setSaleModalOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [saleFormValues, setSaleFormValues] = useState<SaleFormValues>({
+    amount: '',
+    date: new Date(),
+    currency: 'TRY',
+    stockItemId: undefined,
+    description: '',
+    quantity: undefined,
+    unitPrice: undefined,
+  });
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [paymentFormValues, setPaymentFormValues] = useState<PaymentFormValues>({
+    amount: '',
+    date: new Date(),
+    currency: 'TRY',
+    method: 'nakit',
+    referenceNumber: null
+  });
   const [isEditCustomerModalOpen, setEditCustomerModalOpen] = useState(false);
 
   // Deletion States
@@ -130,32 +146,75 @@ export function CustomerDetailPageClient({
 
 
   // Handlers
-  const handleSaleFormSubmit = (values: SaleFormValues) => {
-    onSaleSubmit(values, editingSale);
+  const handleSaleFormOpen = (sale?: Sale) => {
+    if (sale) {
+      setEditingSale(sale);
+      setSaleFormValues({
+        amount: sale.amount.toString(),
+        date: parseISO(sale.date),
+        currency: sale.currency,
+        stockItemId: sale.stockItemId || undefined,
+        description: sale.description || '',
+        quantity: sale.quantity !== undefined ? sale.quantity.toString() : undefined,
+        unitPrice: sale.unitPrice !== undefined ? sale.unitPrice.toString() : undefined,
+      });
+    } else {
+      setEditingSale(null);
+      setSaleFormValues({
+        amount: '',
+        date: new Date(),
+        currency: 'TRY',
+        stockItemId: undefined,
+        description: '',
+        quantity: undefined,
+        unitPrice: undefined,
+      });
+    }
+    setSaleModalOpen(true);
+  };
+
+  const handlePaymentFormOpen = (payment?: Payment) => {
+    if (payment) {
+      setEditingPayment(payment);
+      setPaymentFormValues({
+        amount: payment.amount.toString(),
+        date: parseISO(payment.date),
+        currency: payment.currency,
+        method: payment.method,
+        referenceNumber: payment.referenceNumber || null,
+        checkDate: payment.checkDate ? parseISO(payment.checkDate) : undefined,
+        checkSerialNumber: payment.checkSerialNumber || undefined,
+        description: payment.description || '',
+      });
+    } else {
+      setEditingPayment(null);
+      setPaymentFormValues({
+        amount: '',
+        date: new Date(),
+        currency: 'TRY',
+        method: 'nakit',
+        referenceNumber: null
+      });
+    }
+    setPaymentModalOpen(true);
+  };
+
+  const handleSaleFormSubmit = async (values: SaleFormValues) => {
+    await onSaleSubmit(values, editingSale);
     setSaleModalOpen(false);
     setEditingSale(null);
   };
   
-  const handleEditSaleClick = (sale: Sale) => {
-    setEditingSale(sale);
-    setSaleModalOpen(true);
-  }
-
-  const handlePaymentFormSubmit = (values: PaymentFormValues) => {
-    onPaymentSubmit(values, editingPayment);
+  const handlePaymentFormSubmit = async (values: PaymentFormValues) => {
+    await onPaymentSubmit(values, editingPayment);
     setPaymentModalOpen(false);
     setEditingPayment(null);
   };
-  
-  const handleEditPaymentClick = (payment: Payment) => {
-    setEditingPayment(payment);
-    setPaymentModalOpen(true);
-  }
 
-  const handleCustomerFormSubmit = (values: Partial<Customer>) => {
-    onCustomerUpdate(values);
+  const handleEditCustomerSave = async (values: Customer) => {
+    await onCustomerUpdate(values);
     setEditCustomerModalOpen(false);
-  }
+  };
   
   const confirmSaleDelete = () => {
     if (deletingSaleId) {
@@ -179,7 +238,7 @@ export function CustomerDetailPageClient({
   }
 
   if (showPrintView) {
-    return <PrintView customer={customer} transactions={unifiedTransactions} balances={balances} onClose={() => setShowPrintView(false)} />;
+    return <PrintView customer={customer} transactions={unifiedTransactions} onClose={() => setShowPrintView(false)} />;
   }
 
   return (
@@ -189,7 +248,7 @@ export function CustomerDetailPageClient({
         <CardHeader className="flex flex-row items-start justify-between">
           <div>
             <CardTitle className="text-2xl font-bold">{customer.name}</CardTitle>
-            <CardDescription>{customer.title} - {customer.city}</CardDescription>
+            <CardDescription></CardDescription>
           </div>
           <div className="flex space-x-2">
              <Button variant="outline" onClick={() => setEditCustomerModalOpen(true)}><Pencil className="mr-2 h-4 w-4" /> Düzenle</Button>
@@ -235,7 +294,7 @@ export function CustomerDetailPageClient({
                 <CardTitle>Hesap Hareketleri</CardTitle>
                 <div className="flex items-center gap-2 w-full md:w-auto">
                     <Input placeholder="Ara..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="max-w-sm" />
-                    <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+                    <DateRangePicker value={dateRange} onChange={setDateRange} />
                      <Select value={sortOrder} onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Sırala" />
@@ -245,8 +304,8 @@ export function CustomerDetailPageClient({
                             <SelectItem value="asc">Eskiden Yeniye</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button onClick={() => setSaleModalOpen(true)}><PlusCircle className="mr-2 h-4 w-4"/> Satış Ekle</Button>
-                    <Button onClick={() => setPaymentModalOpen(true)}><PlusCircle className="mr-2 h-4 w-4"/> Ödeme Ekle</Button>
+                    <Button onClick={() => handleSaleFormOpen()}><PlusCircle className="mr-2 h-4 w-4"/> Satış Ekle</Button>
+                    <Button onClick={() => handlePaymentFormOpen()}><PlusCircle className="mr-2 h-4 w-4"/> Ödeme Ekle</Button>
                 </div>
               </div>
             </CardHeader>
@@ -262,26 +321,28 @@ export function CustomerDetailPageClient({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {unifiedTransactions.map((item) => (
-                    <TableRow key={`${item.transactionType}-${item.id}`}>
-                      <TableCell>{format(parseISO(item.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
-                      <TableCell>
-                        <Badge variant={item.transactionType === 'sale' ? 'destructive' : 'default'}>
-                          {item.transactionType === 'sale' ? 'Satış' : 'Ödeme'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{item.description}</TableCell>
-                      <TableCell className="text-right">{item.amount.toLocaleString('tr-TR', { style: 'currency', currency: item.currency })}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => item.transactionType === 'sale' ? handleEditSaleClick(item as Sale) : handleEditPaymentClick(item as Payment)}>
-                            <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => item.transactionType === 'sale' ? setDeletingSaleId(item.id) : setDeletingPaymentId(item.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {unifiedTransactions
+                    .filter(item => typeof item.amount === 'number' && !isNaN(item.amount))
+                    .map((item) => (
+                      <TableRow key={`${item.transactionType}-${item.id}`}>
+                        <TableCell>{format(parseISO(item.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
+                        <TableCell>
+                          <Badge variant={item.transactionType === 'sale' ? 'destructive' : 'default'}>
+                            {item.transactionType === 'sale' ? 'Satış' : 'Ödeme'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{item.description}</TableCell>
+                        <TableCell className="text-right">{item.amount.toLocaleString('tr-TR', { style: 'currency', currency: item.currency })}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => item.transactionType === 'sale' ? handleSaleFormOpen(item as Sale) : handlePaymentFormOpen(item as Payment)}>
+                              <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => item.transactionType === 'sale' ? setDeletingSaleId(item.id) : setDeletingPaymentId(item.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -332,9 +393,10 @@ export function CustomerDetailPageClient({
           isOpen={isSaleModalOpen}
           onClose={() => { setSaleModalOpen(false); setEditingSale(null); }}
           onSubmit={handleSaleFormSubmit}
-          initialData={editingSale ? { ...editingSale, amount: editingSale.amount.toString(), date: parseISO(editingSale.date), stockItemId: editingSale.stockItemId || undefined } : undefined}
+          formValues={saleFormValues}
+          setFormValues={setSaleFormValues}
           availableStockItems={availableStockItems}
-          customerName={customer.name}
+          stockItemDisplayNames={{}}
         />
       )}
 
@@ -343,8 +405,8 @@ export function CustomerDetailPageClient({
           isOpen={isPaymentModalOpen}
           onClose={() => { setPaymentModalOpen(false); setEditingPayment(null); }}
           onSubmit={handlePaymentFormSubmit}
-          initialData={editingPayment ? { ...editingPayment, amount: editingPayment.amount.toString(), date: parseISO(editingPayment.date), checkDate: editingPayment.checkDate ? parseISO(editingPayment.checkDate) : undefined } : undefined}
-          customerName={customer.name}
+          formValues={paymentFormValues}
+          setFormValues={setPaymentFormValues}
         />
       )}
 
@@ -352,7 +414,7 @@ export function CustomerDetailPageClient({
         <EditCustomerModal
           isOpen={isEditCustomerModalOpen}
           onClose={() => setEditCustomerModalOpen(false)}
-          onSubmit={handleCustomerFormSubmit}
+          onSave={handleEditCustomerSave}
           customer={customer}
         />
       )}
@@ -361,21 +423,24 @@ export function CustomerDetailPageClient({
         isOpen={!!deletingSaleId}
         onClose={() => setDeletingSaleId(null)}
         onConfirm={confirmSaleDelete}
-        message="Bu satışı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+        title="Satış Sil"
+        description="Bu satışı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
       />
 
       <DeleteConfirmationModal
         isOpen={!!deletingPaymentId}
         onClose={() => setDeletingPaymentId(null)}
         onConfirm={confirmPaymentDelete}
-        message="Bu ödemeyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+        title="Ödeme Sil"
+        description="Bu ödemeyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
       />
 
        <DeleteConfirmationModal
         isOpen={!!deletingCustomerId}
         onClose={() => setDeletingCustomerId(null)}
         onConfirm={confirmCustomerDelete}
-        message={`${customer.name} adlı müşteriyi kalıcı olarak silmek istediğinizden emin misiniz? Müşteriye ait tüm satışlar ve ödemeler de silinecektir. Bu işlem geri alınamaz.`}
+        title="Müşteri Sil"
+        description={`${customer.name} adlı müşteriyi kalıcı olarak silmek istediğinizden emin misiniz? Müşteriye ait tüm satışlar ve ödemeler de silinecektir. Bu işlem geri alınamaz.`}
       />
     </div>
   );
