@@ -300,9 +300,12 @@ export default function SettingsPage() {
       <Separator className="my-6" />
       <div className="mb-4">
         <h3 className="font-semibold mb-2">Yerel Satış ve Ödeme Verilerini Temizle</h3>
-        <Button variant="destructive" onClick={handleClearLocalSalesPayments}>
-          Yerel Satış ve Ödeme Kayıtlarını Sil
-        </Button>
+        <div className="mb-6 p-4 border border-dashed rounded bg-muted flex items-center gap-4">
+          <span>Test: Buton görünür ve tıklanabilir</span>
+          <Button variant="destructive" onClick={() => { handleClearLocalSalesPayments(); console.log('Butona tıklandı!'); alert('Butona tıklandı!'); }}>
+            Yerel Satış ve Ödeme Kayıtlarını Sil
+          </Button>
+        </div>
       </div>
 
     </div>
