@@ -262,6 +262,9 @@ export default function CustomerDetailPage() {
         await handleCustomerUpdate({ tasks: updatedTasks });
     };
 
+    // Satış ve ödeme işlemlerinde amount alanı olmayan kayıtları filtrele
+    const filteredSales = sales.filter(sale => typeof sale.amount === 'number' && !isNaN(sale.amount));
+    const filteredPayments = payments.filter(payment => typeof payment.amount === 'number' && !isNaN(payment.amount));
 
   if (isLoading || authLoading) {
     return (
@@ -300,11 +303,12 @@ export default function CustomerDetailPage() {
   return (
     <CustomerDetailPageClient
       customer={customer}
-      sales={sales}
-      payments={payments}
+      sales={filteredSales}
+      payments={filteredPayments}
       user={user}
       availableStockItems={availableStockItems}
       contactHistory={contactHistory}
+      notes={customer.notes || ''}
       onSaleSubmit={handleSaleSubmit}
       onPaymentSubmit={handlePaymentSubmit}
       onSaleDelete={handleSaleDelete}
