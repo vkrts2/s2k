@@ -214,7 +214,7 @@ export const getSales = async (uid: string, customerId?: string): Promise<Sale[]
     if (customerId) {
       salesQuery = query(salesQuery, where("customerId", "==", customerId));
     }
-    const querySnapshot = await getDocs(salesQuery, { source: 'server' });
+    const querySnapshot = await getDocs(salesQuery);
     console.log("getSales - querySnapshot.docs:", querySnapshot.docs);
     const sales: Sale[] = querySnapshot.docs.map(doc => {
       let description = doc.data().description;
@@ -294,15 +294,6 @@ export const storageDeleteSale = async (uid: string, saleId: string): Promise<vo
   try {
     await deleteDoc(saleDocRef);
     console.log(`storageDeleteSale: Successfully deleted saleId ${saleId}`);
-    
-    // Deletion confirmation check
-    const docSnap = await getDoc(saleDocRef);
-    if (docSnap.exists()) {
-      console.error(`storageDeleteSale: Deletion failed verification. Doc ${saleId} still exists.`);
-      throw new Error("Silme işlemi sunucuda başarısız oldu.");
-    }
-    console.log(`storageDeleteSale: Deletion verified for saleId ${saleId}.`);
-    
   } catch (error) {
     console.error(`storageDeleteSale: Error deleting sale ${saleId}:`, error);
     throw error;
@@ -320,7 +311,7 @@ export const getPayments = async (uid: string, customerId?: string): Promise<Pay
     if (customerId) {
       paymentsQuery = query(paymentsQuery, where("customerId", "==", customerId));
     }
-    const querySnapshot = await getDocs(paymentsQuery, { source: 'server' });
+    const querySnapshot = await getDocs(paymentsQuery);
     const payments: Payment[] = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data() as Omit<Payment, 'id'>,
@@ -380,15 +371,6 @@ export const storageDeletePayment = async (uid: string, paymentId: string): Prom
   try {
     await deleteDoc(paymentDocRef);
     console.log(`storageDeletePayment: Successfully deleted paymentId ${paymentId}`);
-    
-    // Deletion confirmation check
-    const docSnap = await getDoc(paymentDocRef);
-    if (docSnap.exists()) {
-      console.error(`storageDeletePayment: Deletion failed verification. Doc ${paymentId} still exists.`);
-      throw new Error("Silme işlemi sunucuda başarısız oldu.");
-    }
-    console.log(`storageDeletePayment: Deletion verified for paymentId ${paymentId}.`);
-    
   } catch (error)
   {
     console.error(`storageDeletePayment: Error deleting payment ${paymentId}:`, error);
