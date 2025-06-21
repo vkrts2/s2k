@@ -79,24 +79,21 @@ export default function CustomerDetailPage() {
     }
   }, [authLoading, user?.uid, fetchData]);
 
-    // Olay Yöneticileri (Event Handlers)
+    // Olay Yöneticileri (Event Handlers) with OPTIMISTIC UPDATES
     const handleSaleSubmit = async (values: SaleFormValues, editingSale: Sale | null) => {
         if (!user || !customer) return;
         try {
             const saleData = { ...values, customerId: customer.id, date: formatISO(values.date), amount: parseFloat(values.amount.toString()), quantity: values.quantity ? parseFloat(values.quantity.toString()) : undefined, unitPrice: values.unitPrice ? parseFloat(values.unitPrice.toString()) : undefined, category: 'satis' as const, tags: [] };
             if (editingSale) {
-                const updatedSale: Sale = {
-                    ...editingSale,
-                    ...saleData,
-                    updatedAt: formatISO(new Date()),
-                };
+                const updatedSale: Sale = { ...editingSale, ...saleData, updatedAt: formatISO(new Date()) };
                 await storage.updateSale(user.uid, updatedSale);
+                setSales(prev => prev.map(s => s.id === updatedSale.id ? updatedSale : s));
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla güncellendi.' });
             } else {
-                await storage.addSale(user.uid, saleData);
+                const newSale = await storage.addSale(user.uid, saleData);
+                setSales(prev => [newSale, ...prev]);
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla eklendi.' });
             }
-            fetchData();
         } catch (error) {
             console.error("Satış kaydedilirken hata:", error);
             toast({ title: "Hata", description: "Satış kaydedilemedi.", variant: "destructive" });
@@ -108,23 +105,16 @@ export default function CustomerDetailPage() {
         try {
             const paymentData = { ...values, customerId: customer.id, date: formatISO(values.date), amount: parseFloat(values.amount.toString()), checkDate: values.checkDate ? formatISO(values.checkDate) : null, category: 'odeme' as const, tags: [] };
             if (editingPayment) {
-                const updatedPayment: Payment = {
-                    ...editingPayment,
-                    ...paymentData,
-                    updatedAt: formatISO(new Date()),
-                };
+                const updatedPayment: Payment = { ...editingPayment, ...paymentData, updatedAt: formatISO(new Date()) };
                 await storage.updatePayment(user.uid, updatedPayment);
+                setPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
                 toast({ title: 'Başarılı!', description: 'Ödeme başarıyla güncellendi.' });
             } else {
-                const newPayment: Omit<Payment, 'id' | 'transactionType'> = {
-                    ...paymentData,
-                    createdAt: formatISO(new Date()),
-                    updatedAt: formatISO(new Date()),
-                };
-                await storage.addPayment(user.uid, newPayment);
+                const newPaymentData: Omit<Payment, 'id' | 'transactionType'> = { ...paymentData, createdAt: formatISO(new Date()), updatedAt: formatISO(new Date()) };
+                const newPayment = await storage.addPayment(user.uid, newPaymentData);
+                setPayments(prev => [newPayment, ...prev]);
                 toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
             }
-            fetchData();
         } catch (error) {
             console.error("Ödeme kaydedilirken hata:", error);
             toast({ title: "Hata", description: "Ödeme kaydedilemedi.", variant: "destructive" });
@@ -135,8 +125,8 @@ export default function CustomerDetailPage() {
         if (!user) return;
         try {
             await storage.storageDeleteSale(user.uid, saleId);
+            setSales(prev => prev.filter(s => s.id !== saleId));
             toast({ title: "Başarılı", description: "Satış başarıyla silindi." });
-            fetchData();
         } catch (error) {
             console.error("Satış silinirken hata:", error);
             toast({ title: "Hata", description: "Satış silinemedi.", variant: "destructive" });
@@ -147,8 +137,8 @@ export default function CustomerDetailPage() {
         if (!user) return;
         try {
             await storage.storageDeletePayment(user.uid, paymentId);
+            setPayments(prev => prev.filter(p => p.id !== paymentId));
             toast({ title: "Başarılı", description: "Ödeme başarıyla silindi." });
-            fetchData();
         } catch (error) {
             console.error("Ödeme silinirken hata:", error);
             toast({ title: "Hata", description: "Ödeme silinemedi.", variant: "destructive" });
@@ -170,9 +160,10 @@ export default function CustomerDetailPage() {
     const handleCustomerUpdate = async (updatedData: Partial<Customer>) => {
         if (!user || !customer) return;
         try {
-            await storage.updateCustomer(user.uid, { ...customer, ...updatedData } as Customer);
+            const updatedCustomer = { ...customer, ...updatedData } as Customer;
+            await storage.updateCustomer(user.uid, updatedCustomer);
+            setCustomer(updatedCustomer);
             toast({ title: 'Başarılı!', description: 'Müşteri bilgileri güncellendi.' });
-            fetchData();
         } catch (error) {
             console.error("Müşteri güncellenirken hata oluştu:", error);
             toast({ title: "Hata", description: "Müşteri güncellenemedi.", variant: "destructive" });
@@ -182,9 +173,10 @@ export default function CustomerDetailPage() {
     const handleNotesSave = async (notes: string) => {
         if (!user || !customer) return;
         try {
-            await storage.updateCustomer(user.uid, { ...customer, notes });
+            const updatedCustomer = { ...customer, notes };
+            await storage.updateCustomer(user.uid, updatedCustomer as Customer);
+            setCustomer(updatedCustomer as Customer);
             toast({ title: 'Başarılı!', description: 'Notlar kaydedildi.' });
-            fetchData();
         } catch (error) {
             console.error('Failed to save notes:', error);
             toast({ title: 'Hata', description: 'Notlar kaydedilemedi.', variant: 'destructive' });
