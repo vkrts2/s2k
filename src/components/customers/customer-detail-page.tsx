@@ -522,6 +522,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
       });
       
       setDeletingSaleId(null);
+      onDataUpdated();
     } catch (error) {
       console.error("Satış silinirken hata:", error);
       toast({
@@ -530,7 +531,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         variant: "destructive",
       });
     }
-  }, [user, customer?.id, sales, toast]);
+  }, [user, customer?.id, sales, onDataUpdated, toast]);
 
   const handleDeletePayment = useCallback(async (paymentId: string) => {
     if (!user || !customer?.id) return;
@@ -542,6 +543,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         description: "Ödeme başarıyla silindi.",
       });
       setDeletingPaymentId(null);
+      onDataUpdated();
     } catch (error) {
       console.error("Ödeme silinirken hata:", error);
       toast({
@@ -550,7 +552,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         variant: "destructive",
       });
     }
-  }, [user, customer?.id, toast]);
+  }, [user, customer?.id, onDataUpdated, toast]);
 
   const formatCurrency = useCallback((amount: number, currency: Currency): string => {
     if (typeof amount !== 'number' || isNaN(amount)) {

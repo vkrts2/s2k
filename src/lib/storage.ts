@@ -283,20 +283,28 @@ export const updateSale = async (uid: string, updatedSaleData: Sale): Promise<Sa
 };
 
 export const storageDeleteSale = async (uid: string, saleId: string): Promise<void> => {
-  console.log('storageDeleteSale called with uid:', uid, 'saleId:', saleId);
-  
+  console.log('storageDeleteSale: Deleting sale', { uid, saleId });
   if (!uid || !saleId) {
-    throw new Error("User ID or Sale ID is missing");
+    console.error("storageDeleteSale: Missing uid or saleId.");
+    throw new Error("Kullanıcı veya Satış ID bilgisi eksik.");
   }
   
-  const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), saleId);
-  console.log("storageDeleteSale: Attempting to delete doc at path:", saleDocRef.path, "with saleId:", saleId);
+  const saleDocRef = doc(db, "users", uid, "sales", saleId);
   
   try {
     await deleteDoc(saleDocRef);
-    console.log("storageDeleteSale: Document deleted successfully");
+    console.log(`storageDeleteSale: Successfully deleted saleId ${saleId}`);
+    
+    // Deletion confirmation check
+    const docSnap = await getDoc(saleDocRef);
+    if (docSnap.exists()) {
+      console.error(`storageDeleteSale: Deletion failed verification. Doc ${saleId} still exists.`);
+      throw new Error("Silme işlemi sunucuda başarısız oldu.");
+    }
+    console.log(`storageDeleteSale: Deletion verified for saleId ${saleId}.`);
+    
   } catch (error) {
-    console.error("storageDeleteSale: Error occurred:", error);
+    console.error(`storageDeleteSale: Error deleting sale ${saleId}:`, error);
     throw error;
   }
 };
@@ -361,11 +369,31 @@ export const updatePayment = async (uid: string, updatedPayment: Payment): Promi
 };
 
 export const storageDeletePayment = async (uid: string, paymentId: string): Promise<void> => {
+  console.log('storageDeletePayment: Deleting payment', { uid, paymentId });
   if (!uid || !paymentId) {
-    throw new Error("User ID or Payment ID is missing");
+    console.error("storageDeletePayment: Missing uid or paymentId.");
+    throw new Error("Kullanıcı veya Ödeme ID bilgisi eksik.");
   }
-  const paymentDocRef = doc(_getUserCollectionRef(uid, "payments"), paymentId);
-  await deleteDoc(paymentDocRef);
+  
+  const paymentDocRef = doc(db, "users", uid, "payments", paymentId);
+  
+  try {
+    await deleteDoc(paymentDocRef);
+    console.log(`storageDeletePayment: Successfully deleted paymentId ${paymentId}`);
+    
+    // Deletion confirmation check
+    const docSnap = await getDoc(paymentDocRef);
+    if (docSnap.exists()) {
+      console.error(`storageDeletePayment: Deletion failed verification. Doc ${paymentId} still exists.`);
+      throw new Error("Silme işlemi sunucuda başarısız oldu.");
+    }
+    console.log(`storageDeletePayment: Deletion verified for paymentId ${paymentId}.`);
+    
+  } catch (error)
+  {
+    console.error(`storageDeletePayment: Error deleting payment ${paymentId}:`, error);
+    throw error;
+  }
 };
 
 // Supplier Functions
