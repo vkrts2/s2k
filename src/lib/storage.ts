@@ -834,6 +834,523 @@ export const generateQuotationNumber = async (uid: string): Promise<string> => {
     }
   }
   const newNumber = lastNumber + 1;
+  return `QT${String(newNumber).padStart(4, '0')}`; = lastNumber + 1;
+  return `QT${String(newNumber).padStart(4, '0')}`;
+};
+
+export const addQuotation = async (uid: string, quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation> => {
+  const now = formatISO(new Date());
+  const quotationNumber = await generateQuotationNumber(uid);
+  const newQuotationData = {
+    ...quotationData,
+    quotationNumber,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "quotations"), newQuotationData);
+  return { ...newQuotationData, id: docRef.id } as Quotation;
+};
+
+export const updateQuotation = async (uid: string, updatedQuotation: Quotation): Promise<Quotation> => {
+  const now = formatISO(new Date());
+  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), updatedQuotation.id);
+  const finalQuotation = { ...updatedQuotation, updatedAt: now };
+  await updateDoc(quotationDocRef, finalQuotation);
+  return finalQuotation;
+};
+
+export const deleteQuotation = async (uid: string, quotationId: string): Promise<void> => {
+  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), quotationId);
+  await deleteDoc(quotationDocRef);
+};
+
+// Supplier Task Functions
+export const getSupplierTasks = async (uid: string, supplierId?: string): Promise<SupplierTask[]> => {
+  if (!uid) {
+    console.error("getSupplierTasks: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    let q = query(_getUserCollectionRef(uid, "supplierTasks"), orderBy("createdAt", "desc"));
+    if (supplierId) {
+      q = query(q, where("supplierId", "==", supplierId));
+    }
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<SupplierTask, 'id'>,
+    }));
+  } catch (error) {
+    console.error("Error fetching supplier tasks:", error);
+    return [];
+  }
+};
+
+export const addSupplierTask = async (uid: string, taskData: Omit<SupplierTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<SupplierTask> => {
+  const now = formatISO(new Date());
+  const newTaskData = {
+    ...taskData,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "supplierTasks"), newTaskData);
+  return { ...newTaskData, id: docRef.id } as SupplierTask;
+};
+
+export const updateSupplierTask = async (uid: string, taskData: SupplierTask): Promise<SupplierTask> => {
+  const now = formatISO(new Date());
+  const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskData.id);
+  const { id, ...restOfUpdatedData } = taskData;
+  const dataForFirestore: any = {
+    ...restOfUpdatedData,
+    updatedAt: now,
+  };
+  // Remove undefined fields to prevent Firebase errors
+  Object.keys(dataForFirestore).forEach(key => {
+    if (dataForFirestore[key] === undefined) {
+      delete dataForFirestore[key];
+    }
+  });
+  await updateDoc(taskDocRef, dataForFirestore);
+  return { ...dataForFirestore, id: taskData.id } as SupplierTask;
+};
+
+export const deleteSupplierTask = async (uid: string, taskId: string): Promise<void> => {
+  const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskId);
+  await deleteDoc(taskDocRef);
+};
+
+// Portfolio Functions
+export const getPortfolioItems = async (uid: string): Promise<PortfolioItem[]> => {
+  console.log(`getPortfolioItems called with uid: ${uid}`);
+  if (!uid) {
+    console.error("getPortfolioItems: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    const q = query(_getUserCollectionRef(uid, "portfolioItems"), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<PortfolioItem, 'id'>
+    }));
+  } catch (error) {
+    console.error("Error fetching portfolio items:", error);
+    return [];
+  }
+};
+
+export const getPortfolioItemById = async (uid: string, id: string): Promise<PortfolioItem | undefined> => {
+  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), id);
+  const docSnap = await getDoc(portfolioItemDocRef);
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() as Omit<PortfolioItem, 'id'> };
+  }
+  return undefined;
+};
+
+export const addPortfolioItem = async (uid: string, itemData: Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<PortfolioItem> => {
+  const now = formatISO(new Date());
+  const newItemData = {
+    ...itemData,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "portfolioItems"), newItemData);
+  return { ...newItemData, id: docRef.id } as PortfolioItem;
+};
+
+export const updatePortfolioItem = async (uid: string, updatedItem: PortfolioItem): Promise<PortfolioItem> => {
+  const now = formatISO(new Date());
+  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), updatedItem.id);
+  const { id, ...restOfUpdatedItem } = updatedItem;
+  const dataForFirestore: any = {
+    ...restOfUpdatedItem,
+    updatedAt: now,
+  };
+  await updateDoc(portfolioItemDocRef, dataForFirestore);
+  return { ...dataForFirestore, id: updatedItem.id } as PortfolioItem;
+};
+
+export const deletePortfolioItem = async (uid: string, itemId: string): Promise<void> => {
+  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), itemId);
+  await deleteDoc(portfolioItemDocRef);
+};
+
+// Archived Files Functions
+export const getArchivedFilesMetadata = async (uid: string): Promise<ArchivedFile[]> => {
+  console.log(`getArchivedFilesMetadata called with uid: ${uid}`);
+  if (!uid) {
+    console.error("getArchivedFilesMetadata: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    const q = query(_getUserCollectionRef(uid, "archivedFiles"), orderBy("uploadDate", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<ArchivedFile, 'id'>
+    }));
+  } catch (error) {
+    console.error("Error fetching archived files metadata:", error);
+    return [];
+  }
+};
+
+export const addArchivedFile = async (uid: string, fileMetadataInput: Omit<ArchivedFile, 'id' | 'uploadDate'>, fileBlob: Blob): Promise<ArchivedFile> => {
+  const now = formatISO(new Date());
+  const newFileMetadata = {
+    ...fileMetadataInput,
+    uploadDate: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "archivedFiles"), newFileMetadata);
+  return { ...newFileMetadata, id: docRef.id } as ArchivedFile;
+};
+
+export const deleteArchivedFile = async (uid: string, fileId: string): Promise<void> => {
+  const fileDocRef = doc(_getUserCollectionRef(uid, "archivedFiles"), fileId);
+  await deleteDoc(fileDocRef);
+};
+
+// Useful Links Functions
+export const getUsefulLinks = async (uid: string): Promise<UsefulLink[]> => {
+  console.log(`getUsefulLinks called with uid: ${uid}`);
+  if (!uid) {
+    console.error("getUsefulLinks: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    const q = query(_getUserCollectionRef(uid, "usefulLinks"), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<UsefulLink, 'id'>
+    }));
+  } catch (error) {
+    console.error("Error fetching useful links:", error);
+    return [];
+  }
+};
+
+export const addUsefulLink = async (uid: string, linkData: Omit<UsefulLink, 'id' | 'createdAt'>): Promise<UsefulLink> => {
+  const now = formatISO(new Date());
+  const newLinkData = {
+    ...linkData,
+    createdAt: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "usefulLinks"), newLinkData);
+  return { ...newLinkData, id: docRef.id } as UsefulLink;
+};
+
+export const deleteUsefulLink = async (uid: string, linkId: string): Promise<void> => {
+  const linkDocRef = doc(_getUserCollectionRef(uid, "usefulLinks"), linkId);
+  await deleteDoc(linkDocRef);
+};
+
+// Quotation Functions
+export const getQuotations = async (uid: string): Promise<Quotation[]> => {
+  console.log(`getQuotations called with uid: ${uid}`);
+  if (!uid) {
+    console.error("getQuotations: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    const q = query(_getUserCollectionRef(uid, "quotations"), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<Quotation, 'id'>
+    }));
+  } catch (error) {
+    console.error("Error fetching quotations:", error);
+    return [];
+  }
+};
+
+export const getQuotationById = async (uid: string, quotationId: string): Promise<Quotation | undefined> => {
+  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), quotationId);
+  const docSnap = await getDoc(quotationDocRef);
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() as Omit<Quotation, 'id'> };
+  }
+  return undefined;
+};
+
+export const generateQuotationNumber = async (uid: string): Promise<string> => {
+  const q = query(
+    _getUserCollectionRef(uid, "quotations"),
+    orderBy("createdAt", "desc"),
+    limit(1)
+  );
+  const querySnapshot = await getDocs(q);
+  let lastNumber = 0;
+  if (!querySnapshot.empty) {
+    const lastQuotation = querySnapshot.docs[0].data() as Quotation;
+    const match = lastQuotation.quotationNumber.match(/\d+$/);
+    if (match) {
+      lastNumber = parseInt(match[0], 10);
+    }
+  }
+  const newNumber = lastNumber + 1;
+  return `QT${String(newNumber).padStart(4, '0')}`; = lastNumber + 1;
+  return `QT${String(newNumber).padStart(4, '0')}`;
+};
+
+export const addQuotation = async (uid: string, quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation> => {
+  const now = formatISO(new Date());
+  const quotationNumber = await generateQuotationNumber(uid);
+  const newQuotationData = {
+    ...quotationData,
+    quotationNumber,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "quotations"), newQuotationData);
+  return { ...newQuotationData, id: docRef.id } as Quotation;
+};
+
+export const updateQuotation = async (uid: string, updatedQuotation: Quotation): Promise<Quotation> => {
+  const now = formatISO(new Date());
+  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), updatedQuotation.id);
+  const finalQuotation = { ...updatedQuotation, updatedAt: now };
+  await updateDoc(quotationDocRef, finalQuotation);
+  return finalQuotation;
+};
+
+export const deleteQuotation = async (uid: string, quotationId: string): Promise<void> => {
+  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), quotationId);
+  await deleteDoc(quotationDocRef);
+};
+
+// Supplier Task Functions
+export const getSupplierTasks = async (uid: string, supplierId?: string): Promise<SupplierTask[]> => {
+  if (!uid) {
+    console.error("getSupplierTasks: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    let q = query(_getUserCollectionRef(uid, "supplierTasks"), orderBy("createdAt", "desc"));
+    if (supplierId) {
+      q = query(q, where("supplierId", "==", supplierId));
+    }
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<SupplierTask, 'id'>,
+    }));
+  } catch (error) {
+    console.error("Error fetching supplier tasks:", error);
+    return [];
+  }
+};
+
+export const addSupplierTask = async (uid: string, taskData: Omit<SupplierTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<SupplierTask> => {
+  const now = formatISO(new Date());
+  const newTaskData = {
+    ...taskData,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "supplierTasks"), newTaskData);
+  return { ...newTaskData, id: docRef.id } as SupplierTask;
+};
+
+export const updateSupplierTask = async (uid: string, taskData: SupplierTask): Promise<SupplierTask> => {
+  const now = formatISO(new Date());
+  const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskData.id);
+  const { id, ...restOfUpdatedData } = taskData;
+  const dataForFirestore: any = {
+    ...restOfUpdatedData,
+    updatedAt: now,
+  };
+  // Remove undefined fields to prevent Firebase errors
+  Object.keys(dataForFirestore).forEach(key => {
+    if (dataForFirestore[key] === undefined) {
+      delete dataForFirestore[key];
+    }
+  });
+  await updateDoc(taskDocRef, dataForFirestore);
+  return { ...dataForFirestore, id: taskData.id } as SupplierTask;
+};
+
+export const deleteSupplierTask = async (uid: string, taskId: string): Promise<void> => {
+  const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskId);
+  await deleteDoc(taskDocRef);
+};
+
+// Portfolio Functions
+export const getPortfolioItems = async (uid: string): Promise<PortfolioItem[]> => {
+  console.log(`getPortfolioItems called with uid: ${uid}`);
+  if (!uid) {
+    console.error("getPortfolioItems: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    const q = query(_getUserCollectionRef(uid, "portfolioItems"), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<PortfolioItem, 'id'>
+    }));
+  } catch (error) {
+    console.error("Error fetching portfolio items:", error);
+    return [];
+  }
+};
+
+export const getPortfolioItemById = async (uid: string, id: string): Promise<PortfolioItem | undefined> => {
+  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), id);
+  const docSnap = await getDoc(portfolioItemDocRef);
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() as Omit<PortfolioItem, 'id'> };
+  }
+  return undefined;
+};
+
+export const addPortfolioItem = async (uid: string, itemData: Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<PortfolioItem> => {
+  const now = formatISO(new Date());
+  const newItemData = {
+    ...itemData,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "portfolioItems"), newItemData);
+  return { ...newItemData, id: docRef.id } as PortfolioItem;
+};
+
+export const updatePortfolioItem = async (uid: string, updatedItem: PortfolioItem): Promise<PortfolioItem> => {
+  const now = formatISO(new Date());
+  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), updatedItem.id);
+  const { id, ...restOfUpdatedItem } = updatedItem;
+  const dataForFirestore: any = {
+    ...restOfUpdatedItem,
+    updatedAt: now,
+  };
+  await updateDoc(portfolioItemDocRef, dataForFirestore);
+  return { ...dataForFirestore, id: updatedItem.id } as PortfolioItem;
+};
+
+export const deletePortfolioItem = async (uid: string, itemId: string): Promise<void> => {
+  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), itemId);
+  await deleteDoc(portfolioItemDocRef);
+};
+
+// Archived Files Functions
+export const getArchivedFilesMetadata = async (uid: string): Promise<ArchivedFile[]> => {
+  console.log(`getArchivedFilesMetadata called with uid: ${uid}`);
+  if (!uid) {
+    console.error("getArchivedFilesMetadata: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    const q = query(_getUserCollectionRef(uid, "archivedFiles"), orderBy("uploadDate", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<ArchivedFile, 'id'>
+    }));
+  } catch (error) {
+    console.error("Error fetching archived files metadata:", error);
+    return [];
+  }
+};
+
+export const addArchivedFile = async (uid: string, fileMetadataInput: Omit<ArchivedFile, 'id' | 'uploadDate'>, fileBlob: Blob): Promise<ArchivedFile> => {
+  const now = formatISO(new Date());
+  const newFileMetadata = {
+    ...fileMetadataInput,
+    uploadDate: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "archivedFiles"), newFileMetadata);
+  return { ...newFileMetadata, id: docRef.id } as ArchivedFile;
+};
+
+export const deleteArchivedFile = async (uid: string, fileId: string): Promise<void> => {
+  const fileDocRef = doc(_getUserCollectionRef(uid, "archivedFiles"), fileId);
+  await deleteDoc(fileDocRef);
+};
+
+// Useful Links Functions
+export const getUsefulLinks = async (uid: string): Promise<UsefulLink[]> => {
+  console.log(`getUsefulLinks called with uid: ${uid}`);
+  if (!uid) {
+    console.error("getUsefulLinks: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    const q = query(_getUserCollectionRef(uid, "usefulLinks"), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<UsefulLink, 'id'>
+    }));
+  } catch (error) {
+    console.error("Error fetching useful links:", error);
+    return [];
+  }
+};
+
+export const addUsefulLink = async (uid: string, linkData: Omit<UsefulLink, 'id' | 'createdAt'>): Promise<UsefulLink> => {
+  const now = formatISO(new Date());
+  const newLinkData = {
+    ...linkData,
+    createdAt: now,
+  };
+  const docRef = await addDoc(_getUserCollectionRef(uid, "usefulLinks"), newLinkData);
+  return { ...newLinkData, id: docRef.id } as UsefulLink;
+};
+
+export const deleteUsefulLink = async (uid: string, linkId: string): Promise<void> => {
+  const linkDocRef = doc(_getUserCollectionRef(uid, "usefulLinks"), linkId);
+  await deleteDoc(linkDocRef);
+};
+
+// Quotation Functions
+export const getQuotations = async (uid: string): Promise<Quotation[]> => {
+  console.log(`getQuotations called with uid: ${uid}`);
+  if (!uid) {
+    console.error("getQuotations: User ID (uid) is missing.");
+    return [];
+  }
+  try {
+    const q = query(_getUserCollectionRef(uid, "quotations"), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<Quotation, 'id'>
+    }));
+  } catch (error) {
+    console.error("Error fetching quotations:", error);
+    return [];
+  }
+};
+
+export const getQuotationById = async (uid: string, quotationId: string): Promise<Quotation | undefined> => {
+  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), quotationId);
+  const docSnap = await getDoc(quotationDocRef);
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() as Omit<Quotation, 'id'> };
+  }
+  return undefined;
+};
+
+export const generateQuotationNumber = async (uid: string): Promise<string> => {
+  const q = query(
+    _getUserCollectionRef(uid, "quotations"),
+    orderBy("createdAt", "desc"),
+    limit(1)
+  );
+  const querySnapshot = await getDocs(q);
+  let lastNumber = 0;
+  if (!querySnapshot.empty) {
+    const lastQuotation = querySnapshot.docs[0].data() as Quotation;
+    const match = lastQuotation.quotationNumber.match(/\d+$/);
+    if (match) {
+      lastNumber = parseInt(match[0], 10);
+    }
+  }
+  const newNumber = lastNumber + 1;
+  return `QT${String(newNumber).padStart(4, '0')}`; = lastNumber + 1;
   return `QT${String(newNumber).padStart(4, '0')}`;
 };
 
@@ -1092,516 +1609,3 @@ export const generateQuotationNumber = async (uid: string): Promise<string> => {
   }
   const newNumber = lastNumber + 1;
   return `QT${String(newNumber).padStart(4, '0')}`;
-};
-
-export const addQuotation = async (uid: string, quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation> => {
-  const now = formatISO(new Date());
-  const quotationNumber = await generateQuotationNumber(uid);
-  const newQuotationData = {
-    ...quotationData,
-    quotationNumber,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "quotations"), newQuotationData);
-  return { ...newQuotationData, id: docRef.id } as Quotation;
-};
-
-export const updateQuotation = async (uid: string, updatedQuotation: Quotation): Promise<Quotation> => {
-  const now = formatISO(new Date());
-  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), updatedQuotation.id);
-  const finalQuotation = { ...updatedQuotation, updatedAt: now };
-  await updateDoc(quotationDocRef, finalQuotation);
-  return finalQuotation;
-};
-
-export const deleteQuotation = async (uid: string, quotationId: string): Promise<void> => {
-  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), quotationId);
-  await deleteDoc(quotationDocRef);
-};
-
-// Supplier Task Functions
-export const getSupplierTasks = async (uid: string, supplierId?: string): Promise<SupplierTask[]> => {
-  if (!uid) {
-    console.error("getSupplierTasks: User ID (uid) is missing.");
-    return [];
-  }
-  try {
-    let q = query(_getUserCollectionRef(uid, "supplierTasks"), orderBy("createdAt", "desc"));
-    if (supplierId) {
-      q = query(q, where("supplierId", "==", supplierId));
-    }
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Omit<SupplierTask, 'id'>,
-    }));
-  } catch (error) {
-    console.error("Error fetching supplier tasks:", error);
-    return [];
-  }
-};
-
-export const addSupplierTask = async (uid: string, taskData: Omit<SupplierTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<SupplierTask> => {
-  const now = formatISO(new Date());
-  const newTaskData = {
-    ...taskData,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "supplierTasks"), newTaskData);
-  return { ...newTaskData, id: docRef.id } as SupplierTask;
-};
-
-export const updateSupplierTask = async (uid: string, taskData: SupplierTask): Promise<SupplierTask> => {
-  const now = formatISO(new Date());
-  const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskData.id);
-  const { id, ...restOfUpdatedData } = taskData;
-  const dataForFirestore: any = {
-    ...restOfUpdatedData,
-    updatedAt: now,
-  };
-  // Remove undefined fields to prevent Firebase errors
-  Object.keys(dataForFirestore).forEach(key => {
-    if (dataForFirestore[key] === undefined) {
-      delete dataForFirestore[key];
-    }
-  });
-  await updateDoc(taskDocRef, dataForFirestore);
-  return { ...dataForFirestore, id: taskData.id } as SupplierTask;
-};
-
-export const deleteSupplierTask = async (uid: string, taskId: string): Promise<void> => {
-  const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskId);
-  await deleteDoc(taskDocRef);
-};
-
-// Portfolio Functions
-export const getPortfolioItems = async (uid: string): Promise<PortfolioItem[]> => {
-  console.log(`getPortfolioItems called with uid: ${uid}`);
-  if (!uid) {
-    console.error("getPortfolioItems: User ID (uid) is missing.");
-    return [];
-  }
-  try {
-    const q = query(_getUserCollectionRef(uid, "portfolioItems"), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Omit<PortfolioItem, 'id'>
-    }));
-  } catch (error) {
-    console.error("Error fetching portfolio items:", error);
-    return [];
-  }
-};
-
-export const getPortfolioItemById = async (uid: string, id: string): Promise<PortfolioItem | undefined> => {
-  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), id);
-  const docSnap = await getDoc(portfolioItemDocRef);
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() as Omit<PortfolioItem, 'id'> };
-  }
-  return undefined;
-};
-
-export const addPortfolioItem = async (uid: string, itemData: Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<PortfolioItem> => {
-  const now = formatISO(new Date());
-  const newItemData = {
-    ...itemData,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "portfolioItems"), newItemData);
-  return { ...newItemData, id: docRef.id } as PortfolioItem;
-};
-
-export const updatePortfolioItem = async (uid: string, updatedItem: PortfolioItem): Promise<PortfolioItem> => {
-  const now = formatISO(new Date());
-  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), updatedItem.id);
-  const { id, ...restOfUpdatedItem } = updatedItem;
-  const dataForFirestore: any = {
-    ...restOfUpdatedItem,
-    updatedAt: now,
-  };
-  await updateDoc(portfolioItemDocRef, dataForFirestore);
-  return { ...dataForFirestore, id: updatedItem.id } as PortfolioItem;
-};
-
-export const deletePortfolioItem = async (uid: string, itemId: string): Promise<void> => {
-  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), itemId);
-  await deleteDoc(portfolioItemDocRef);
-};
-
-// Archived Files Functions
-export const getArchivedFilesMetadata = async (uid: string): Promise<ArchivedFile[]> => {
-  console.log(`getArchivedFilesMetadata called with uid: ${uid}`);
-  if (!uid) {
-    console.error("getArchivedFilesMetadata: User ID (uid) is missing.");
-    return [];
-  }
-  try {
-    const q = query(_getUserCollectionRef(uid, "archivedFiles"), orderBy("uploadDate", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Omit<ArchivedFile, 'id'>
-    }));
-  } catch (error) {
-    console.error("Error fetching archived files metadata:", error);
-    return [];
-  }
-};
-
-export const addArchivedFile = async (uid: string, fileMetadataInput: Omit<ArchivedFile, 'id' | 'uploadDate'>, fileBlob: Blob): Promise<ArchivedFile> => {
-  const now = formatISO(new Date());
-  const newFileMetadata = {
-    ...fileMetadataInput,
-    uploadDate: now,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "archivedFiles"), newFileMetadata);
-  return { ...newFileMetadata, id: docRef.id } as ArchivedFile;
-};
-
-export const deleteArchivedFile = async (uid: string, fileId: string): Promise<void> => {
-  const fileDocRef = doc(_getUserCollectionRef(uid, "archivedFiles"), fileId);
-  await deleteDoc(fileDocRef);
-};
-
-// Useful Links Functions
-export const getUsefulLinks = async (uid: string): Promise<UsefulLink[]> => {
-  console.log(`getUsefulLinks called with uid: ${uid}`);
-  if (!uid) {
-    console.error("getUsefulLinks: User ID (uid) is missing.");
-    return [];
-  }
-  try {
-    const q = query(_getUserCollectionRef(uid, "usefulLinks"), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Omit<UsefulLink, 'id'>
-    }));
-  } catch (error) {
-    console.error("Error fetching useful links:", error);
-    return [];
-  }
-};
-
-export const addUsefulLink = async (uid: string, linkData: Omit<UsefulLink, 'id' | 'createdAt'>): Promise<UsefulLink> => {
-  const now = formatISO(new Date());
-  const newLinkData = {
-    ...linkData,
-    createdAt: now,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "usefulLinks"), newLinkData);
-  return { ...newLinkData, id: docRef.id } as UsefulLink;
-};
-
-export const deleteUsefulLink = async (uid: string, linkId: string): Promise<void> => {
-  const linkDocRef = doc(_getUserCollectionRef(uid, "usefulLinks"), linkId);
-  await deleteDoc(linkDocRef);
-};
-
-// Quotation Functions
-export const getQuotations = async (uid: string): Promise<Quotation[]> => {
-  console.log(`getQuotations called with uid: ${uid}`);
-  if (!uid) {
-    console.error("getQuotations: User ID (uid) is missing.");
-    return [];
-  }
-  try {
-    const q = query(_getUserCollectionRef(uid, "quotations"), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Omit<Quotation, 'id'>
-    }));
-  } catch (error) {
-    console.error("Error fetching quotations:", error);
-    return [];
-  }
-};
-
-export const getQuotationById = async (uid: string, quotationId: string): Promise<Quotation | undefined> => {
-  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), quotationId);
-  const docSnap = await getDoc(quotationDocRef);
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() as Omit<Quotation, 'id'> };
-  }
-  return undefined;
-};
-
-export const generateQuotationNumber = async (uid: string): Promise<string> => {
-  const q = query(
-    _getUserCollectionRef(uid, "quotations"),
-    orderBy("createdAt", "desc"),
-    limit(1)
-  );
-  const querySnapshot = await getDocs(q);
-  let lastNumber = 0;
-  if (!querySnapshot.empty) {
-    const lastQuotation = querySnapshot.docs[0].data() as Quotation;
-    const match = lastQuotation.quotationNumber.match(/\d+$/);
-    if (match) {
-      lastNumber = parseInt(match[0], 10);
-    }
-  }
-  const newNumber = lastNumber + 1;
-  return `QT${String(newNumber).padStart(4, '0')}`;
-};
-
-export const addQuotation = async (uid: string, quotationData: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation> => {
-  const now = formatISO(new Date());
-  const quotationNumber = await generateQuotationNumber(uid);
-  const newQuotationData = {
-    ...quotationData,
-    quotationNumber,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "quotations"), newQuotationData);
-  return { ...newQuotationData, id: docRef.id } as Quotation;
-};
-
-export const updateQuotation = async (uid: string, updatedQuotation: Quotation): Promise<Quotation> => {
-  const now = formatISO(new Date());
-  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), updatedQuotation.id);
-  const finalQuotation = { ...updatedQuotation, updatedAt: now };
-  await updateDoc(quotationDocRef, finalQuotation);
-  return finalQuotation;
-};
-
-export const deleteQuotation = async (uid: string, quotationId: string): Promise<void> => {
-  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), quotationId);
-  await deleteDoc(quotationDocRef);
-};
-
-// Supplier Task Functions
-export const getSupplierTasks = async (uid: string, supplierId?: string): Promise<SupplierTask[]> => {
-  if (!uid) {
-    console.error("getSupplierTasks: User ID (uid) is missing.");
-    return [];
-  }
-  try {
-    let q = query(_getUserCollectionRef(uid, "supplierTasks"), orderBy("createdAt", "desc"));
-    if (supplierId) {
-      q = query(q, where("supplierId", "==", supplierId));
-    }
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Omit<SupplierTask, 'id'>,
-    }));
-  } catch (error) {
-    console.error("Error fetching supplier tasks:", error);
-    return [];
-  }
-};
-
-export const addSupplierTask = async (uid: string, taskData: Omit<SupplierTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<SupplierTask> => {
-  const now = formatISO(new Date());
-  const newTaskData = {
-    ...taskData,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "supplierTasks"), newTaskData);
-  return { ...newTaskData, id: docRef.id } as SupplierTask;
-};
-
-export const updateSupplierTask = async (uid: string, taskData: SupplierTask): Promise<SupplierTask> => {
-  const now = formatISO(new Date());
-  const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskData.id);
-  const { id, ...restOfUpdatedData } = taskData;
-  const dataForFirestore: any = {
-    ...restOfUpdatedData,
-    updatedAt: now,
-  };
-  // Remove undefined fields to prevent Firebase errors
-  Object.keys(dataForFirestore).forEach(key => {
-    if (dataForFirestore[key] === undefined) {
-      delete dataForFirestore[key];
-    }
-  });
-  await updateDoc(taskDocRef, dataForFirestore);
-  return { ...dataForFirestore, id: taskData.id } as SupplierTask;
-};
-
-export const deleteSupplierTask = async (uid: string, taskId: string): Promise<void> => {
-  const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskId);
-  await deleteDoc(taskDocRef);
-};
-
-// Portfolio Functions
-export const getPortfolioItems = async (uid: string): Promise<PortfolioItem[]> => {
-  console.log(`getPortfolioItems called with uid: ${uid}`);
-  if (!uid) {
-    console.error("getPortfolioItems: User ID (uid) is missing.");
-    return [];
-  }
-  try {
-    const q = query(_getUserCollectionRef(uid, "portfolioItems"), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Omit<PortfolioItem, 'id'>
-    }));
-  } catch (error) {
-    console.error("Error fetching portfolio items:", error);
-    return [];
-  }
-};
-
-export const getPortfolioItemById = async (uid: string, id: string): Promise<PortfolioItem | undefined> => {
-  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), id);
-  const docSnap = await getDoc(portfolioItemDocRef);
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() as Omit<PortfolioItem, 'id'> };
-  }
-  return undefined;
-};
-
-export const addPortfolioItem = async (uid: string, itemData: Omit<PortfolioItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<PortfolioItem> => {
-  const now = formatISO(new Date());
-  const newItemData = {
-    ...itemData,
-    createdAt: now,
-    updatedAt: now,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "portfolioItems"), newItemData);
-  return { ...newItemData, id: docRef.id } as PortfolioItem;
-};
-
-export const updatePortfolioItem = async (uid: string, updatedItem: PortfolioItem): Promise<PortfolioItem> => {
-  const now = formatISO(new Date());
-  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), updatedItem.id);
-  const { id, ...restOfUpdatedItem } = updatedItem;
-  const dataForFirestore: any = {
-    ...restOfUpdatedItem,
-    updatedAt: now,
-  };
-  await updateDoc(portfolioItemDocRef, dataForFirestore);
-  return { ...dataForFirestore, id: updatedItem.id } as PortfolioItem;
-};
-
-export const deletePortfolioItem = async (uid: string, itemId: string): Promise<void> => {
-  const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), itemId);
-  await deleteDoc(portfolioItemDocRef);
-};
-
-// Archived Files Functions
-export const getArchivedFilesMetadata = async (uid: string): Promise<ArchivedFile[]> => {
-  console.log(`getArchivedFilesMetadata called with uid: ${uid}`);
-  if (!uid) {
-    console.error("getArchivedFilesMetadata: User ID (uid) is missing.");
-    return [];
-  }
-  try {
-    const q = query(_getUserCollectionRef(uid, "archivedFiles"), orderBy("uploadDate", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Omit<ArchivedFile, 'id'>
-    }));
-  } catch (error) {
-    console.error("Error fetching archived files metadata:", error);
-    return [];
-  }
-};
-
-export const addArchivedFile = async (uid: string, fileMetadataInput: Omit<ArchivedFile, 'id' | 'uploadDate'>, fileBlob: Blob): Promise<ArchivedFile> => {
-  const now = formatISO(new Date());
-  const newFileMetadata = {
-    ...fileMetadataInput,
-    uploadDate: now,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "archivedFiles"), newFileMetadata);
-  return { ...newFileMetadata, id: docRef.id } as ArchivedFile;
-};
-
-export const deleteArchivedFile = async (uid: string, fileId: string): Promise<void> => {
-  const fileDocRef = doc(_getUserCollectionRef(uid, "archivedFiles"), fileId);
-  await deleteDoc(fileDocRef);
-};
-
-// Useful Links Functions
-export const getUsefulLinks = async (uid: string): Promise<UsefulLink[]> => {
-  console.log(`getUsefulLinks called with uid: ${uid}`);
-  if (!uid) {
-    console.error("getUsefulLinks: User ID (uid) is missing.");
-    return [];
-  }
-  try {
-    const q = query(_getUserCollectionRef(uid, "usefulLinks"), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Omit<UsefulLink, 'id'>
-    }));
-  } catch (error) {
-    console.error("Error fetching useful links:", error);
-    return [];
-  }
-};
-
-export const addUsefulLink = async (uid: string, linkData: Omit<UsefulLink, 'id' | 'createdAt'>): Promise<UsefulLink> => {
-  const now = formatISO(new Date());
-  const newLinkData = {
-    ...linkData,
-    createdAt: now,
-  };
-  const docRef = await addDoc(_getUserCollectionRef(uid, "usefulLinks"), newLinkData);
-  return { ...newLinkData, id: docRef.id } as UsefulLink;
-};
-
-export const deleteUsefulLink = async (uid: string, linkId: string): Promise<void> => {
-  const linkDocRef = doc(_getUserCollectionRef(uid, "usefulLinks"), linkId);
-  await deleteDoc(linkDocRef);
-};
-
-// Quotation Functions
-export const getQuotations = async (uid: string): Promise<Quotation[]> => {
-  console.log(`getQuotations called with uid: ${uid}`);
-  if (!uid) {
-    console.error("getQuotations: User ID (uid) is missing.");
-    return [];
-  }
-  try {
-    const q = query(_getUserCollectionRef(uid, "quotations"), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Omit<Quotation, 'id'>
-    }));
-  } catch (error) {
-    console.error("Error fetching quotations:", error);
-    return [];
-  }
-};
-
-export const getQuotationById = async (uid: string, quotationId: string): Promise<Quotation | undefined> => {
-  const quotationDocRef = doc(_getUserCollectionRef(uid, "quotations"), quotationId);
-  const docSnap = await getDoc(quotationDocRef);
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() as Omit<Quotation, 'id'> };
-  }
-  return undefined;
-};
-
-export const generateQuotationNumber = async (uid: string): Promise<string> => {
-  const q = query(
-    _getUserCollectionRef(uid, "quotations"),
-    orderBy("createdAt", "desc"),
-    limit(1)
-  );
-  const querySnapshot = await getDocs(q);
-  let lastNumber = 0;
-  if (!querySnapshot.empty) {
-    const lastQuotation = querySnapshot.docs[0].data() as Quotation;
-    const match = lastQuotation.quotationNumber.match(/\d+$/);
-    if (match) {
-      lastNumber = parseInt(match[0], 10);
-    }
-  }
-  const newNumber
