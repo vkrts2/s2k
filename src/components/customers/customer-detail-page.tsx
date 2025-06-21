@@ -86,21 +86,25 @@ export function CustomerDetailPageClient({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   
+  // amount alanı olmayan satış ve ödemeleri filtrele
+  const filteredSales = sales.filter(sale => typeof sale.amount === 'number' && !isNaN(sale.amount));
+  const filteredPayments = payments.filter(payment => typeof payment.amount === 'number' && !isNaN(payment.amount));
+
   const balances = useMemo(() => {
     const newBalances: Record<Currency, number> = { USD: 0, TRY: 0, EUR: 0 };
-    sales.forEach(sale => {
+    filteredSales.forEach(sale => {
       newBalances[sale.currency] = (newBalances[sale.currency] || 0) + sale.amount;
     });
-    payments.forEach(payment => {
+    filteredPayments.forEach(payment => {
       newBalances[payment.currency] = (newBalances[payment.currency] || 0) - payment.amount;
     });
     return newBalances;
-  }, [sales, payments]);
+  }, [filteredSales, filteredPayments]);
 
   const unifiedTransactions = useMemo(() => {
     const all = [
-      ...sales.map(s => ({ ...s, transactionType: 'sale' as const })),
-      ...payments.map(p => ({ ...p, transactionType: 'payment' as const }))
+      ...filteredSales.map(s => ({ ...s, transactionType: 'sale' as const })),
+      ...filteredPayments.map(p => ({ ...p, transactionType: 'payment' as const }))
     ];
     
     return all
@@ -115,7 +119,7 @@ export function CustomerDetailPageClient({
         if(searchQueryLower === "") return true;
 
         const descriptionMatch = item.description?.toLowerCase().includes(searchQueryLower);
-        const amountMatch = item.amount.toString().includes(searchQueryLower);
+        const amountMatch = item.amount && item.amount.toString().includes(searchQueryLower);
         const typeMatch = 'method' in item && item.method.toLowerCase().includes(searchQueryLower);
         
         return descriptionMatch || amountMatch || typeMatch;
@@ -125,7 +129,7 @@ export function CustomerDetailPageClient({
         const dateB = new Date(b.date).getTime();
         return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
-  }, [sales, payments, searchQuery, sortOrder, dateRange]);
+  }, [filteredSales, filteredPayments, searchQuery, sortOrder, dateRange]);
 
 
   // Handlers
