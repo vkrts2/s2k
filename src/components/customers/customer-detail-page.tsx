@@ -385,7 +385,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
       setShowSaleModal(false);
       setSaleFormValues(EMPTY_SALE_FORM_VALUES);
       setEditingSale(null);
-      onDataUpdated();
     } catch (error) {
       console.error("Satış kaydedilirken hata:", error);
       toast({
@@ -457,7 +456,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
       setShowPaymentModal(false);
       setPaymentFormValues(EMPTY_PAYMENT_FORM_VALUES);
       setEditingPayment(null);
-      onDataUpdated();
     } catch (error) {
       console.error("Ödeme kaydedilirken hata:", error);
       toast({
@@ -524,7 +522,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
       });
       
       setDeletingSaleId(null);
-      onDataUpdated();
     } catch (error) {
       console.error("Satış silinirken hata:", error);
       toast({
@@ -533,7 +530,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         variant: "destructive",
       });
     }
-  }, [user, customer?.id, sales, onDataUpdated, toast]);
+  }, [user, customer?.id, sales, toast]);
 
   const handleDeletePayment = useCallback(async (paymentId: string) => {
     if (!user || !customer?.id) return;
@@ -545,7 +542,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         description: "Ödeme başarıyla silindi.",
       });
       setDeletingPaymentId(null);
-      onDataUpdated();
     } catch (error) {
       console.error("Ödeme silinirken hata:", error);
       toast({
@@ -554,7 +550,7 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         variant: "destructive",
       });
     }
-  }, [user, customer?.id, onDataUpdated, toast]);
+  }, [user, customer?.id, toast]);
 
   const formatCurrency = useCallback((amount: number, currency: Currency): string => {
     if (typeof amount !== 'number' || isNaN(amount)) {
@@ -916,12 +912,11 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         }
       }
       toast({ title: "Etiket Eklendi", description: "Etiket başarıyla eklendi." });
-      onDataUpdated();
     } catch (error) {
       console.error("Etiket eklenirken hata:", error);
       toast({ title: "Hata", description: "Etiket eklenirken bir sorun oluştu.", variant: "destructive",});
     }
-  }, [user, customer, sales, payments, onDataUpdated, toast, tagColors]);
+  }, [user, customer, sales, payments, toast, tagColors]);
 
   // Etiket silme
   const handleRemoveTag = useCallback(async (transactionId: string, tagId: string, transactionType: 'sale' | 'payment') => {
@@ -944,12 +939,11 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         }
       }
       toast({ title: "Etiket Silindi", description: "Etiket başarıyla silindi." });
-      onDataUpdated();
     } catch (error) {
       console.error("Etiket silinirken hata:", error);
       toast({ title: "Hata", description: "Etiket silinirken bir sorun oluştu.", variant: "destructive",});
     }
-  }, [user, customer, sales, payments, onDataUpdated, toast]);
+  }, [user, customer, sales, payments, toast]);
 
   const handleCustomerUpdate = async (updatedCustomerData: Customer) => {
     if (!user) return;
@@ -960,7 +954,6 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         title: "Başarılı",
         description: "Müşteri bilgileri güncellendi.",
       });
-      onDataUpdated();
     } catch (error) {
       console.error("Müşteri güncellenirken hata:", error);
       toast({
@@ -1510,9 +1503,9 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         isOpen={deletingSaleId !== null}
         onClose={() => setDeletingSaleId(null)}
         onConfirm={() => {
-          console.log('DeleteConfirmationModal: Confirming sale deletion for ID:', deletingSaleId);
-          if (deletingSaleId) {
-            handleDeleteSale(deletingSaleId);
+          const idToDelete = deletingSaleId;
+          if (idToDelete) {
+            handleDeleteSale(idToDelete);
           }
         }}
         title="Satışı Sil"
@@ -1523,9 +1516,9 @@ export function CustomerDetailPageClient({ customer: initialCustomer, sales: ini
         isOpen={deletingPaymentId !== null}
         onClose={() => setDeletingPaymentId(null)}
         onConfirm={() => {
-          console.log('DeleteConfirmationModal: Confirming payment deletion for ID:', deletingPaymentId);
-          if (deletingPaymentId) {
-            handleDeletePayment(deletingPaymentId!);
+          const idToDelete = deletingPaymentId;
+          if (idToDelete) {
+            handleDeletePayment(idToDelete);
           }
         }}
         title="Ödemeyi Sil"

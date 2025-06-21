@@ -24,9 +24,6 @@ export default function CustomerDetailPage() {
   const router = useRouter();
 
   const fetchData = useCallback(async () => {
-    // Veritabanı tutarlılığı için kısa bir gecikme ekle
-    await new Promise(resolve => setTimeout(resolve, 500)); 
-
     setIsLoading(true);
     setError(null);
     if (!user || !customerId) {
