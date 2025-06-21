@@ -94,23 +94,19 @@ export default function CustomerDetailPage() {
                 setSales(prev => prev.map(s => s.id === saleData.id ? saleData : s));
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla güncellendi.' });
             } else {
-                const newSale: Sale = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    customerId: customer.id,
-                    amount: parsedAmount,
-                    date: formatISO(values.date),
-                    currency: values.currency,
-                    stockItemId: values.stockItemId || undefined,
-                    description: values.description || '',
-                    quantity: values.quantity ? parseFloat(values.quantity.toString()) : undefined,
-                    unitPrice: values.unitPrice ? parseFloat(values.unitPrice.toString()) : undefined,
-                    transactionType: 'sale',
-                    category: 'satis',
-                    tags: [],
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
+                const newSaleData = {
+                  customerId: customer.id,
+                  amount: parsedAmount,
+                  date: formatISO(values.date),
+                  currency: values.currency,
+                  stockItemId: values.stockItemId || undefined,
+                  description: values.description || '',
+                  quantity: values.quantity ? parseFloat(values.quantity.toString()) : undefined,
+                  unitPrice: values.unitPrice ? parseFloat(values.unitPrice.toString()) : undefined,
+                  category: 'satis' as const,
+                  tags: [],
                 };
-                await storage.addSale(user.uid, newSale);
+                const newSale = await storage.addSale(user.uid, newSaleData);
                 setSales(prev => [newSale, ...prev]);
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla eklendi.' });
             }
@@ -319,7 +315,6 @@ export default function CustomerDetailPage() {
       customer={customer}
       sales={filteredSales}
       payments={filteredPayments}
-      user={user}
       availableStockItems={availableStockItems}
       contactHistory={contactHistory}
       notes={customer.notes || ''}
@@ -334,7 +329,6 @@ export default function CustomerDetailPage() {
       onContactHistoryDelete={handleContactHistoryDelete}
       onTaskSubmit={handleTaskSubmit}
       onTaskDelete={handleTaskDelete}
-      fetchContactHistory={fetchContactHistory}
     />
   );
 }
