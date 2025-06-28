@@ -54,6 +54,7 @@ export default function CheckManagementPage() {
   const [partyType, setPartyType] = useState<'customer' | 'supplier'>('customer');
   const [description, setDescription] = useState("");
   const [issueDateInput, setIssueDateInput] = useState('');
+  const [dueDateInput, setDueDateInput] = useState('');
 
   useEffect(() => {
     // Load checks from localStorage
@@ -116,6 +117,7 @@ export default function CheckManagementPage() {
     setPartyType(check.partyType);
     setDescription(check.description || "");
     setShowCheckModal(true);
+    setDueDateInput(check.dueDate ? format(new Date(check.dueDate), 'dd.MM.yyyy') : '');
   };
 
   const handleUpdateCheck = () => {
@@ -179,6 +181,7 @@ export default function CheckManagementPage() {
     setPartyName("");
     setPartyType('customer');
     setDescription("");
+    setDueDateInput('');
   };
 
   const filteredChecks = checks.filter(check =>
@@ -303,16 +306,19 @@ export default function CheckManagementPage() {
                   <Input
                     type="text"
                     placeholder="gg.aa.yyyy"
-                    value={dueDate ? format(dueDate, 'dd.MM.yyyy') : ''}
+                    value={dueDateInput}
                     onChange={e => {
                       let val = e.target.value.replace(/\D/g, "");
                       if (val.length > 8) val = val.slice(0, 8);
                       if (val.length >= 5) val = val.replace(/(\d{2})(\d{2})(\d{0,4})/, "$1.$2.$3");
                       else if (val.length >= 3) val = val.replace(/(\d{2})(\d{0,2})/, "$1.$2");
+                      setDueDateInput(val);
                       if (val.length === 10) {
                         const parsed = parse(val, 'dd.MM.yyyy', new Date());
                         if (isValid(parsed)) {
                           setDueDate(parsed);
+                        } else {
+                          setDueDate(undefined);
                         }
                       } else {
                         setDueDate(undefined);

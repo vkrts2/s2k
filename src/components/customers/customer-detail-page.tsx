@@ -1,6 +1,7 @@
+/// <reference types="react" />
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, FC, ChangeEvent } from 'react';
 import type { Customer, Sale, Payment, Currency, StockItem, ContactHistoryItem, CustomerTask, SaleFormValues, PaymentFormValues, TaskFormValues } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from '../ui/textarea';
 import Link from 'next/link';
 import { Label } from '@/components/ui/label';
+import { JSX } from 'react/jsx-runtime';
 
 
 interface CustomerDetailPageClientProps {
