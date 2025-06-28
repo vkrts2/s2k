@@ -403,7 +403,7 @@ export default function CheckManagementPage() {
                     <TableCell>{check.checkNumber}</TableCell>
                     <TableCell>{check.bankName}</TableCell>
                     <TableCell>{check.amount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</TableCell>
-                    <TableCell>{format(new Date(check.dueDate), "dd MMMM yyyy", { locale: tr })}</TableCell>
+                    <TableCell>{format(new Date(check.dueDate), "dd.MM.yyyy", { locale: tr })}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs ${
                         check.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :

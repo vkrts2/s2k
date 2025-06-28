@@ -58,7 +58,7 @@ export function CostList({ items, onEdit, onDelete }: CostListProps) {
             {items.map((item) => (
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.description}</TableCell>
-                <TableCell>{format(parseISO(item.createdAt), "dd MMM yyyy", { locale: tr })}</TableCell>
+                <TableCell>{format(parseISO(item.createdAt), "dd.MM.yyyy", { locale: tr })}</TableCell>
                 <TableCell className="text-right">
                   <Button
                     variant="ghost"
