@@ -104,6 +104,14 @@ export function CustomerList({
     return a.name.localeCompare(b.name, 'tr', { sensitivity: 'base' });
   });
 
+  // Toplam bakiyeleri hesapla
+  const totalBalances = customers.reduce((acc, customer) => {
+    const balances = calculateBalancesForCustomer(customer.id);
+    acc.TRY += balances.TRY || 0;
+    acc.USD += balances.USD || 0;
+    return acc;
+  }, { TRY: 0, USD: 0 });
+
   return (
     <Card className="shadow-sm">
       <CardHeader>
@@ -113,7 +121,13 @@ export function CustomerList({
               <Home className="h-5 w-5" />
             </Button>
           </Link>
-          <CardTitle>{title}</CardTitle>
+          <div className="flex-1 flex flex-col items-center">
+            <CardTitle>{title}</CardTitle>
+            <div className="mt-2 flex flex-col items-center text-sm text-muted-foreground bg-gray-50 rounded p-2 shadow-sm">
+              <span><b>Toplam Bakiye (TRY):</b> {formatCurrency(totalBalances.TRY, 'TRY')}</span>
+              <span><b>Toplam Bakiye (USD):</b> {formatCurrency(totalBalances.USD, 'USD')}</span>
+            </div>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
