@@ -157,7 +157,7 @@ export class ReportService {
 
     const targetCurrency = filters.currency || 'TRY';
 
-    // Gelir hesaplamaları (tüm satışlar ve müşteri ödemeleri)
+    // Gelir hesaplamaları (sadece satışlar)
     const incomeDetails = [
       ...sales.map(sale => ({
         date: sale.date,
@@ -166,18 +166,10 @@ export class ReportService {
         category: sale.category || 'Satış',
         description: sale.description || 'Satış',
         customerName: customers.find(c => c.id === sale.customerId)?.name
-      })),
-      ...payments.map(payment => ({
-        date: payment.date,
-        amount: payment.amount,
-        currency: payment.currency,
-        category: 'Ödeme',
-        description: payment.description || 'Müşteri Ödemesi',
-        customerName: customers.find(c => c.id === payment.customerId)?.name
       }))
     ];
 
-    // Gider hesaplamaları (tüm alışlar ve tedarikçi ödemeleri)
+    // Gider hesaplamaları (sadece alışlar)
     const expenseDetails = [
       ...purchases.map(purchase => ({
         date: purchase.date,
@@ -186,14 +178,6 @@ export class ReportService {
         category: purchase.category || 'Alış',
         description: purchase.description || 'Tedarikçi Alışı',
         supplierName: suppliers.find(s => s.id === purchase.supplierId)?.name
-      })),
-      ...paymentsToSuppliers.map(payment => ({
-        date: payment.date,
-        amount: payment.amount,
-        currency: payment.currency,
-        category: 'Tedarikçi Ödemesi',
-        description: payment.description || 'Tedarikçi Ödemesi',
-        supplierName: suppliers.find(s => s.id === payment.supplierId)?.name
       }))
     ];
 
