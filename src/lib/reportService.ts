@@ -177,17 +177,30 @@ export class ReportService {
       }))
     ];
 
-    // Gider hesaplamaları (sadece alışlar)
+    // Gider hesaplamaları (alışlar + devreden bakiyeler)
     const expenseDetails = [
-      ...purchases.map(purchase => ({
-        date: purchase.date,
-        amount: purchase.amount,
-        currency: purchase.currency,
-        category: purchase.category || 'Alış',
-        description: purchase.description || 'Tedarikçi Alışı',
-        supplierName: suppliers.find(s => s.id === purchase.supplierId)?.name
-      }))
-      // Tedarikçi ödemeleri gider toplamına eklenmeyecek
+      // Devreden bakiyeleri ekle (sadece description'da 'devreden bakiye' geçenler)
+      ...purchases
+        .filter(purchase => purchase.description && purchase.description.toLowerCase().includes('devreden bakiye'))
+        .map(purchase => ({
+          date: purchase.date,
+          amount: purchase.amount,
+          currency: purchase.currency,
+          category: 'Devreden Bakiye',
+          description: purchase.description || 'Devreden Bakiye',
+          supplierName: suppliers.find(s => s.id === purchase.supplierId)?.name
+        })),
+      // Normal alışlar (description'da 'devreden bakiye' geçmeyenler)
+      ...purchases
+        .filter(purchase => !(purchase.description && purchase.description.toLowerCase().includes('devreden bakiye')))
+        .map(purchase => ({
+          date: purchase.date,
+          amount: purchase.amount,
+          currency: purchase.currency,
+          category: purchase.category || 'Alış',
+          description: purchase.description || 'Tedarikçi Alışı',
+          supplierName: suppliers.find(s => s.id === purchase.supplierId)?.name
+        })),
     ];
 
     const incomeTotal = calculateTotal(incomeDetails, targetCurrency);
