@@ -121,13 +121,10 @@ export function CustomerList({
               <Home className="h-5 w-5" />
             </Button>
           </Link>
-          <div className="flex flex-col items-center flex-1">
-            <div className="flex items-center gap-4 mb-2">
-              <CardTitle>{title}</CardTitle>
-              <Button onClick={() => window.location.href='/customers/register'} className="ml-2">Müşteri Ekle</Button>
-            </div>
-            <div className="flex justify-center w-full">
-              <div className="mt-2 flex flex-col items-center bg-neutral-900/95 rounded-xl shadow-lg px-6 py-3 border border-gray-700 min-w-[220px] max-w-full space-y-1">
+          <CardTitle>{title}</CardTitle>
+          <div className="flex-shrink-0 ml-4">
+            <div className="flex flex-col items-end">
+              <div className="bg-neutral-900/95 rounded-xl shadow-lg px-6 py-3 border border-gray-700 min-w-[220px] max-w-full space-y-1 mt-0">
                 <span className="text-base font-bold text-white mb-1">
                   Toplam Bakiye (TRY):
                   <span className={
