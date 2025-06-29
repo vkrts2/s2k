@@ -121,29 +121,34 @@ export function CustomerList({
               <Home className="h-5 w-5" />
             </Button>
           </Link>
-          <div className="flex-1 flex flex-col items-center">
-            <CardTitle>{title}</CardTitle>
-            <div className="mt-4 flex flex-col items-center bg-neutral-900/95 rounded-2xl shadow-2xl px-12 py-7 border border-gray-700 min-w-[380px] max-w-full space-y-2">
-              <span className="text-xl font-extrabold text-white mb-2">
-                Toplam Bakiye (TRY): 
-                <span className={
-                  totalBalances.TRY > 0 ? "text-3xl font-bold text-green-400" :
-                  totalBalances.TRY < 0 ? "text-3xl font-bold text-red-400" :
-                  "text-3xl font-bold text-gray-400"
-                }>
-                  {formatCurrency(totalBalances.TRY, 'TRY')}
+          <div className="flex flex-col items-center flex-1">
+            <div className="flex items-center gap-4 mb-2">
+              <CardTitle>{title}</CardTitle>
+              <Button onClick={() => window.location.href='/customers/register'} className="ml-2">Müşteri Ekle</Button>
+            </div>
+            <div className="flex justify-center w-full">
+              <div className="mt-2 flex flex-col items-center bg-neutral-900/95 rounded-xl shadow-lg px-6 py-3 border border-gray-700 min-w-[220px] max-w-full space-y-1">
+                <span className="text-base font-bold text-white mb-1">
+                  Toplam Bakiye (TRY):
+                  <span className={
+                    totalBalances.TRY > 0 ? "text-xl font-bold text-green-400" :
+                    totalBalances.TRY < 0 ? "text-xl font-bold text-red-400" :
+                    "text-xl font-bold text-gray-400"
+                  }>
+                    {formatCurrency(totalBalances.TRY, 'TRY')}
+                  </span>
                 </span>
-              </span>
-              <span className="text-xl font-extrabold text-white">
-                Toplam Bakiye (USD): 
-                <span className={
-                  totalBalances.USD > 0 ? "text-3xl font-bold text-green-400" :
-                  totalBalances.USD < 0 ? "text-3xl font-bold text-red-400" :
-                  "text-3xl font-bold text-gray-400"
-                }>
-                  {formatCurrency(totalBalances.USD, 'USD')}
+                <span className="text-base font-bold text-white">
+                  Toplam Bakiye (USD):
+                  <span className={
+                    totalBalances.USD > 0 ? "text-xl font-bold text-green-400" :
+                    totalBalances.USD < 0 ? "text-xl font-bold text-red-400" :
+                    "text-xl font-bold text-gray-400"
+                  }>
+                    {formatCurrency(totalBalances.USD, 'USD')}
+                  </span>
                 </span>
-              </span>
+              </div>
             </div>
           </div>
         </div>
