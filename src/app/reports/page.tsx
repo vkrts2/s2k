@@ -52,6 +52,8 @@ export default function ReportsPage() {
   const [allStockItems, setAllStockItems] = useState<StockItem[]>([]);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [allPayments, setAllPayments] = useState<any[]>([]);
+  const [allPaymentsToSuppliers, setAllPaymentsToSuppliers] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user, loading } = useAuth();
@@ -97,6 +99,18 @@ export default function ReportsPage() {
         setAllPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       }
     );
+    const paymentsToSuppliersUnsub = onSnapshot(
+      query(_getUserCollectionRef(user.uid, "paymentsToSuppliers")) as any,
+      (snapshot: QuerySnapshot) => {
+        setAllPaymentsToSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+    );
+    const suppliersUnsub = onSnapshot(
+      query(_getUserCollectionRef(user.uid, "suppliers")) as any,
+      (snapshot: QuerySnapshot) => {
+        setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+    );
 
     setIsLoading(false);
 
@@ -107,6 +121,8 @@ export default function ReportsPage() {
       stockUnsub();
       customersUnsub();
       paymentsUnsub();
+      paymentsToSuppliersUnsub();
+      suppliersUnsub();
     };
   }, [user, loading]);
 
@@ -121,15 +137,17 @@ export default function ReportsPage() {
       profitLoss: { TRY: 0, USD: 0, EUR: 0 },
     };
 
-    allSales.forEach(s => {
-      if (s && typeof s.amount === 'number' && s.currency) {
-        totals.sales[s.currency] = (totals.sales[s.currency] || 0) + s.amount;
+    allSales.forEach((s: any) => {
+      if (s && (typeof s.totalAmount === 'number' || typeof s.amount === 'number') && s.currency) {
+        const currency = s.currency as Currency;
+        totals.sales[currency] = (totals.sales[currency] || 0) + (s.totalAmount || s.amount || 0);
       }
     });
 
-    allPurchases.forEach(p => {
-      if (p && typeof p.amount === 'number' && p.currency) {
-        totals.purchases[p.currency] = (totals.purchases[p.currency] || 0) + p.amount;
+    allPurchases.forEach((p: any) => {
+      if (p && (typeof p.totalAmount === 'number' || typeof p.amount === 'number') && p.currency) {
+        const currency = p.currency as Currency;
+        totals.purchases[currency] = (totals.purchases[currency] || 0) + (p.totalAmount || p.amount || 0);
       }
     });
 
@@ -314,15 +332,14 @@ export default function ReportsPage() {
           });
 
           // Tedarikçi bakiyeleri (alışlar - ödemeler)
-          // Tedarikçi ödemeleri için allPurchases ve allPaymentsToSuppliers kullanılmalı
-          // Ancak burada sadece allPurchases ve allSales var, bu yüzden tedarikçi borcu için alışlar - ödemeler mantığı kullanılacak
-          // allPurchases: alışlar, allSales: satışlar
-          // Tedarikçi borcu: alışlar - ödemeler
-          // allPurchases: Purchase[], allPaymentsToSuppliers: PaymentToSupplier[]
-          // allPaymentsToSuppliers yok, bu yüzden sadece alışlar üzerinden hesap
-          // (Eğer ödeme varsa, eklenmeli)
-          // Şimdilik alışların toplamı
-          toplamBorc = allPurchases.filter(p => p.currency === 'TRY').reduce((sum, p) => sum + (p.amount || 0), 0);
+          suppliers.forEach((supplier: any) => {
+            const purchases = allPurchases.filter((p: any) => p.supplierId === supplier.id && p.currency === 'TRY');
+            const payments = allPaymentsToSuppliers.filter((p: any) => p.supplierId === supplier.id && p.currency === 'TRY');
+            const purchasesTotal = purchases.reduce((sum: number, p: any) => sum + (p.totalAmount || p.amount || 0), 0);
+            const paymentsTotal = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+            const balance = purchasesTotal - paymentsTotal;
+            if (balance > 0) toplamBorc += balance;
+          });
 
           // Güncel kar durumu: toplam alacak - toplam borç
           const guncelKar = toplamAlacak - toplamBorc;
