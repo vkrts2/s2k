@@ -4,11 +4,10 @@
 import React, { useState, useEffect } from "react";
 import { ReportService } from "@/lib/reportService";
 import { ReportType, ReportFilters } from "@/lib/reportTypes";
-import { format, startOfMonth, endOfMonth } from "date-fns";
-import { tr } from "date-fns/locale";
 import { formatCurrency } from "@/lib/reportUtils";
-import { Card } from "@/src/components/ui/card";
-import { Button } from "@/src/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 
 const REPORT_TYPES: { key: ReportType; label: string }[] = [
   { key: "income-expense", label: "Gelir-Gider" },
