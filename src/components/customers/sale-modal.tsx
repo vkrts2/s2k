@@ -88,7 +88,13 @@ export function SaleModal({
       return;
     }
     try {
-      await onSubmit(formValues);
+      // amount ve unitPrice'ı hem string hem number olarak gönder
+      const submitValues = {
+        ...formValues,
+        amountNumber: parseFloat(String(formValues.amount).replace(',', '.')),
+        unitPriceNumber: formValues.unitPrice !== undefined ? parseFloat(String(formValues.unitPrice).replace(',', '.')) : undefined,
+      };
+      await onSubmit(submitValues);
     } catch (error) {
       console.error("Error submitting sale form:", error);
     }
