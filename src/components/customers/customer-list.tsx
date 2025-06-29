@@ -123,9 +123,27 @@ export function CustomerList({
           </Link>
           <div className="flex-1 flex flex-col items-center">
             <CardTitle>{title}</CardTitle>
-            <div className="mt-2 flex flex-col items-center text-sm text-muted-foreground bg-gray-50 rounded p-2 shadow-sm">
-              <span><b>Toplam Bakiye (TRY):</b> {formatCurrency(totalBalances.TRY, 'TRY')}</span>
-              <span><b>Toplam Bakiye (USD):</b> {formatCurrency(totalBalances.USD, 'USD')}</span>
+            <div className="mt-4 flex flex-col items-center bg-neutral-900/95 rounded-2xl shadow-2xl px-12 py-7 border border-gray-700 min-w-[380px] max-w-full space-y-2">
+              <span className="text-xl font-extrabold text-white mb-2">
+                Toplam Bakiye (TRY): 
+                <span className={
+                  totalBalances.TRY > 0 ? "text-3xl font-bold text-green-400" :
+                  totalBalances.TRY < 0 ? "text-3xl font-bold text-red-400" :
+                  "text-3xl font-bold text-gray-400"
+                }>
+                  {formatCurrency(totalBalances.TRY, 'TRY')}
+                </span>
+              </span>
+              <span className="text-xl font-extrabold text-white">
+                Toplam Bakiye (USD): 
+                <span className={
+                  totalBalances.USD > 0 ? "text-3xl font-bold text-green-400" :
+                  totalBalances.USD < 0 ? "text-3xl font-bold text-red-400" :
+                  "text-3xl font-bold text-gray-400"
+                }>
+                  {formatCurrency(totalBalances.USD, 'USD')}
+                </span>
+              </span>
             </div>
           </div>
         </div>
