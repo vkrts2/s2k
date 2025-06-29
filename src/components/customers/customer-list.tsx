@@ -121,16 +121,18 @@ export function CustomerList({
               <Home className="h-5 w-5" />
             </Button>
           </Link>
-          <CardTitle>{title}</CardTitle>
+          <div className="flex-1 flex flex-col items-center">
+            <CardTitle className="text-3xl font-bold text-center w-full">{title}</CardTitle>
+          </div>
           <div className="flex-shrink-0 ml-4">
             <div className="flex flex-col items-end">
-              <div className="bg-neutral-900/95 rounded-xl shadow-lg px-6 py-3 border border-gray-700 min-w-[220px] max-w-full space-y-1 mt-0">
-                <span className="text-base font-bold text-white mb-1">
+              <div className="bg-neutral-900/95 rounded-xl shadow-lg px-6 py-3 border border-gray-700 min-w-[260px] max-w-full space-y-2 mt-0">
+                <span className="text-base font-bold text-white">
                   Toplam Bakiye (TRY):
                   <span className={
-                    totalBalances.TRY > 0 ? "text-xl font-bold text-green-400" :
-                    totalBalances.TRY < 0 ? "text-xl font-bold text-red-400" :
-                    "text-xl font-bold text-gray-400"
+                    totalBalances.TRY > 0 ? "text-xl font-bold text-green-400 ml-2" :
+                    totalBalances.TRY < 0 ? "text-xl font-bold text-red-400 ml-2" :
+                    "text-xl font-bold text-gray-400 ml-2"
                   }>
                     {formatCurrency(totalBalances.TRY, 'TRY')}
                   </span>
@@ -138,9 +140,9 @@ export function CustomerList({
                 <span className="text-base font-bold text-white">
                   Toplam Bakiye (USD):
                   <span className={
-                    totalBalances.USD > 0 ? "text-xl font-bold text-green-400" :
-                    totalBalances.USD < 0 ? "text-xl font-bold text-red-400" :
-                    "text-xl font-bold text-gray-400"
+                    totalBalances.USD > 0 ? "text-xl font-bold text-green-400 ml-2" :
+                    totalBalances.USD < 0 ? "text-xl font-bold text-red-400 ml-2" :
+                    "text-xl font-bold text-gray-400 ml-2"
                   }>
                     {formatCurrency(totalBalances.USD, 'USD')}
                   </span>

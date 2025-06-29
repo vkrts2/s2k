@@ -6,7 +6,7 @@ import type { Customer, Sale, Payment, Currency, StockItem, ContactHistoryItem, 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Trash2, Pencil, Printer, FileText } from 'lucide-react';
+import { PlusCircle, Trash2, Pencil, Printer, FileText, Home } from 'lucide-react';
 import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
@@ -267,6 +267,14 @@ export function CustomerDetailPageClient({
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
+      {/* Sol üst köşede ana menüye dön butonu */}
+      <div className="absolute left-4 top-4 z-10">
+        <Link href="/" passHref legacyBehavior>
+          <Button variant="ghost" size="icon" className="h-10 w-10" title="Ana Sayfa">
+            <Home className="h-6 w-6" />
+          </Button>
+        </Link>
+      </div>
       {/* Header */}
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-start justify-between">
