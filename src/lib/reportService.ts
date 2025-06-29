@@ -177,7 +177,7 @@ export class ReportService {
       }))
     ];
 
-    // Gider hesaplamaları (alışlar + tedarikçi ödemeleri)
+    // Gider hesaplamaları (sadece alışlar)
     const expenseDetails = [
       ...purchases.map(purchase => ({
         date: purchase.date,
@@ -186,15 +186,8 @@ export class ReportService {
         category: purchase.category || 'Alış',
         description: purchase.description || 'Tedarikçi Alışı',
         supplierName: suppliers.find(s => s.id === purchase.supplierId)?.name
-      })),
-      ...paymentsToSuppliers.map(payment => ({
-        date: payment.date,
-        amount: payment.amount,
-        currency: payment.currency,
-        category: 'Tedarikçi Ödemesi',
-        description: payment.description || 'Tedarikçi Ödemesi',
-        supplierName: suppliers.find(s => s.id === payment.supplierId)?.name
       }))
+      // Tedarikçi ödemeleri gider toplamına eklenmeyecek
     ];
 
     const incomeTotal = calculateTotal(incomeDetails, targetCurrency);
