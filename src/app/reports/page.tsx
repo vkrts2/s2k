@@ -220,6 +220,33 @@ export default function ReportsPage() {
               )}
               {/* Diğer raporlar için de benzer özet kutuları eklenebilir */}
             </div>
+            {/* Alışların detay tablosu (sadece gelir-gider raporunda) */}
+            {selectedReport === "income-expense" && reportData.expenses.details && (
+              <div className="overflow-x-auto mt-4">
+                <table className="min-w-full text-sm border rounded bg-background">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="px-3 py-2 text-left">Tarih</th>
+                      <th className="px-3 py-2 text-left">Açıklama</th>
+                      <th className="px-3 py-2 text-left">Tedarikçi</th>
+                      <th className="px-3 py-2 text-right">Tutar</th>
+                      <th className="px-3 py-2 text-left">Para Birimi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportData.expenses.details.map((item: any, i: number) => (
+                      <tr key={i} className="border-b last:border-b-0">
+                        <td className="px-3 py-2">{item.date}</td>
+                        <td className="px-3 py-2">{item.description}</td>
+                        <td className="px-3 py-2">{item.supplierName || '-'}</td>
+                        <td className="px-3 py-2 text-right">{formatCurrency(item.amount, item.currency)}</td>
+                        <td className="px-3 py-2">{item.currency}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {/* Grafik ve tablo alanı (şimdilik placeholder) */}
             <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
               <span className="text-muted-foreground">Grafik ve detaylı tablo burada olacak (geliştirilebilir)</span>
