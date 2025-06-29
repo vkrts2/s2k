@@ -84,8 +84,12 @@ export default function CustomerDetailPage() {
     // Olay Yöneticileri (Event Handlers) with OPTIMISTIC UPDATES
     const handleSaleSubmit = async (values: SaleFormValues, editingSale: Sale | null) => {
         if (!user || !customer) return;
+        if (!values.date || !(values.date instanceof Date) || isNaN(values.date.getTime())) {
+            toast({ title: "Hata", description: "Lütfen geçerli bir tarih girin.", variant: "destructive" });
+            return;
+        }
         const parsedAmount = parseFloat(values.amount.toString());
-        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        if (isNaN(parsedAmount)) {
             toast({ title: "Hata", description: "Lütfen geçerli bir tutar girin.", variant: "destructive" });
             return;
         }
@@ -97,7 +101,7 @@ export default function CustomerDetailPage() {
                 const saleData: Sale = {
                     ...editingSale,
                     amount: parsedAmount,
-                    date: formatISO(values.date),
+                    date: formatISO(values.date as Date),
                     currency: values.currency,
                     description: values.description || '',
                     stockItemId: values.stockItemId || null,
@@ -115,7 +119,7 @@ export default function CustomerDetailPage() {
                 const newSaleData: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'transactionType'> = {
                   customerId: customer.id,
                   amount: parsedAmount,
-                  date: values.date.toISOString(),
+                  date: (values.date as Date).toISOString(),
                   currency: values.currency,
                   description: values.description || '',
                   stockItemId: values.stockItemId || null,
