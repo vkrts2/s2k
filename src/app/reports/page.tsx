@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { ReportService } from "@/lib/reportService";
 import { ReportType, ReportFilters } from "@/lib/reportTypes";
 import { formatCurrency } from "@/lib/reportUtils";
@@ -21,7 +22,7 @@ const REPORT_TYPES: { key: ReportType; label: string }[] = [
 const CURRENCIES = ["TRY", "USD", "EUR"];
 
 export default function ReportsPage() {
-  // Varsayılan tarih aralığı: bu ay
+  const { user, loading: authLoading } = useAuth();
   const [dateRange, setDateRange] = useState({
     start: startOfMonth(new Date()),
     end: endOfMonth(new Date()),
@@ -32,27 +33,37 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<any>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
-  // TODO: Kullanıcı kimliği gerçek auth ile alınmalı
-  const userId = "demo-user";
-  const reportService = new ReportService(userId);
+  // Kullanıcı yoksa uyarı göster
+  if (!authLoading && !user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <h2 className="text-2xl font-bold mb-4">Raporlar</h2>
+        <div className="text-lg text-red-500 font-semibold">Lütfen raporları görüntülemek için giriş yapın.</div>
+      </div>
+    );
+  }
 
   // Raporu getir
   useEffect(() => {
+    if (!user) return;
     setLoading(true);
     setError(null);
+    setInfo(null);
     const filters: ReportFilters = {
       dateRange,
       currency: currency as any,
       customerId: selectedReport === "customer-sales-payments" ? customerId : undefined,
     };
+    const reportService = new ReportService(user.uid);
     reportService
       .generateReport(selectedReport, filters)
       .then((data: any) => setReportData(data))
       .catch((err: any) => setError(err.message || "Bilinmeyen hata"))
       .finally(() => setLoading(false));
     // eslint-disable-next-line
-  }, [selectedReport, dateRange, currency, customerId]);
+  }, [selectedReport, dateRange, currency, customerId, user]);
 
   // Tarih aralığı seçici
   function DateRangePicker() {
@@ -115,12 +126,12 @@ export default function ReportsPage() {
     );
   }
 
-  // PDF/Excel çıktı butonları (şimdilik pasif)
+  // PDF/Excel çıktı butonları
   function ExportButtons() {
     return (
       <div className="flex gap-2">
-        <Button variant="outline">PDF</Button>
-        <Button variant="outline">Excel</Button>
+        <Button variant="outline" onClick={() => setInfo("PDF/Excel çıktısı özelliği çok yakında eklenecek!")}>PDF</Button>
+        <Button variant="outline" onClick={() => setInfo("PDF/Excel çıktısı özelliği çok yakında eklenecek!")}>Excel</Button>
       </div>
     );
   }
@@ -150,6 +161,7 @@ export default function ReportsPage() {
           {selectedReport === "customer-sales-payments" && <CustomerSelect />}
           <ExportButtons />
         </div>
+        {info && <div className="text-center text-blue-500 font-semibold mb-4">{info}</div>}
         {/* İçerik */}
         {loading ? (
           <div className="flex justify-center items-center h-40">
