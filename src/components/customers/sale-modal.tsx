@@ -199,6 +199,7 @@ export function SaleModal({
                 onChange={(e) => setFormValues({ ...formValues, unitPrice: e.target.value })}
                 required
               />
+              <span className="text-xs text-muted-foreground">Negatif değer girebilirsiniz (devreden bakiye için).</span>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="amount">Tutar</Label>
@@ -210,6 +211,7 @@ export function SaleModal({
                 onChange={(e) => setFormValues({ ...formValues, amount: e.target.value })}
                 required
               />
+              <span className="text-xs text-muted-foreground">Negatif değer girebilirsiniz (devreden bakiye için).</span>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="date">Tarih</Label>
