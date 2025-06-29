@@ -239,19 +239,19 @@ export default function ReportsPage() {
                   <Card className="bg-green-100 dark:bg-green-900/60 rounded-xl p-4 shadow text-center">
                     <div className="text-lg font-semibold">Toplam Satış</div>
                     <div className="text-2xl font-bold text-green-700 dark:text-green-300">
-                      {formatCurrency(reportData.revenue.total, currency as any)}
+                      {formatCurrency(reportData.revenue?.total ?? 0, currency as any)}
                     </div>
                   </Card>
                   <Card className="bg-red-100 dark:bg-red-900/60 rounded-xl p-4 shadow text-center">
                     <div className="text-lg font-semibold">Toplam Alış</div>
                     <div className="text-2xl font-bold text-red-700 dark:text-red-300">
-                      {formatCurrency(reportData.costs.total, currency as any)}
+                      {formatCurrency(reportData.costs?.total ?? 0, currency as any)}
                     </div>
                   </Card>
                   <Card className="bg-blue-100 dark:bg-blue-900/60 rounded-xl p-4 shadow text-center">
                     <div className="text-lg font-semibold">Net Kar</div>
                     <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                      {formatCurrency(reportData.netProfit, currency as any)}
+                      {formatCurrency(reportData.netProfit ?? 0, currency as any)}
                     </div>
                   </Card>
                 </>
