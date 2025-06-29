@@ -157,7 +157,7 @@ export class ReportService {
 
     const targetCurrency = filters.currency || 'TRY';
 
-    // Gelir hesaplamaları (satışlar + ödemeler)
+    // Gelir hesaplamaları (tüm satışlar ve müşteri ödemeleri)
     const incomeDetails = [
       ...sales.map(sale => ({
         date: sale.date,
@@ -177,30 +177,24 @@ export class ReportService {
       }))
     ];
 
-    // Gider hesaplamaları (alışlar + devreden bakiyeler)
+    // Gider hesaplamaları (tüm alışlar ve tedarikçi ödemeleri)
     const expenseDetails = [
-      // Devreden bakiyeleri ekle (sadece description'da 'devreden bakiye' geçenler)
-      ...purchases
-        .filter(purchase => purchase.description && purchase.description.toLowerCase().includes('devreden bakiye'))
-        .map(purchase => ({
-          date: purchase.date,
-          amount: purchase.amount,
-          currency: purchase.currency,
-          category: 'Devreden Bakiye',
-          description: purchase.description || 'Devreden Bakiye',
-          supplierName: suppliers.find(s => s.id === purchase.supplierId)?.name
-        })),
-      // Normal alışlar (description'da 'devreden bakiye' geçmeyenler)
-      ...purchases
-        .filter(purchase => !(purchase.description && purchase.description.toLowerCase().includes('devreden bakiye')))
-        .map(purchase => ({
-          date: purchase.date,
-          amount: purchase.amount,
-          currency: purchase.currency,
-          category: purchase.category || 'Alış',
-          description: purchase.description || 'Tedarikçi Alışı',
-          supplierName: suppliers.find(s => s.id === purchase.supplierId)?.name
-        })),
+      ...purchases.map(purchase => ({
+        date: purchase.date,
+        amount: purchase.amount,
+        currency: purchase.currency,
+        category: purchase.category || 'Alış',
+        description: purchase.description || 'Tedarikçi Alışı',
+        supplierName: suppliers.find(s => s.id === purchase.supplierId)?.name
+      })),
+      ...paymentsToSuppliers.map(payment => ({
+        date: payment.date,
+        amount: payment.amount,
+        currency: payment.currency,
+        category: 'Tedarikçi Ödemesi',
+        description: payment.description || 'Tedarikçi Ödemesi',
+        supplierName: suppliers.find(s => s.id === payment.supplierId)?.name
+      }))
     ];
 
     const incomeTotal = calculateTotal(incomeDetails, targetCurrency);
