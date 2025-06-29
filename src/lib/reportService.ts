@@ -56,7 +56,7 @@ export class ReportService {
   }
 
   // Veri Çekme Fonksiyonları
-  private async getSales(filters: ReportFilters): Promise<Sale[]> {
+  async getSales(filters: ReportFilters): Promise<Sale[]> {
     const salesRef = collection(db, `users/${this.userId}/sales`);
     const snapshot = await getDocs(salesRef);
     let sales = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sale));
@@ -73,7 +73,7 @@ export class ReportService {
     return sales;
   }
 
-  private async getPurchases(filters: ReportFilters): Promise<Purchase[]> {
+  async getPurchases(filters: ReportFilters): Promise<Purchase[]> {
     const purchasesRef = collection(db, `users/${this.userId}/purchases`);
     const snapshot = await getDocs(purchasesRef);
     let purchases = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Purchase));

@@ -5,18 +5,19 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ReportService } from "@/lib/reportService";
 import { ReportType, ReportFilters } from "@/lib/reportTypes";
-import { formatCurrency } from "@/lib/reportUtils";
+import { formatCurrency, groupByMonth } from "@/lib/reportUtils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
-const REPORT_TYPES: { key: ReportType; label: string }[] = [
+const REPORT_TYPES: { key: ReportType | 'monthly-sales-purchases'; label: string }[] = [
   { key: "income-expense", label: "Gelir-Gider" },
   { key: "profit-loss", label: "Kar-Zarar" },
   { key: "cash-flow", label: "Nakit Akış" },
   { key: "customer-sales-payments", label: "Müşteri Bazlı" },
   { key: "receivables-payables", label: "Tahsilat/Borç" },
   { key: "expense-analysis", label: "Gider Analizi" },
+  { key: "monthly-sales-purchases", label: "Aylık Alış-Satış" },
 ];
 
 const CURRENCIES = ["TRY", "USD", "EUR"];
@@ -27,13 +28,14 @@ export default function ReportsPage() {
     start: startOfMonth(new Date()),
     end: endOfMonth(new Date()),
   });
-  const [selectedReport, setSelectedReport] = useState<ReportType>("income-expense");
+  const [selectedReport, setSelectedReport] = useState<string>("income-expense");
   const [currency, setCurrency] = useState("TRY");
   const [customerId, setCustomerId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<any>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [monthlyData, setMonthlyData] = useState<Array<{ month: string; sales: number; purchases: number }>>([]);
 
   // Kullanıcı yoksa uyarı göster
   if (!authLoading && !user) {
@@ -57,13 +59,49 @@ export default function ReportsPage() {
       customerId: selectedReport === "customer-sales-payments" ? customerId : undefined,
     };
     const reportService = new ReportService(user.uid);
-    reportService
-      .generateReport(selectedReport, filters)
-      .then((data: any) => setReportData(data))
-      .catch((err: any) => setError(err.message || "Bilinmeyen hata"))
-      .finally(() => setLoading(false));
+    if (selectedReport !== "monthly-sales-purchases") {
+      reportService
+        .generateReport(selectedReport as ReportType, filters)
+        .then((data: any) => setReportData(data))
+        .catch((err: any) => setError(err.message || "Bilinmeyen hata"))
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
     // eslint-disable-next-line
   }, [selectedReport, dateRange, currency, customerId, user]);
+
+  // Aylık Alış-Satış verisini çek
+  useEffect(() => {
+    if (!user) return;
+    if (selectedReport !== "monthly-sales-purchases") return;
+    setLoading(true);
+    setError(null);
+    const filters: ReportFilters = {
+      dateRange,
+      currency: currency as any,
+    };
+    const reportService = new ReportService(user.uid);
+    Promise.all([
+      reportService.getSales(filters),
+      reportService.getPurchases(filters),
+    ])
+      .then(([sales, purchases]) => {
+        const salesByMonth = groupByMonth(sales, currency as any);
+        const purchasesByMonth = groupByMonth(purchases, currency as any);
+        // Tüm ayları birleştir
+        const allMonths = Array.from(new Set([...Object.keys(salesByMonth), ...Object.keys(purchasesByMonth)])).sort();
+        const data = allMonths.map((month) => ({
+          month,
+          sales: salesByMonth[month] || 0,
+          purchases: purchasesByMonth[month] || 0,
+        }));
+        setMonthlyData(data);
+      })
+      .catch((err) => setError(err.message || "Bilinmeyen hata"))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line
+  }, [selectedReport, dateRange, currency, user]);
 
   // Tarih aralığı seçici
   function DateRangePicker() {
@@ -258,6 +296,39 @@ export default function ReportsPage() {
                 {JSON.stringify(reportData, null, 2)}
               </pre>
             </details>
+            {selectedReport === "monthly-sales-purchases" && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-bold text-center mb-4">Aylık Alış-Satış Raporu</h2>
+                {/* Tablo */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm text-center border">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-4 py-2 border">Ay</th>
+                        <th className="px-4 py-2 border">Toplam Satış</th>
+                        <th className="px-4 py-2 border">Toplam Alış</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyData.length === 0 && !loading && (
+                        <tr>
+                          <td colSpan={3} className="border px-4 py-2 text-muted-foreground">Veri bulunamadı</td>
+                        </tr>
+                      )}
+                      {monthlyData.map((row) => (
+                        <tr key={row.month}>
+                          <td className="border px-4 py-2">{row.month}</td>
+                          <td className="border px-4 py-2">{formatCurrency(row.sales, currency as any)}</td>
+                          <td className="border px-4 py-2">{formatCurrency(row.purchases, currency as any)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Grafik (ileride eklenecek) */}
+                <div className="mt-8 text-center text-muted-foreground">Grafik özelliği çok yakında eklenecek!</div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-12">Rapor verisi bulunamadı.</div>
