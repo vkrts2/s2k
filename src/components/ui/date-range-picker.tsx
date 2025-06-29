@@ -26,16 +26,39 @@ export function DateRangePicker({
   onChange,
   className,
 }: DateRangePickerProps) {
+  const [open, setOpen] = React.useState(false);
+
+  const formatDate = (date: Date | undefined) =>
+    date ? format(date, "dd.MM.yyyy", { locale: tr }) : "";
+
   return (
-    <div className={cn("grid gap-2", className)}>
-      <Input
-        type="text"
-        placeholder="gg.aa.yyyy"
-      />
-      <Input
-        type="text"
-        placeholder="gg.aa.yyyy"
-      />
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-normal",
+            !value?.from && !value?.to && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {value?.from ?
+            value.to ?
+              `${formatDate(value.from)} - ${formatDate(value.to)}` :
+              formatDate(value.from)
+            : "Tarih aralığı seçin"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          initialFocus
+          mode="range"
+          selected={value}
+          onSelect={onChange}
+          numberOfMonths={2}
+          locale={tr}
+        />
+      </PopoverContent>
+    </Popover>
   );
 } 

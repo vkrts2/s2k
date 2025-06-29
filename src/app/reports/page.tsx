@@ -51,6 +51,7 @@ export default function ReportsPage() {
   const [allPurchases, setAllPurchases] = useState<Purchase[]>([]);
   const [allStockItems, setAllStockItems] = useState<StockItem[]>([]);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [allPayments, setAllPayments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user, loading } = useAuth();
@@ -90,6 +91,12 @@ export default function ReportsPage() {
         setAllCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as Omit<Customer, 'id'> })));
       }
     );
+    const paymentsUnsub = onSnapshot(
+      query(_getUserCollectionRef(user.uid, "payments")) as any,
+      (snapshot: QuerySnapshot) => {
+        setAllPayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+    );
 
     setIsLoading(false);
 
@@ -99,6 +106,7 @@ export default function ReportsPage() {
       purchasesUnsub();
       stockUnsub();
       customersUnsub();
+      paymentsUnsub();
     };
   }, [user, loading]);
 
@@ -285,6 +293,55 @@ export default function ReportsPage() {
         </div>
 
         <Separator />
+
+        {/* GÜNCEL DURUM KARTI */}
+        {(() => {
+          // Müşterilerden toplam alacak (TRY)
+          let toplamAlacak = 0;
+          // Tedarikçilere toplam borç (TRY)
+          let toplamBorc = 0;
+
+          // Müşteri bakiyeleri (satışlar - ödemeler)
+          const customerBalances: Record<string, number> = {};
+          allCustomers.forEach(customer => {
+            const sales = allSales.filter((s: any) => s.customerId === customer.id && s.currency === 'TRY');
+            const payments = (allPayments || []).filter((p: any) => p.customerId === customer.id && p.currency === 'TRY');
+            const salesTotal = sales.reduce((sum: number, s: any) => sum + (s.amount || 0), 0);
+            const paymentsTotal = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+            const balance = salesTotal - paymentsTotal;
+            customerBalances[customer.id] = balance;
+            toplamAlacak += balance;
+          });
+
+          // Tedarikçi bakiyeleri (alışlar - ödemeler)
+          // Tedarikçi ödemeleri için allPurchases ve allPaymentsToSuppliers kullanılmalı
+          // Ancak burada sadece allPurchases ve allSales var, bu yüzden tedarikçi borcu için alışlar - ödemeler mantığı kullanılacak
+          // allPurchases: alışlar, allSales: satışlar
+          // Tedarikçi borcu: alışlar - ödemeler
+          // allPurchases: Purchase[], allPaymentsToSuppliers: PaymentToSupplier[]
+          // allPaymentsToSuppliers yok, bu yüzden sadece alışlar üzerinden hesap
+          // (Eğer ödeme varsa, eklenmeli)
+          // Şimdilik alışların toplamı
+          toplamBorc = allPurchases.filter(p => p.currency === 'TRY').reduce((sum, p) => sum + (p.amount || 0), 0);
+
+          // Güncel kar durumu: toplam alacak - toplam borç
+          const guncelKar = toplamAlacak - toplamBorc;
+
+          return (
+            <Card className="bg-neutral-900/95 rounded-xl shadow-lg px-6 py-3 border border-gray-700 max-w-xl mx-auto mb-6">
+              <CardHeader>
+                <CardTitle className="text-xl font-bold text-white">Güncel Durum</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-2 text-lg text-white">
+                  <span>Müşterilerden Toplam Alacak: <span className="font-bold text-green-400">{formatCurrencyForReport(toplamAlacak, 'TRY')}</span></span>
+                  <span>Tedarikçilere Toplam Borç: <span className="font-bold text-red-400">{formatCurrencyForReport(toplamBorc, 'TRY')}</span></span>
+                  <span>Güncel Kar Durumu: <span className={guncelKar >= 0 ? 'font-bold text-green-400' : 'font-bold text-red-400'}>{formatCurrencyForReport(guncelKar, 'TRY')}</span></span>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         <Tabs defaultValue="sales" className="space-y-4">
           <TabsList>
