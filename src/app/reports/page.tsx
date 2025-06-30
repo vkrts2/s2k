@@ -345,6 +345,144 @@ export default function ReportsPage() {
                 <p className="text-lg mb-2">Seçilen müşteri için kayıt bulunamadı.</p>
               </div>
             ) : null}
+            {/* Kar-Zarar için grafikler */}
+            {selectedReport === "profit-loss" && reportData && (
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Satışlar grafiği */}
+                <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
+                  <div className="mb-4 text-lg font-semibold">Aylık Satış Grafiği</div>
+                  <Line
+                    data={{
+                      labels: Object.keys(reportData.revenue.byMonth),
+                      datasets: [
+                        {
+                          label: 'Satışlar',
+                          data: Object.values(reportData.revenue.byMonth),
+                          borderColor: 'rgb(34, 197, 94)',
+                          backgroundColor: 'rgba(34, 197, 94, 0.5)',
+                          tension: 0.3,
+                          fill: true,
+                        }
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: { position: 'top' as const },
+                        title: { display: false },
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          ticks: {
+                            callback: function(value) {
+                              return formatCurrency(value as number, currency as any);
+                            }
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </Card>
+                {/* Alışlar grafiği */}
+                <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
+                  <div className="mb-4 text-lg font-semibold">Aylık Alış Grafiği</div>
+                  <Line
+                    data={{
+                      labels: Object.keys(reportData.costs.byMonth),
+                      datasets: [
+                        {
+                          label: 'Alışlar',
+                          data: Object.values(reportData.costs.byMonth),
+                          borderColor: 'rgb(239, 68, 68)',
+                          backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                          tension: 0.3,
+                          fill: true,
+                        }
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: { position: 'top' as const },
+                        title: { display: false },
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          ticks: {
+                            callback: function(value) {
+                              return formatCurrency(value as number, currency as any);
+                            }
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </Card>
+              </div>
+            )}
+            {/* Aylık Alış-Satış için grafik ve tablo */}
+            {selectedReport === "monthly-sales-purchases" && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-bold text-center mb-4">Aylık Alış-Satış Raporu</h2>
+                {/* Grafik */}
+                <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
+                  <Bar
+                    data={{
+                      labels: monthlyData.map(d => d.month),
+                      datasets: [
+                        {
+                          label: 'Satış',
+                          data: monthlyData.map(d => d.sales),
+                          backgroundColor: 'rgba(34,197,94,0.7)',
+                        },
+                        {
+                          label: 'Alış',
+                          data: monthlyData.map(d => d.purchases),
+                          backgroundColor: 'rgba(239,68,68,0.7)',
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: { position: 'top' as const },
+                        title: { display: true, text: 'Aylık Alış-Satış Grafiği' },
+                      },
+                    }}
+                  />
+                </Card>
+                {/* Tablo */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm text-center border">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-4 py-2 border">Ay</th>
+                        <th className="px-4 py-2 border">Toplam Satış</th>
+                        <th className="px-4 py-2 border">Toplam Alış</th>
+                        <th className="px-4 py-2 border">Net Kar/Zarar</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyData.length === 0 && !loading && (
+                        <tr>
+                          <td colSpan={4} className="border px-4 py-2 text-muted-foreground">Veri bulunamadı</td>
+                        </tr>
+                      )}
+                      {monthlyData.map((row) => (
+                        <tr key={row.month}>
+                          <td className="border px-4 py-2">{row.month}</td>
+                          <td className="border px-4 py-2">{formatCurrency(row.sales, currency as any)}</td>
+                          <td className="border px-4 py-2">{formatCurrency(row.purchases, currency as any)}</td>
+                          <td className="border px-4 py-2">{formatCurrency(row.sales - row.purchases, currency as any)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-12">Rapor verisi bulunamadı.</div>
