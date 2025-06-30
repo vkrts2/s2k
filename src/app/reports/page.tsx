@@ -17,13 +17,17 @@ import {
   Title,
   Tooltip,
   Legend,
+  LineElement,
+  PointElement
 } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
+  LineElement,
+  PointElement,
   Title,
   Tooltip,
   Legend
@@ -287,28 +291,37 @@ export default function ReportsPage() {
               <>
                 {/* Grafik */}
                 <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
-                  <Bar
+                  <div className="mb-4 text-lg font-semibold">Aylık Satış Grafiği</div>
+                  <Line
                     data={{
                       labels: Object.keys(reportData.revenue.byMonth),
                       datasets: [
                         {
-                          label: 'Satış',
+                          label: 'Satışlar',
                           data: Object.values(reportData.revenue.byMonth),
-                          backgroundColor: 'rgba(34,197,94,0.7)',
-                        },
-                        {
-                          label: 'Alış',
-                          data: Object.values(reportData.costs.byMonth),
-                          backgroundColor: 'rgba(239,68,68,0.7)',
-                        },
+                          borderColor: 'rgb(34, 197, 94)',
+                          backgroundColor: 'rgba(34, 197, 94, 0.5)',
+                          tension: 0.3,
+                          fill: true,
+                        }
                       ],
                     }}
                     options={{
                       responsive: true,
                       plugins: {
                         legend: { position: 'top' as const },
-                        title: { display: true, text: 'Aylık Satış ve Alış' },
+                        title: { display: false },
                       },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          ticks: {
+                            callback: function(value) {
+                              return formatCurrency(value as number, currency as any);
+                            }
+                          }
+                        }
+                      }
                     }}
                   />
                 </Card>
@@ -362,10 +375,7 @@ export default function ReportsPage() {
                 </table>
               </div>
             )}
-            {/* Grafik ve tablo alanı (şimdilik placeholder) */}
-            <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
-              <span className="text-muted-foreground">Grafik ve detaylı tablo burada olacak (geliştirilebilir)</span>
-            </Card>
+            {/* Grafik ve tablo alanı */}
             {/* JSON çıktısı */}
             <details className="mt-4">
               <summary className="cursor-pointer text-sm text-muted-foreground">JSON çıktısını göster</summary>
