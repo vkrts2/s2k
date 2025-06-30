@@ -9,9 +9,27 @@ import { formatCurrency, groupByMonth } from "@/lib/reportUtils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const REPORT_TYPES: { key: ReportType | 'monthly-sales-purchases'; label: string }[] = [
-  { key: "income-expense", label: "Gelir-Gider" },
   { key: "profit-loss", label: "Kar-Zarar" },
   { key: "customer-sales-payments", label: "Müşteri Bazlı" },
   { key: "monthly-sales-purchases", label: "Aylık Alış-Satış" },
@@ -264,6 +282,59 @@ export default function ReportsPage() {
               )}
               {/* Diğer raporlar için de benzer özet kutuları eklenebilir */}
             </div>
+            {/* Kar-Zarar için grafik ve tablo */}
+            {selectedReport === "profit-loss" && (
+              <>
+                {/* Grafik */}
+                <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
+                  <Bar
+                    data={{
+                      labels: Object.keys(reportData.revenue.byMonth),
+                      datasets: [
+                        {
+                          label: 'Satış',
+                          data: Object.values(reportData.revenue.byMonth),
+                          backgroundColor: 'rgba(34,197,94,0.7)',
+                        },
+                        {
+                          label: 'Alış',
+                          data: Object.values(reportData.costs.byMonth),
+                          backgroundColor: 'rgba(239,68,68,0.7)',
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: { position: 'top' as const },
+                        title: { display: true, text: 'Aylık Satış ve Alış' },
+                      },
+                    }}
+                  />
+                </Card>
+                {/* Tablo */}
+                <div className="overflow-x-auto mt-4">
+                  <table className="min-w-full text-sm border rounded bg-background">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-3 py-2 text-left">Ay</th>
+                        <th className="px-3 py-2 text-right">Satış</th>
+                        <th className="px-3 py-2 text-right">Alış</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.keys(reportData.revenue.byMonth).map((month) => (
+                        <tr key={month} className="border-b last:border-b-0">
+                          <td className="px-3 py-2">{month}</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(reportData.revenue.byMonth[month], currency as any)}</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(reportData.costs.byMonth[month] || 0, currency as any)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
             {/* Alışların detay tablosu (sadece gelir-gider raporunda) */}
             {selectedReport === "income-expense" && reportData.expenses.details && (
               <div className="overflow-x-auto mt-4">
