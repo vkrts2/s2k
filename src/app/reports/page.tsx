@@ -257,239 +257,94 @@ export default function ReportsPage() {
           <div className="text-red-600 text-center font-semibold py-8">{error}</div>
         ) : reportData ? (
           <div className="space-y-6">
-            {selectedReport === "customer-sales-payments" && !customerId ? (
-              <div className="text-center text-muted-foreground py-12">
-                <p className="text-lg mb-2">Tüm müşteriler için toplu rapor alınamaz.</p>
-                <p className="text-sm">Lütfen bir müşteri seçin.</p>
-              </div>
-            ) : reportData && reportData.sales && reportData.sales.details.length === 0 ? (
-              <div className="text-center text-muted-foreground py-12">
-                <p className="text-lg mb-2">Seçilen müşteri için kayıt bulunamadı.</p>
-              </div>
-            ) : (
+            {selectedReport === "customer-sales-payments" && reportData && reportData.sales && reportData.sales.details.length > 0 ? (
               <>
                 {/* Özet kutuları */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {selectedReport === "income-expense" && (
-                    <>
-                      <Card className="bg-green-100 dark:bg-green-900/60 rounded-xl p-4 shadow text-center">
-                        <div className="text-lg font-semibold">Toplam Gelir</div>
-                        <div className="text-2xl font-bold text-green-700 dark:text-green-300">
-                          {formatCurrency(reportData.income.total, currency as any)}
-                        </div>
-                      </Card>
-                      <Card className="bg-red-100 dark:bg-red-900/60 rounded-xl p-4 shadow text-center">
-                        <div className="text-lg font-semibold">Toplam Gider</div>
-                        <div className="text-2xl font-bold text-red-700 dark:text-red-300">
-                          {formatCurrency(reportData.expenses.total, currency as any)}
-                        </div>
-                      </Card>
-                      <Card className="bg-blue-100 dark:bg-blue-900/60 rounded-xl p-4 shadow text-center">
-                        <div className="text-lg font-semibold">Net Gelir</div>
-                        <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                          {formatCurrency(reportData.netIncome, currency as any)}
-                        </div>
-                      </Card>
-                    </>
-                  )}
-                  {selectedReport === "profit-loss" && (
-                    <>
-                      <Card className="bg-green-100 dark:bg-green-900/60 rounded-xl p-4 shadow text-center">
-                        <div className="text-lg font-semibold">Toplam Satış</div>
-                        <div className="text-2xl font-bold text-green-700 dark:text-green-300">
-                          {formatCurrency(reportData.revenue?.total ?? 0, currency as any)}
-                        </div>
-                      </Card>
-                      <Card className="bg-red-100 dark:bg-red-900/60 rounded-xl p-4 shadow text-center">
-                        <div className="text-lg font-semibold">Toplam Alış</div>
-                        <div className="text-2xl font-bold text-red-700 dark:text-red-300">
-                          {formatCurrency(reportData.costs?.total ?? 0, currency as any)}
-                        </div>
-                      </Card>
-                      <Card className="bg-blue-100 dark:bg-blue-900/60 rounded-xl p-4 shadow text-center">
-                        <div className="text-lg font-semibold">Net Kar</div>
-                        <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                          {formatCurrency(reportData.netProfit ?? 0, currency as any)}
-                        </div>
-                      </Card>
-                    </>
-                  )}
-                  {/* Diğer raporlar için de benzer özet kutuları eklenebilir */}
-                </div>
-                {/* Kar-Zarar için grafik ve tablo */}
-                {selectedReport === "profit-loss" && (
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {/* Satışlar grafiği */}
-                    <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
-                      <div className="mb-4 text-lg font-semibold">Aylık Satış Grafiği</div>
-                      <Line
-                        data={{
-                          labels: Object.keys(reportData.revenue.byMonth),
-                          datasets: [
-                            {
-                              label: 'Satışlar',
-                              data: Object.values(reportData.revenue.byMonth),
-                              borderColor: 'rgb(34, 197, 94)',
-                              backgroundColor: 'rgba(34, 197, 94, 0.5)',
-                              tension: 0.3,
-                              fill: true,
-                            }
-                          ],
-                        }}
-                        options={{
-                          responsive: true,
-                          plugins: {
-                            legend: { position: 'top' as const },
-                            title: { display: false },
-                          },
-                          scales: {
-                            y: {
-                              beginAtZero: true,
-                              ticks: {
-                                callback: function(value) {
-                                  return formatCurrency(value as number, currency as any);
-                                }
-                              }
-                            }
-                          }
-                        }}
-                      />
-                    </Card>
-                    {/* Alışlar grafiği */}
-                    <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
-                      <div className="mb-4 text-lg font-semibold">Aylık Alış Grafiği</div>
-                      <Line
-                        data={{
-                          labels: Object.keys(reportData.costs.byMonth),
-                          datasets: [
-                            {
-                              label: 'Alışlar',
-                              data: Object.values(reportData.costs.byMonth),
-                              borderColor: 'rgb(239, 68, 68)',
-                              backgroundColor: 'rgba(239, 68, 68, 0.5)',
-                              tension: 0.3,
-                              fill: true,
-                            }
-                          ],
-                        }}
-                        options={{
-                          responsive: true,
-                          plugins: {
-                            legend: { position: 'top' as const },
-                            title: { display: false },
-                          },
-                          scales: {
-                            y: {
-                              beginAtZero: true,
-                              ticks: {
-                                callback: function(value) {
-                                  return formatCurrency(value as number, currency as any);
-                                }
-                              }
-                            }
-                          }
-                        }}
-                      />
-                    </Card>
-                  </div>
-                )}
-                {/* Alışların detay tablosu (sadece gelir-gider raporunda) */}
-                {selectedReport === "income-expense" && reportData.expenses.details && (
-                  <div className="overflow-x-auto mt-4">
-                    <table className="min-w-full text-sm border rounded bg-background">
-                      <thead>
-                        <tr className="bg-muted">
-                          <th className="px-3 py-2 text-left">Tarih</th>
-                          <th className="px-3 py-2 text-left">Açıklama</th>
-                          <th className="px-3 py-2 text-left">Tedarikçi</th>
-                          <th className="px-3 py-2 text-right">Tutar</th>
-                          <th className="px-3 py-2 text-left">Para Birimi</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reportData.expenses.details.map((item: any, i: number) => (
-                          <tr key={i} className="border-b last:border-b-0">
-                            <td className="px-3 py-2">{item.date}</td>
-                            <td className="px-3 py-2">{item.description}</td>
-                            <td className="px-3 py-2">{item.supplierName || '-'}</td>
-                            <td className="px-3 py-2 text-right">{formatCurrency(item.amount, item.currency)}</td>
-                            <td className="px-3 py-2">{item.currency}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                {/* Grafik ve tablo alanı */}
-                {/* JSON çıktısı */}
-                <details className="mt-4">
-                  <summary className="cursor-pointer text-sm text-muted-foreground">JSON çıktısını göster</summary>
-                  <pre className="bg-background p-2 rounded text-xs text-left overflow-x-auto mt-2">
-                    {JSON.stringify(reportData, null, 2)}
-                  </pre>
-                </details>
-                {selectedReport === "monthly-sales-purchases" && (
-                  <div className="space-y-6">
-                    <h2 className="text-xl font-bold text-center mb-4">Aylık Alış-Satış Raporu</h2>
-                    {/* Grafik */}
-                    <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
-                      <Bar
-                        data={{
-                          labels: monthlyData.map(d => d.month),
-                          datasets: [
-                            {
-                              label: 'Satış',
-                              data: monthlyData.map(d => d.sales),
-                              backgroundColor: 'rgba(34,197,94,0.7)',
-                            },
-                            {
-                              label: 'Alış',
-                              data: monthlyData.map(d => d.purchases),
-                              backgroundColor: 'rgba(239,68,68,0.7)',
-                            },
-                          ],
-                        }}
-                        options={{
-                          responsive: true,
-                          plugins: {
-                            legend: { position: 'top' as const },
-                            title: { display: true, text: 'Aylık Alış-Satış Grafiği' },
-                          },
-                        }}
-                      />
-                    </Card>
-                    {/* Tablo */}
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm text-center border">
-                        <thead>
-                          <tr className="bg-muted">
-                            <th className="px-4 py-2 border">Ay</th>
-                            <th className="px-4 py-2 border">Toplam Satış</th>
-                            <th className="px-4 py-2 border">Toplam Alış</th>
-                            <th className="px-4 py-2 border">Net Kar/Zarar</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {monthlyData.length === 0 && !loading && (
-                            <tr>
-                              <td colSpan={4} className="border px-4 py-2 text-muted-foreground">Veri bulunamadı</td>
-                            </tr>
-                          )}
-                          {monthlyData.map((row) => (
-                            <tr key={row.month}>
-                              <td className="border px-4 py-2">{row.month}</td>
-                              <td className="border px-4 py-2">{formatCurrency(row.sales, currency as any)}</td>
-                              <td className="border px-4 py-2">{formatCurrency(row.purchases, currency as any)}</td>
-                              <td className="border px-4 py-2">{formatCurrency(row.sales - row.purchases, currency as any)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  <Card className="bg-green-100 dark:bg-green-900/60 rounded-xl p-4 shadow text-center">
+                    <div className="text-lg font-semibold">Toplam Satış</div>
+                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                      {formatCurrency(reportData.sales.total, currency as any)}
                     </div>
-                  </div>
-                )}
+                  </Card>
+                  <Card className="bg-blue-100 dark:bg-blue-900/60 rounded-xl p-4 shadow text-center">
+                    <div className="text-lg font-semibold">Toplam Tahsilat</div>
+                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                      {formatCurrency(reportData.payments.total, currency as any)}
+                    </div>
+                  </Card>
+                  <Card className="bg-yellow-100 dark:bg-yellow-900/60 rounded-xl p-4 shadow text-center">
+                    <div className="text-lg font-semibold">Bakiye</div>
+                    <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
+                      {formatCurrency(reportData.balance, currency as any)}
+                    </div>
+                  </Card>
+                </div>
+                {/* Satışlar grafiği */}
+                <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px] mt-6">
+                  <div className="mb-4 text-lg font-semibold">Aylık Satış Grafiği</div>
+                  <Line
+                    data={{
+                      labels: Object.keys(reportData.sales.byCurrency),
+                      datasets: [
+                        {
+                          label: 'Satışlar',
+                          data: Object.values(reportData.sales.byCurrency),
+                          borderColor: 'rgb(34, 197, 94)',
+                          backgroundColor: 'rgba(34, 197, 94, 0.5)',
+                          tension: 0.3,
+                          fill: true,
+                        }
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: { position: 'top' as const },
+                        title: { display: false },
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          ticks: {
+                            callback: function(value) {
+                              return formatCurrency(value as number, currency as any);
+                            }
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </Card>
+                {/* Satışlar detay tablosu */}
+                <div className="overflow-x-auto mt-4">
+                  <table className="min-w-full text-sm border rounded bg-background">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-3 py-2 text-left">Tarih</th>
+                        <th className="px-3 py-2 text-left">Açıklama</th>
+                        <th className="px-3 py-2 text-right">Tutar</th>
+                        <th className="px-3 py-2 text-left">Para Birimi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.sales.details.map((item: any, i: number) => (
+                        <tr key={i} className="border-b last:border-b-0">
+                          <td className="px-3 py-2">{item.date}</td>
+                          <td className="px-3 py-2">{item.description}</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(item.amount, item.currency)}</td>
+                          <td className="px-3 py-2">{item.currency}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </>
-            )}
+            ) : selectedReport === "customer-sales-payments" && reportData && reportData.sales && reportData.sales.details.length === 0 ? (
+              <div className="text-center text-muted-foreground py-12">
+                <p className="text-lg mb-2">Seçilen müşteri için kayıt bulunamadı.</p>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-12">Rapor verisi bulunamadı.</div>
