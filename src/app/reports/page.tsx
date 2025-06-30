@@ -197,11 +197,11 @@ export default function ReportsPage() {
 
     return (
       <select
-        value={customerId || ""}
-        onChange={(e) => setCustomerId(e.target.value || undefined)}
+        value={customerId === undefined ? "all" : customerId}
+        onChange={(e) => setCustomerId(e.target.value === "all" ? undefined : e.target.value)}
         className="border rounded px-2 py-1 bg-background min-w-[200px]"
       >
-        <option value="">Müşteri Seçiniz</option>
+        <option value="all">Tüm Müşteriler</option>
         {customers.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}
@@ -259,8 +259,12 @@ export default function ReportsPage() {
           <div className="space-y-6">
             {selectedReport === "customer-sales-payments" && !customerId ? (
               <div className="text-center text-muted-foreground py-12">
-                <p className="text-lg mb-2">Lütfen rapor için bir müşteri seçin</p>
-                <p className="text-sm">Müşteri seçtikten sonra rapor otomatik olarak yüklenecektir</p>
+                <p className="text-lg mb-2">Tüm müşteriler için toplu rapor alınamaz.</p>
+                <p className="text-sm">Lütfen bir müşteri seçin.</p>
+              </div>
+            ) : reportData && reportData.sales && reportData.sales.details.length === 0 ? (
+              <div className="text-center text-muted-foreground py-12">
+                <p className="text-lg mb-2">Seçilen müşteri için kayıt bulunamadı.</p>
               </div>
             ) : (
               <>
@@ -314,8 +318,8 @@ export default function ReportsPage() {
                 </div>
                 {/* Kar-Zarar için grafik ve tablo */}
                 {selectedReport === "profit-loss" && (
-                  <>
-                    {/* Grafik */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Satışlar grafiği */}
                     <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
                       <div className="mb-4 text-lg font-semibold">Aylık Satış Grafiği</div>
                       <Line
@@ -351,28 +355,43 @@ export default function ReportsPage() {
                         }}
                       />
                     </Card>
-                    {/* Tablo */}
-                    <div className="overflow-x-auto mt-4">
-                      <table className="min-w-full text-sm border rounded bg-background">
-                        <thead>
-                          <tr className="bg-muted">
-                            <th className="px-3 py-2 text-left">Ay</th>
-                            <th className="px-3 py-2 text-right">Satış</th>
-                            <th className="px-3 py-2 text-right">Alış</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.keys(reportData.revenue.byMonth).map((month) => (
-                            <tr key={month} className="border-b last:border-b-0">
-                              <td className="px-3 py-2">{month}</td>
-                              <td className="px-3 py-2 text-right">{formatCurrency(reportData.revenue.byMonth[month], currency as any)}</td>
-                              <td className="px-3 py-2 text-right">{formatCurrency(reportData.costs.byMonth[month] || 0, currency as any)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
+                    {/* Alışlar grafiği */}
+                    <Card className="bg-muted/40 rounded-xl p-6 shadow text-center min-h-[200px]">
+                      <div className="mb-4 text-lg font-semibold">Aylık Alış Grafiği</div>
+                      <Line
+                        data={{
+                          labels: Object.keys(reportData.costs.byMonth),
+                          datasets: [
+                            {
+                              label: 'Alışlar',
+                              data: Object.values(reportData.costs.byMonth),
+                              borderColor: 'rgb(239, 68, 68)',
+                              backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                              tension: 0.3,
+                              fill: true,
+                            }
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          plugins: {
+                            legend: { position: 'top' as const },
+                            title: { display: false },
+                          },
+                          scales: {
+                            y: {
+                              beginAtZero: true,
+                              ticks: {
+                                callback: function(value) {
+                                  return formatCurrency(value as number, currency as any);
+                                }
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    </Card>
+                  </div>
                 )}
                 {/* Alışların detay tablosu (sadece gelir-gider raporunda) */}
                 {selectedReport === "income-expense" && reportData.expenses.details && (
