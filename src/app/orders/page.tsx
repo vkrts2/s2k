@@ -94,12 +94,23 @@ export default function OrdersPage() {
       // Tarih alanlarını güvenli şekilde Date nesnesine çevir
       const safeOrders = orders.map(order => ({
         ...order,
-        orderDate: order.orderDate ? new Date(order.orderDate) : new Date(),
-        deliveryDate: order.deliveryDate ? new Date(order.deliveryDate) : new Date(),
+        orderDate: parseSafeDate(order.orderDate),
+        deliveryDate: parseSafeDate(order.deliveryDate),
       }));
       setOrders(safeOrders);
     });
   }, [user]);
+
+  // Güvenli tarih parse fonksiyonu
+  function parseSafeDate(val: any): Date {
+    if (!val) return new Date();
+    if (val instanceof Date && !isNaN(val.getTime())) return val;
+    if (typeof val === 'string' && val.trim() !== '') {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date();
+  }
 
   useEffect(() => {
     if (!user) return;
