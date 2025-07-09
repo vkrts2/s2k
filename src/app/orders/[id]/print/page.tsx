@@ -7,6 +7,8 @@ import { ArrowLeft, Printer } from 'lucide-react';
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import type { Order } from '@/lib/types';
+import html2pdf from 'html2pdf.js';
+import Link from 'next/link';
 
 const orderStatuses = {
   pending: 'Beklemede',
@@ -73,31 +75,36 @@ export default function OrderPrintPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Print Header - Sadece yazdırma ve indir butonu */}
-      <div className="print:hidden bg-gray-100 p-4 border-b flex justify-end">
-        <Button
-          onClick={handlePrint}
-          className="flex items-center space-x-2 mr-2"
-        >
-          <Printer className="h-4 w-4" />
-          Yazdır
-        </Button>
-        <Button
-          onClick={() => handleDownloadPdf()}
-          className="flex items-center space-x-2"
-        >
-          PDF İndir
-        </Button>
+      {/* Print Header - Sadece yazdırma, PDF ve ana sayfa butonu */}
+      <div className="print:hidden bg-gray-100 p-4 border-b flex justify-between items-center">
+        <Link href="/" className="text-blue-600 font-semibold hover:underline text-base">
+          Ana Sayfa
+        </Link>
+        <div>
+          <Button
+            onClick={handlePrint}
+            className="flex items-center space-x-2 mr-2"
+          >
+            <Printer className="h-4 w-4" />
+            Yazdır
+          </Button>
+          <Button
+            onClick={handleDownloadPdf}
+            className="flex items-center space-x-2"
+          >
+            PDF İndir
+          </Button>
+        </div>
       </div>
       {/* Print Content */}
       <div ref={printRef} className="container mx-auto py-8 px-4 print:py-0 print:px-0">
-        <div className="max-w-4xl mx-auto bg-white print:bg-white border rounded-lg shadow p-8 print:p-0">
+        <div className="max-w-3xl mx-auto bg-white print:bg-white border rounded-lg shadow p-8 print:p-0">
           {/* Header */}
           <div className="text-center mb-8 print:mb-6">
-            <h1 className="text-3xl font-bold mb-2 text-gray-800">SİPARİŞ FORMU</h1>
-            <div className="text-gray-600">
-              <p>Sipariş No: {order.orderNumber}</p>
-              <p>Tarih: {format(parseSafeDate(order.orderDate), "dd.MM.yyyy", { locale: tr })}</p>
+            <h1 className="text-4xl font-extrabold mb-2 text-gray-900 tracking-tight">SİPARİŞ FORMU</h1>
+            <div className="text-gray-700 text-lg">
+              <p className="font-medium">Sipariş No: <span className="font-bold">{order.orderNumber}</span></p>
+              <p className="font-medium">Tarih: <span className="font-bold">{format(parseSafeDate(order.orderDate), "dd.MM.yyyy", { locale: tr })}</span></p>
             </div>
           </div>
           {/* Company Info */}
@@ -128,9 +135,9 @@ export default function OrderPrintPage() {
           </div>
           {/* Items Table */}
           <div className="mb-8 print:mb-6">
-            <h2 className="text-xl font-bold mb-4 text-gray-800">Sipariş Kalemleri</h2>
+            <h2 className="text-2xl font-bold mb-4 text-gray-800">Sipariş Kalemleri</h2>
             <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full">
+              <table className="w-full text-base">
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="border border-gray-200 p-3 text-left font-bold">Sıra</th>
@@ -211,6 +218,14 @@ export default function OrderPrintPage() {
     </div>
   );
 
-  // PDF indirme fonksiyonu (boş, bir sonraki adımda doldurulacak)
-  function handleDownloadPdf() {}
+  // PDF indirme fonksiyonu
+  function handleDownloadPdf() {
+    if (!printRef.current) return;
+    html2pdf().set({
+      margin: 10,
+      filename: `${order?.orderNumber || 'siparis'}_formu.pdf`,
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(printRef.current).save();
+  }
 } 
