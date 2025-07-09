@@ -154,7 +154,6 @@ export default function OrderPrintPage() {
                     <th className="border border-black p-3 text-left font-bold text-gray-700">Sıra</th>
                     <th className="border border-black p-3 text-left font-bold text-gray-700">Ürün/Hizmet</th>
                     <th className="border border-black p-3 text-center font-bold text-gray-700">Miktar</th>
-                    <th className="border border-black p-3 text-center font-bold text-gray-700">Birim</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -167,14 +166,13 @@ export default function OrderPrintPage() {
                           <div className="text-xs text-gray-500 mt-1">{item.specifications}</div>
                         )}
                       </td>
-                      <td className="border border-black p-3 text-center text-black">{item.quantity}</td>
-                      <td className="border border-black p-3 text-center text-black">{item.unit === 'top' ? 'Top Adeti' : item.unit === 'kg' ? 'Kg' : item.unit === 'mt' ? 'Mt' : item.unit}</td>
+                      <td className="border border-black p-3 text-center text-black">{item.quantity} {item.unit === 'top' ? 'Top' : item.unit === 'kg' ? 'Kg' : item.unit === 'mt' ? 'Mt' : ''}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-gray-100">
                   <tr>
-                    <td colSpan={4} className="border border-black p-3 text-right font-bold text-gray-700">
+                    <td colSpan={3} className="border border-black p-3 text-right font-bold text-gray-700">
                       TOPLAM:
                     </td>
                     <td className="border border-black p-3 text-right font-bold text-lg text-black">
