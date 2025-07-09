@@ -22,33 +22,7 @@ import { getCustomers, getOrders, addOrder, updateOrder, deleteOrder } from '@/l
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-
-interface Order {
-  id: string;
-  orderNumber: string;
-  customerName: string;
-  customerId: string;
-  orderDate: Date;
-  deliveryDate: Date;
-  status: 'pending' | 'confirmed' | 'in_production' | 'ready' | 'delivered' | 'cancelled';
-  totalAmount: number;
-  currency: string;
-  items: OrderItem[];
-  notes?: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface OrderItem {
-  id: string;
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-  specifications?: string;
-  unit?: string; // Added unit field
-}
+import type { Order, OrderItem } from '@/lib/types';
 
 const orderStatuses = {
   pending: 'Beklemede',
@@ -136,9 +110,9 @@ export default function OrdersPage() {
         customerId: '',
         orderDate: orderForm.orderDate,
         deliveryDate: orderForm.deliveryDate,
-        status: orderForm.status,
+        status: orderForm.status as Order['status'],
         priority: orderForm.priority,
-        totalAmount: orderForm.items.reduce((sum, item) => sum + item.total, 0),
+        totalAmount: 0, // Artık kalemlerden hesaplanmıyor
         currency: orderForm.currency,
         items: orderForm.items,
         notes: orderForm.notes,
@@ -152,11 +126,7 @@ export default function OrdersPage() {
         title: "Başarılı",
         description: "Sipariş başarıyla eklendi.",
       });
-      
-      // Yazdırma ve indirme seçenekleri göster
-      if (confirm("Sipariş başarıyla oluşturuldu. Yazdırmak veya indirmek ister misiniz?")) {
-        handlePrintOrder(newOrder);
-      }
+      // confirm kutusu kaldırıldı
     } catch (error) {
       toast({
         title: "Hata",
@@ -190,9 +160,9 @@ export default function OrdersPage() {
         customerName: orderForm.customerName,
         orderDate: orderForm.orderDate,
         deliveryDate: orderForm.deliveryDate,
-        status: orderForm.status,
+        status: orderForm.status as Order['status'],
         priority: orderForm.priority,
-        totalAmount: orderForm.items.reduce((sum, item) => sum + item.total, 0),
+        totalAmount: 0, // Artık kalemlerden hesaplanmıyor
         currency: orderForm.currency,
         items: orderForm.items,
         notes: orderForm.notes,
@@ -265,7 +235,7 @@ export default function OrdersPage() {
   // Siparişi tamamlandı olarak işaretle
   const handleMarkAsDelivered = async (order: Order) => {
     if (!user) return;
-    const updatedOrder = { ...order, status: 'delivered' };
+    const updatedOrder = { ...order, status: 'delivered' as Order['status'] };
     await updateOrder(user.uid, updatedOrder);
     setOrders(orders.map(o => o.id === order.id ? updatedOrder : o));
     toast({
@@ -295,9 +265,7 @@ export default function OrdersPage() {
         {
           id: Math.random().toString(36).substr(2, 9),
           productName: '',
-          quantity: '', // boş başlasın
           specifications: '',
-          unit: 'adet',
         },
       ],
     }));
@@ -314,16 +282,7 @@ export default function OrdersPage() {
     setOrderForm(prev => {
       const newItems = [...prev.items];
       const item = { ...newItems[index] };
-      
-      if (field === 'quantity') {
-        item[field] = Number(value);
-        item.total = item.quantity * item.unitPrice;
-      } else if (field === 'unit') {
-        item[field] = value;
-      } else {
-        item[field] = value;
-      }
-      
+      item[field] = value;
       newItems[index] = item;
       return { ...prev, items: newItems };
     });
@@ -491,26 +450,7 @@ export default function OrdersPage() {
                           placeholder="Ürün veya hizmet adı"
                         />
                       </div>
-                      <div>
-                        <Label>Miktar</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => updateOrderItem(index, 'quantity', e.target.value)}
-                            placeholder="0"
-                          />
-                          <select
-                            className="border rounded px-2 py-1"
-                            value={item.unit || 'adet'}
-                            onChange={e => updateOrderItem(index, 'unit', e.target.value)}
-                          >
-                            <option value="adet">Adet</option>
-                            <option value="metre">Metre</option>
-                            <option value="kg">Kg</option>
-                          </select>
-                        </div>
-                      </div>
+                      {/* Miktar ve birim alanı kaldırıldı */}
                     </div>
                     <div>
                       <Label>Teknik Özellikler</Label>
@@ -617,7 +557,7 @@ export default function OrdersPage() {
                           <Printer className="h-4 w-4" />
                         </Button>
                         <Button
-                          variant="success"
+                          variant="default"
                           size="icon"
                           title="Siparişi Tamamlandı Olarak İşaretle"
                           onClick={() => handleMarkAsDelivered(order)}
