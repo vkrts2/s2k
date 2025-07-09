@@ -145,35 +145,35 @@ export default function OrderPrintPage() {
           {/* Items Table */}
           <div className="mb-8 print:mb-6">
             <h2 className="text-2xl font-bold mb-4 text-black">Sipariş Kalemleri</h2>
-            <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
+            <div className="border-2 border-black rounded-lg overflow-hidden">
               <table className="w-full text-base">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="border border-gray-200 p-3 text-left font-bold text-gray-700">Sıra</th>
-                    <th className="border border-gray-200 p-3 text-left font-bold text-gray-700">Ürün/Hizmet</th>
-                    <th className="border border-gray-200 p-3 text-center font-bold text-gray-700">Miktar</th>
-                    <th className="border border-gray-200 p-3 text-right font-bold text-gray-700">Birim Fiyat</th>
-                    <th className="border border-gray-200 p-3 text-right font-bold text-gray-700">Toplam</th>
+                    <th className="border border-black p-3 text-left font-bold text-gray-700">Sıra</th>
+                    <th className="border border-black p-3 text-left font-bold text-gray-700">Ürün/Hizmet</th>
+                    <th className="border border-black p-3 text-center font-bold text-gray-700">Miktar</th>
+                    <th className="border border-black p-3 text-right font-bold text-gray-700">Birim Fiyat</th>
+                    <th className="border border-black p-3 text-right font-bold text-gray-700">Toplam</th>
                   </tr>
                 </thead>
                 <tbody>
                   {order.items.map((item, index) => (
                     <tr key={item.id || index} className="bg-white">
-                      <td className="border border-gray-200 p-3 text-black">{index + 1}</td>
-                      <td className="border border-gray-200 p-3 text-black">
+                      <td className="border border-black p-3 text-black">{index + 1}</td>
+                      <td className="border border-black p-3 text-black">
                         <span className="font-medium">{item.productName}</span>
                         {item.specifications && (
                           <div className="text-xs text-gray-500 mt-1">{item.specifications}</div>
                         )}
                       </td>
-                      <td className="border border-gray-200 p-3 text-center text-black">{item.quantity}</td>
-                      <td className="border border-gray-200 p-3 text-right text-black">
+                      <td className="border border-black p-3 text-center text-black">{item.quantity}</td>
+                      <td className="border border-black p-3 text-right text-black">
                         {item.unitPrice.toLocaleString('tr-TR', {
                           style: 'currency',
                           currency: order.currency
                         })}
                       </td>
-                      <td className="border border-gray-200 p-3 text-right font-semibold text-black">
+                      <td className="border border-black p-3 text-right font-semibold text-black">
                         {item.total.toLocaleString('tr-TR', {
                           style: 'currency',
                           currency: order.currency
@@ -184,10 +184,10 @@ export default function OrderPrintPage() {
                 </tbody>
                 <tfoot className="bg-gray-100">
                   <tr>
-                    <td colSpan={4} className="border border-gray-200 p-3 text-right font-bold text-gray-700">
+                    <td colSpan={4} className="border border-black p-3 text-right font-bold text-gray-700">
                       TOPLAM:
                     </td>
-                    <td className="border border-gray-200 p-3 text-right font-bold text-lg text-black">
+                    <td className="border border-black p-3 text-right font-bold text-lg text-black">
                       {order.totalAmount.toLocaleString('tr-TR', {
                         style: 'currency',
                         currency: order.currency
