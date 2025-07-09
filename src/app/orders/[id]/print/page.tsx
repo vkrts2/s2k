@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer } from 'lucide-react';
@@ -28,6 +28,7 @@ export default function OrderPrintPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const [order, setOrder] = useState<Order | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const data = searchParams.get('data');
@@ -49,6 +50,17 @@ export default function OrderPrintPage() {
     window.history.back();
   };
 
+  // Güvenli tarih parse fonksiyonu
+  function parseSafeDate(val: any): Date {
+    if (!val) return new Date();
+    if (val instanceof Date && !isNaN(val.getTime())) return val;
+    if (typeof val === 'string' && val.trim() !== '') {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date();
+  }
+
   if (!order) {
     return (
       <div className="container mx-auto py-6">
@@ -61,103 +73,91 @@ export default function OrderPrintPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Print Header - Only visible on screen */}
-      <div className="print:hidden bg-gray-100 p-4 border-b">
-        <div className="container mx-auto flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={handleGoBack}
-            className="flex items-center space-x-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Geri Dön
-          </Button>
-          <Button
-            onClick={handlePrint}
-            className="flex items-center space-x-2"
-          >
-            <Printer className="h-4 w-4" />
-            Yazdır
-          </Button>
-        </div>
+      {/* Print Header - Sadece yazdırma ve indir butonu */}
+      <div className="print:hidden bg-gray-100 p-4 border-b flex justify-end">
+        <Button
+          onClick={handlePrint}
+          className="flex items-center space-x-2 mr-2"
+        >
+          <Printer className="h-4 w-4" />
+          Yazdır
+        </Button>
+        <Button
+          onClick={() => handleDownloadPdf()}
+          className="flex items-center space-x-2"
+        >
+          PDF İndir
+        </Button>
       </div>
-
       {/* Print Content */}
-      <div className="container mx-auto py-8 px-4 print:py-0 print:px-0">
-        <div className="max-w-4xl mx-auto bg-white print:bg-white">
+      <div ref={printRef} className="container mx-auto py-8 px-4 print:py-0 print:px-0">
+        <div className="max-w-4xl mx-auto bg-white print:bg-white border rounded-lg shadow p-8 print:p-0">
           {/* Header */}
           <div className="text-center mb-8 print:mb-6">
-            <h1 className="text-3xl font-bold mb-2">SİPARİŞ FORMU</h1>
+            <h1 className="text-3xl font-bold mb-2 text-gray-800">SİPARİŞ FORMU</h1>
             <div className="text-gray-600">
               <p>Sipariş No: {order.orderNumber}</p>
-              <p>Tarih: {format(new Date(order.orderDate), "dd.MM.yyyy", { locale: tr })}</p>
+              <p>Tarih: {format(parseSafeDate(order.orderDate), "dd.MM.yyyy", { locale: tr })}</p>
             </div>
           </div>
-
           {/* Company Info */}
-          <div className="mb-8 print:mb-6 p-4 border-2 border-gray-300 rounded-lg">
-            <h2 className="text-xl font-bold mb-4">Firma Bilgileri</h2>
+          <div className="mb-8 print:mb-6 p-4 border-2 border-gray-200 rounded-lg bg-gray-50">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="font-semibold">Müşteri:</p>
-                <p className="text-lg">{order.customerName}</p>
+                <span className="font-semibold text-gray-700">Müşteri:</span>
+                <span className="ml-2 text-gray-900">{order.customerName}</span>
               </div>
               <div>
-                <p className="font-semibold">Teslimat Tarihi:</p>
-                <p className="text-lg">{format(new Date(order.deliveryDate), "dd.MM.yyyy", { locale: tr })}</p>
+                <span className="font-semibold text-gray-700">Teslimat Tarihi:</span>
+                <span className="ml-2 text-gray-900">{format(parseSafeDate(order.deliveryDate), "dd.MM.yyyy", { locale: tr })}</span>
               </div>
             </div>
           </div>
-
           {/* Order Details */}
           <div className="mb-8 print:mb-6">
-            <h2 className="text-xl font-bold mb-4">Sipariş Detayları</h2>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <p className="font-semibold">Durum:</p>
-                <p className="text-lg">{orderStatuses[order.status]}</p>
+                <span className="font-semibold text-gray-700">Durum:</span>
+                <span className="ml-2 text-gray-900">{orderStatuses[order.status]}</span>
               </div>
               <div>
-                <p className="font-semibold">Öncelik:</p>
-                <p className="text-lg">{orderPriorities[order.priority]}</p>
+                <span className="font-semibold text-gray-700">Öncelik:</span>
+                <span className="ml-2 text-gray-900">{orderPriorities[order.priority]}</span>
               </div>
             </div>
           </div>
-
           {/* Items Table */}
           <div className="mb-8 print:mb-6">
-            <h2 className="text-xl font-bold mb-4">Sipariş Kalemleri</h2>
-            <div className="border-2 border-gray-300 rounded-lg overflow-hidden">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">Sipariş Kalemleri</h2>
+            <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="border border-gray-300 p-3 text-left font-bold">Sıra</th>
-                    <th className="border border-gray-300 p-3 text-left font-bold">Ürün/Hizmet</th>
-                    <th className="border border-gray-300 p-3 text-center font-bold">Miktar</th>
-                    <th className="border border-gray-300 p-3 text-right font-bold">Birim Fiyat</th>
-                    <th className="border border-gray-300 p-3 text-right font-bold">Toplam</th>
+                    <th className="border border-gray-200 p-3 text-left font-bold">Sıra</th>
+                    <th className="border border-gray-200 p-3 text-left font-bold">Ürün/Hizmet</th>
+                    <th className="border border-gray-200 p-3 text-center font-bold">Miktar</th>
+                    <th className="border border-gray-200 p-3 text-right font-bold">Birim Fiyat</th>
+                    <th className="border border-gray-200 p-3 text-right font-bold">Toplam</th>
                   </tr>
                 </thead>
                 <tbody>
                   {order.items.map((item, index) => (
                     <tr key={item.id || index}>
-                      <td className="border border-gray-300 p-3">{index + 1}</td>
-                      <td className="border border-gray-300 p-3">
-                        <div>
-                          <p className="font-medium">{item.productName}</p>
-                          {item.specifications && (
-                            <p className="text-sm text-gray-600 mt-1">{item.specifications}</p>
-                          )}
-                        </div>
+                      <td className="border border-gray-200 p-3">{index + 1}</td>
+                      <td className="border border-gray-200 p-3">
+                        <span className="font-medium text-gray-900">{item.productName}</span>
+                        {item.specifications && (
+                          <div className="text-xs text-gray-500 mt-1">{item.specifications}</div>
+                        )}
                       </td>
-                      <td className="border border-gray-300 p-3 text-center">{item.quantity}</td>
-                      <td className="border border-gray-300 p-3 text-right">
+                      <td className="border border-gray-200 p-3 text-center">{item.quantity}</td>
+                      <td className="border border-gray-200 p-3 text-right">
                         {item.unitPrice.toLocaleString('tr-TR', {
                           style: 'currency',
                           currency: order.currency
                         })}
                       </td>
-                      <td className="border border-gray-300 p-3 text-right font-semibold">
+                      <td className="border border-gray-200 p-3 text-right font-semibold">
                         {item.total.toLocaleString('tr-TR', {
                           style: 'currency',
                           currency: order.currency
@@ -168,10 +168,10 @@ export default function OrderPrintPage() {
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={4} className="border border-gray-300 p-3 text-right font-bold">
+                    <td colSpan={4} className="border border-gray-200 p-3 text-right font-bold">
                       TOPLAM:
                     </td>
-                    <td className="border border-gray-300 p-3 text-right font-bold text-lg">
+                    <td className="border border-gray-200 p-3 text-right font-bold text-lg">
                       {order.totalAmount.toLocaleString('tr-TR', {
                         style: 'currency',
                         currency: order.currency
@@ -182,33 +182,17 @@ export default function OrderPrintPage() {
               </table>
             </div>
           </div>
-
           {/* Notes */}
           {order.notes && (
             <div className="mb-8 print:mb-6">
-              <h2 className="text-xl font-bold mb-4">Notlar</h2>
-              <div className="border-2 border-gray-300 rounded-lg p-4">
-                <p className="whitespace-pre-wrap">{order.notes}</p>
+              <h2 className="text-xl font-bold mb-4 text-gray-800">Notlar</h2>
+              <div className="border-2 border-gray-200 rounded-lg p-4 bg-gray-50">
+                <span className="whitespace-pre-wrap text-gray-900">{order.notes}</span>
               </div>
             </div>
           )}
-
-          {/* Footer */}
-          <div className="mt-12 print:mt-8 pt-8 border-t-2 border-gray-300">
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <h3 className="font-bold mb-2">Müşteri İmza:</h3>
-                <div className="border-b-2 border-gray-400 h-12"></div>
-              </div>
-              <div>
-                <h3 className="font-bold mb-2">Firma İmza:</h3>
-                <div className="border-b-2 border-gray-400 h-12"></div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
-
       {/* Print Styles */}
       <style jsx global>{`
         @media print {
@@ -226,4 +210,7 @@ export default function OrderPrintPage() {
       `}</style>
     </div>
   );
+
+  // PDF indirme fonksiyonu (boş, bir sonraki adımda doldurulacak)
+  function handleDownloadPdf() {}
 } 

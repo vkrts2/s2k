@@ -97,8 +97,8 @@ export default function OrderDetailPage() {
     const orderData = {
       siparisNo: order.orderNumber,
       musteri: order.customerName,
-      siparisTarihi: format(new Date(order.orderDate), "dd.MM.yyyy"),
-      teslimatTarihi: format(new Date(order.deliveryDate), "dd.MM.yyyy"),
+      siparisTarihi: format(parseSafeDate(order.orderDate), "dd.MM.yyyy"),
+      teslimatTarihi: format(parseSafeDate(order.deliveryDate), "dd.MM.yyyy"),
       durum: orderStatuses[order.status],
       oncelik: orderPriorities[order.priority],
       toplamTutar: order.totalAmount.toLocaleString('tr-TR', {
@@ -130,6 +130,17 @@ export default function OrderDetailPage() {
     if (!order) return;
     router.push(`/orders?edit=${order.id}`);
   };
+
+  // Güvenli tarih parse fonksiyonu
+  function parseSafeDate(val: any): Date {
+    if (!val) return new Date();
+    if (val instanceof Date && !isNaN(val.getTime())) return val;
+    if (typeof val === 'string' && val.trim() !== '') {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date();
+  }
 
   if (loading) {
     return (
@@ -212,11 +223,11 @@ export default function OrderDetailPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-500">Sipariş Tarihi</label>
-                <p className="text-lg">{format(new Date(order.orderDate), "dd.MM.yyyy", { locale: tr })}</p>
+                <p className="text-lg">{format(parseSafeDate(order.orderDate), "dd.MM.yyyy", { locale: tr })}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Teslimat Tarihi</label>
-                <p className="text-lg">{format(new Date(order.deliveryDate), "dd.MM.yyyy", { locale: tr })}</p>
+                <p className="text-lg">{format(parseSafeDate(order.deliveryDate), "dd.MM.yyyy", { locale: tr })}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
