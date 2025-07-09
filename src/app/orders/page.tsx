@@ -467,7 +467,7 @@ export default function OrdersPage() {
                             value={item.unit}
                             onChange={e => updateOrderItem(index, 'unit', e.target.value)}
                           >
-                            <option value="adet">Adet</option>
+                            <option value="top">Top Adeti</option>
                             <option value="kg">Kg</option>
                             <option value="mt">Mt</option>
                           </select>
