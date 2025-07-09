@@ -47,6 +47,7 @@ interface OrderItem {
   unitPrice: number;
   total: number;
   specifications?: string;
+  unit?: string; // Added unit field
 }
 
 const orderStatuses = {
@@ -289,14 +290,16 @@ export default function OrdersPage() {
   const addOrderItem = () => {
     setOrderForm(prev => ({
       ...prev,
-      items: [...prev.items, {
-        id: crypto.randomUUID(),
-        productName: '',
-        quantity: 0,
-        unitPrice: 0,
-        total: 0,
-        specifications: ''
-      }]
+      items: [
+        ...prev.items,
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          productName: '',
+          quantity: '', // boş başlasın
+          specifications: '',
+          unit: 'adet',
+        },
+      ],
     }));
   };
 
@@ -312,9 +315,11 @@ export default function OrdersPage() {
       const newItems = [...prev.items];
       const item = { ...newItems[index] };
       
-      if (field === 'quantity' || field === 'unitPrice') {
+      if (field === 'quantity') {
         item[field] = Number(value);
         item.total = item.quantity * item.unitPrice;
+      } else if (field === 'unit') {
+        item[field] = value;
       } else {
         item[field] = value;
       }
@@ -488,31 +493,23 @@ export default function OrdersPage() {
                       </div>
                       <div>
                         <Label>Miktar</Label>
-                        <Input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => updateOrderItem(index, 'quantity', e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Birim Fiyat</Label>
-                        <Input
-                          type="number"
-                          value={item.unitPrice}
-                          onChange={(e) => updateOrderItem(index, 'unitPrice', e.target.value)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div>
-                        <Label>Toplam</Label>
-                        <Input
-                          value={item.total.toFixed(2)}
-                          readOnly
-                          className="bg-gray-100"
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateOrderItem(index, 'quantity', e.target.value)}
+                            placeholder="0"
+                          />
+                          <select
+                            className="border rounded px-2 py-1"
+                            value={item.unit || 'adet'}
+                            onChange={e => updateOrderItem(index, 'unit', e.target.value)}
+                          >
+                            <option value="adet">Adet</option>
+                            <option value="metre">Metre</option>
+                            <option value="kg">Kg</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
                     <div>
