@@ -20,6 +20,7 @@ import Link from "next/link";
 import BackToHomeButton from '@/components/common/back-to-home-button';
 import { getCustomers, getOrders, addOrder, updateOrder, deleteOrder } from '@/lib/storage';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface Order {
@@ -67,6 +68,7 @@ const orderPriorities = {
 export default function OrdersPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -96,7 +98,9 @@ export default function OrdersPage() {
   useEffect(() => {
     if (!user) return;
     getCustomers(user.uid).then((customers) => {
-      setCustomers(customers);
+      // Sadece customers koleksiyonundan gelen müşterileri filtrele (portfolio olmayanlar)
+      const regularCustomers = customers.filter(customer => !customer.id.startsWith('portfolio_'));
+      setCustomers(regularCustomers);
     });
   }, [user]);
 
@@ -130,6 +134,11 @@ export default function OrdersPage() {
         title: "Başarılı",
         description: "Sipariş başarıyla eklendi.",
       });
+      
+      // Yazdırma ve indirme seçenekleri göster
+      if (confirm("Sipariş başarıyla oluşturuldu. Yazdırmak veya indirmek ister misiniz?")) {
+        handlePrintOrder(newOrder);
+      }
     } catch (error) {
       toast({
         title: "Hata",
@@ -217,6 +226,44 @@ export default function OrdersPage() {
       handleDeleteOrder(deleteConfirmId);
       setDeleteConfirmId(null);
     }
+  };
+
+  const handlePrintOrder = (order: Order) => {
+    const data = encodeURIComponent(JSON.stringify(order));
+    window.open(`/orders/${order.id}/print?data=${data}`, '_blank');
+  };
+
+  const handleDownloadOrder = (order: Order) => {
+    const orderData = {
+      siparisNo: order.orderNumber,
+      musteri: order.customerName,
+      siparisTarihi: format(new Date(order.orderDate), "dd.MM.yyyy"),
+      teslimatTarihi: format(new Date(order.deliveryDate), "dd.MM.yyyy"),
+      durum: orderStatuses[order.status],
+      oncelik: orderPriorities[order.priority],
+      toplamTutar: order.totalAmount.toLocaleString('tr-TR', {
+        style: 'currency',
+        currency: order.currency
+      }),
+      kalemler: order.items.map(item => ({
+        urun: item.productName,
+        miktar: item.quantity,
+        birimFiyat: item.unitPrice,
+        toplam: item.total,
+        ozellikler: item.specifications
+      })),
+      notlar: order.notes
+    };
+
+    const blob = new Blob([JSON.stringify(orderData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${order.orderNumber}_siparis.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const resetForm = () => {
@@ -515,7 +562,15 @@ export default function OrdersPage() {
               <TableBody>
                 {filteredOrders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell>{order.orderNumber}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="link"
+                        className="p-0 h-auto font-medium"
+                        onClick={() => router.push(`/orders/${order.id}`)}
+                      >
+                        {order.orderNumber}
+                      </Button>
+                    </TableCell>
                     <TableCell>{order.customerName}</TableCell>
                     <TableCell>{format(new Date(order.orderDate), "dd.MM.yyyy", { locale: tr })}</TableCell>
                     <TableCell>{format(new Date(order.deliveryDate), "dd.MM.yyyy", { locale: tr })}</TableCell>
@@ -550,8 +605,25 @@ export default function OrdersPage() {
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button
+                          variant="outline"
+                          size="icon"
+                          title="Siparişi Yazdır"
+                          onClick={() => handlePrintOrder(order)}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          title="Siparişi İndir"
+                          onClick={() => handleDownloadOrder(order)}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button
                           variant="ghost"
                           size="icon"
+                          title="Siparişi Düzenle"
                           onClick={() => handleEditOrder(order)}
                         >
                           <Edit className="h-4 w-4" />
@@ -559,6 +631,7 @@ export default function OrdersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          title="Siparişi Sil"
                           onClick={() => setDeleteConfirmId(order.id)}
                         >
                           <Trash2 className="h-4 w-4" />
