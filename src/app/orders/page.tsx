@@ -265,6 +265,8 @@ export default function OrdersPage() {
         {
           id: Math.random().toString(36).substr(2, 9),
           productName: '',
+          quantity: 1,
+          unit: 'adet',
           specifications: '',
         },
       ],
@@ -450,7 +452,27 @@ export default function OrdersPage() {
                           placeholder="Ürün veya hizmet adı"
                         />
                       </div>
-                      {/* Miktar ve birim alanı kaldırıldı */}
+                      <div>
+                        <Label>Miktar</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            min={1}
+                            value={item.quantity}
+                            onChange={(e) => updateOrderItem(index, 'quantity', Number(e.target.value))}
+                            placeholder="Miktar"
+                          />
+                          <select
+                            className="border rounded px-2 py-1"
+                            value={item.unit}
+                            onChange={e => updateOrderItem(index, 'unit', e.target.value)}
+                          >
+                            <option value="adet">Adet</option>
+                            <option value="kg">Kg</option>
+                            <option value="mt">Mt</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
                     <div>
                       <Label>Teknik Özellikler</Label>

@@ -411,6 +411,8 @@ export interface TodoItem {
 export interface OrderItem {
   id: string;
   productName: string;
+  quantity: number;
+  unit: string;
   specifications?: string;
 }
 

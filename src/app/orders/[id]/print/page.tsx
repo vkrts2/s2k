@@ -7,6 +7,8 @@ import { ArrowLeft, Printer, Home } from 'lucide-react';
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import type { Order } from '@/lib/types';
+// html2pdf.js için typescript bildirimi
+// @ts-ignore
 import html2pdf from 'html2pdf.js';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -151,9 +153,6 @@ export default function OrderPrintPage() {
                   <tr>
                     <th className="border border-black p-3 text-left font-bold text-gray-700">Sıra</th>
                     <th className="border border-black p-3 text-left font-bold text-gray-700">Ürün/Hizmet</th>
-                    <th className="border border-black p-3 text-center font-bold text-gray-700">Miktar</th>
-                    <th className="border border-black p-3 text-right font-bold text-gray-700">Birim Fiyat</th>
-                    <th className="border border-black p-3 text-right font-bold text-gray-700">Toplam</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -166,32 +165,16 @@ export default function OrderPrintPage() {
                           <div className="text-xs text-gray-500 mt-1">{item.specifications}</div>
                         )}
                       </td>
-                      <td className="border border-black p-3 text-center text-black">{item.quantity}</td>
-                      <td className="border border-black p-3 text-right text-black">
-                        {item.unitPrice.toLocaleString('tr-TR', {
-                          style: 'currency',
-                          currency: order.currency
-                        })}
-                      </td>
-                      <td className="border border-black p-3 text-right font-semibold text-black">
-                        {item.total.toLocaleString('tr-TR', {
-                          style: 'currency',
-                          currency: order.currency
-                        })}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-gray-100">
                   <tr>
-                    <td colSpan={4} className="border border-black p-3 text-right font-bold text-gray-700">
+                    <td colSpan={2} className="border border-black p-3 text-right font-bold text-gray-700">
                       TOPLAM:
                     </td>
                     <td className="border border-black p-3 text-right font-bold text-lg text-black">
-                      {order.totalAmount.toLocaleString('tr-TR', {
-                        style: 'currency',
-                        currency: order.currency
-                      })}
+                      -
                     </td>
                   </tr>
                 </tfoot>
