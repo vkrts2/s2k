@@ -9,6 +9,7 @@ import { tr } from "date-fns/locale";
 import type { Order } from '@/lib/types';
 import html2pdf from 'html2pdf.js';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const orderStatuses = {
   pending: 'Beklemede',
@@ -41,6 +42,10 @@ export default function OrderPrintPage() {
       } catch (error) {
         console.error('Error parsing order data:', error);
       }
+    }
+    // Otomatik PDF indirme
+    if (searchParams.get('pdf') === '1') {
+      setTimeout(() => handleDownloadPdf(), 1000);
     }
   }, [searchParams]);
 
@@ -75,15 +80,17 @@ export default function OrderPrintPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Print Header - Sadece yazdırma, PDF ve ana sayfa butonu */}
+      {/* Print Header - Logo solda, butonlar sağda */}
       <div className="print:hidden bg-gray-100 p-4 border-b flex justify-between items-center">
-        <Link href="/" className="text-blue-600 font-semibold hover:underline text-base">
-          Ana Sayfa
-        </Link>
-        <div>
+        <div className="flex items-center">
+          <Link href="/">
+            <Image src="/logo.png" alt="Logo" width={48} height={48} className="rounded" />
+          </Link>
+        </div>
+        <div className="flex gap-2">
           <Button
             onClick={handlePrint}
-            className="flex items-center space-x-2 mr-2"
+            className="flex items-center space-x-2"
           >
             <Printer className="h-4 w-4" />
             Yazdır

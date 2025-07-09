@@ -250,37 +250,15 @@ export default function OrdersPage() {
     window.open(`/orders/${order.id}/print?data=${data}`, '_blank');
   };
 
+  // İşlemler kısmındaki handleDownloadOrder fonksiyonunu PDF indirme için güncelle
   const handleDownloadOrder = (order: Order) => {
-    const orderData = {
-      siparisNo: order.orderNumber,
-      musteri: order.customerName,
-      siparisTarihi: format(new Date(order.orderDate), "dd.MM.yyyy"),
-      teslimatTarihi: format(new Date(order.deliveryDate), "dd.MM.yyyy"),
-      durum: orderStatuses[order.status],
-      oncelik: orderPriorities[order.priority],
-      toplamTutar: order.totalAmount.toLocaleString('tr-TR', {
-        style: 'currency',
-        currency: order.currency
-      }),
-      kalemler: order.items.map(item => ({
-        urun: item.productName,
-        miktar: item.quantity,
-        birimFiyat: item.unitPrice,
-        toplam: item.total,
-        ozellikler: item.specifications
-      })),
-      notlar: order.notes
-    };
-
-    const blob = new Blob([JSON.stringify(orderData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${order.orderNumber}_siparis.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Yazdırma sayfasını yeni sekmede açıp PDF indirmeyi başlatacak bir URL oluştur
+    const url = `/orders/${order.id}/print?pdf=1`;
+    window.open(url, '_blank');
+    toast({
+      title: "PDF İndiriliyor",
+      description: "Sipariş PDF dosyanız yeni sekmede hazırlanıyor.",
+    });
   };
 
   const resetForm = () => {
