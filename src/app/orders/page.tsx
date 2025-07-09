@@ -91,7 +91,13 @@ export default function OrdersPage() {
   useEffect(() => {
     if (!user) return;
     getOrders(user.uid).then((orders) => {
-      setOrders(orders);
+      // Tarih alanlarını güvenli şekilde Date nesnesine çevir
+      const safeOrders = orders.map(order => ({
+        ...order,
+        orderDate: order.orderDate ? new Date(order.orderDate) : new Date(),
+        deliveryDate: order.deliveryDate ? new Date(order.deliveryDate) : new Date(),
+      }));
+      setOrders(safeOrders);
     });
   }, [user]);
 
