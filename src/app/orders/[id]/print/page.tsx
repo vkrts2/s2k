@@ -79,12 +79,12 @@ export default function OrderPrintPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-white">
       {/* Print Header - Home butonu solda, butonlar sağda */}
-      <div className="print:hidden bg-zinc-900 p-4 border-b border-zinc-800 flex justify-between items-center">
+      <div className="print:hidden bg-white p-4 border-b border-gray-200 flex justify-between items-center">
         <div className="flex items-center">
           <Link href="/">
-            <Button variant="ghost" className="p-2 text-white hover:bg-zinc-800">
+            <Button variant="ghost" className="p-2 text-black hover:bg-gray-100">
               <Home className="h-6 w-6" />
             </Button>
           </Link>
@@ -92,14 +92,14 @@ export default function OrderPrintPage() {
         <div className="flex gap-2">
           <Button
             onClick={handlePrint}
-            className="flex items-center space-x-2 bg-zinc-800 text-white hover:bg-zinc-700 border-none"
+            className="flex items-center space-x-2 bg-gray-200 text-black hover:bg-gray-300 border-none"
           >
             <Printer className="h-4 w-4" />
             Yazdır
           </Button>
           <Button
             onClick={handleDownloadPdf}
-            className="flex items-center space-x-2 bg-zinc-800 text-white hover:bg-zinc-700 border-none"
+            className="flex items-center space-x-2 bg-gray-200 text-black hover:bg-gray-300 border-none"
           >
             PDF İndir
           </Button>
@@ -107,25 +107,25 @@ export default function OrderPrintPage() {
       </div>
       {/* Print Content */}
       <div ref={printRef} className="container mx-auto py-8 px-4 print:py-0 print:px-0">
-        <div className="max-w-3xl mx-auto bg-zinc-900 print:bg-zinc-900 border border-zinc-800 rounded-lg shadow p-8 print:p-0">
+        <div className="max-w-3xl mx-auto bg-white print:bg-white border border-gray-200 rounded-lg shadow p-8 print:p-0">
           {/* Header */}
           <div className="text-center mb-8 print:mb-6">
-            <h1 className="text-4xl font-extrabold mb-2 text-white tracking-tight">SİPARİŞ FORMU</h1>
-            <div className="text-zinc-300 text-lg">
-              <p className="font-medium">Sipariş No: <span className="font-bold text-white">{order.orderNumber}</span></p>
-              <p className="font-medium">Tarih: <span className="font-bold text-white">{format(parseSafeDate(order.orderDate), "dd.MM.yyyy", { locale: tr })}</span></p>
+            <h1 className="text-4xl font-extrabold mb-2 text-black tracking-tight">SİPARİŞ FORMU</h1>
+            <div className="text-gray-700 text-lg">
+              <p className="font-medium">Sipariş No: <span className="font-bold text-black">{order.orderNumber}</span></p>
+              <p className="font-medium">Tarih: <span className="font-bold text-black">{format(parseSafeDate(order.orderDate), "dd.MM.yyyy", { locale: tr })}</span></p>
             </div>
           </div>
           {/* Company Info */}
-          <div className="mb-8 print:mb-6 p-4 border-2 border-zinc-800 rounded-lg bg-zinc-800">
+          <div className="mb-8 print:mb-6 p-4 border-2 border-gray-200 rounded-lg bg-gray-50">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="font-semibold text-zinc-200">Müşteri:</span>
-                <span className="ml-2 text-white">{order.customerName}</span>
+                <span className="font-semibold text-gray-700">Müşteri:</span>
+                <span className="ml-2 text-black">{order.customerName}</span>
               </div>
               <div>
-                <span className="font-semibold text-zinc-200">Teslimat Tarihi:</span>
-                <span className="ml-2 text-white">{format(parseSafeDate(order.deliveryDate), "dd.MM.yyyy", { locale: tr })}</span>
+                <span className="font-semibold text-gray-700">Teslimat Tarihi:</span>
+                <span className="ml-2 text-black">{format(parseSafeDate(order.deliveryDate), "dd.MM.yyyy", { locale: tr })}</span>
               </div>
             </div>
           </div>
@@ -133,47 +133,47 @@ export default function OrderPrintPage() {
           <div className="mb-8 print:mb-6">
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <span className="font-semibold text-zinc-200">Durum:</span>
-                <span className="ml-2 text-white">{orderStatuses[order.status]}</span>
+                <span className="font-semibold text-gray-700">Durum:</span>
+                <span className="ml-2 text-black">{orderStatuses[order.status]}</span>
               </div>
               <div>
-                <span className="font-semibold text-zinc-200">Öncelik:</span>
-                <span className="ml-2 text-white">{orderPriorities[order.priority]}</span>
+                <span className="font-semibold text-gray-700">Öncelik:</span>
+                <span className="ml-2 text-black">{orderPriorities[order.priority]}</span>
               </div>
             </div>
           </div>
           {/* Items Table */}
           <div className="mb-8 print:mb-6">
-            <h2 className="text-2xl font-bold mb-4 text-white">Sipariş Kalemleri</h2>
-            <div className="border-2 border-zinc-800 rounded-lg overflow-hidden">
+            <h2 className="text-2xl font-bold mb-4 text-black">Sipariş Kalemleri</h2>
+            <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
               <table className="w-full text-base">
-                <thead className="bg-zinc-800">
+                <thead className="bg-gray-100">
                   <tr>
-                    <th className="border border-zinc-800 p-3 text-left font-bold text-zinc-200">Sıra</th>
-                    <th className="border border-zinc-800 p-3 text-left font-bold text-zinc-200">Ürün/Hizmet</th>
-                    <th className="border border-zinc-800 p-3 text-center font-bold text-zinc-200">Miktar</th>
-                    <th className="border border-zinc-800 p-3 text-right font-bold text-zinc-200">Birim Fiyat</th>
-                    <th className="border border-zinc-800 p-3 text-right font-bold text-zinc-200">Toplam</th>
+                    <th className="border border-gray-200 p-3 text-left font-bold text-gray-700">Sıra</th>
+                    <th className="border border-gray-200 p-3 text-left font-bold text-gray-700">Ürün/Hizmet</th>
+                    <th className="border border-gray-200 p-3 text-center font-bold text-gray-700">Miktar</th>
+                    <th className="border border-gray-200 p-3 text-right font-bold text-gray-700">Birim Fiyat</th>
+                    <th className="border border-gray-200 p-3 text-right font-bold text-gray-700">Toplam</th>
                   </tr>
                 </thead>
                 <tbody>
                   {order.items.map((item, index) => (
-                    <tr key={item.id || index} className="bg-zinc-900">
-                      <td className="border border-zinc-800 p-3 text-zinc-100">{index + 1}</td>
-                      <td className="border border-zinc-800 p-3 text-white">
+                    <tr key={item.id || index} className="bg-white">
+                      <td className="border border-gray-200 p-3 text-black">{index + 1}</td>
+                      <td className="border border-gray-200 p-3 text-black">
                         <span className="font-medium">{item.productName}</span>
                         {item.specifications && (
-                          <div className="text-xs text-zinc-400 mt-1">{item.specifications}</div>
+                          <div className="text-xs text-gray-500 mt-1">{item.specifications}</div>
                         )}
                       </td>
-                      <td className="border border-zinc-800 p-3 text-center text-zinc-100">{item.quantity}</td>
-                      <td className="border border-zinc-800 p-3 text-right text-zinc-100">
+                      <td className="border border-gray-200 p-3 text-center text-black">{item.quantity}</td>
+                      <td className="border border-gray-200 p-3 text-right text-black">
                         {item.unitPrice.toLocaleString('tr-TR', {
                           style: 'currency',
                           currency: order.currency
                         })}
                       </td>
-                      <td className="border border-zinc-800 p-3 text-right font-semibold text-zinc-100">
+                      <td className="border border-gray-200 p-3 text-right font-semibold text-black">
                         {item.total.toLocaleString('tr-TR', {
                           style: 'currency',
                           currency: order.currency
@@ -182,12 +182,12 @@ export default function OrderPrintPage() {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-zinc-800">
+                <tfoot className="bg-gray-100">
                   <tr>
-                    <td colSpan={4} className="border border-zinc-800 p-3 text-right font-bold text-zinc-200">
+                    <td colSpan={4} className="border border-gray-200 p-3 text-right font-bold text-gray-700">
                       TOPLAM:
                     </td>
-                    <td className="border border-zinc-800 p-3 text-right font-bold text-lg text-white">
+                    <td className="border border-gray-200 p-3 text-right font-bold text-lg text-black">
                       {order.totalAmount.toLocaleString('tr-TR', {
                         style: 'currency',
                         currency: order.currency
@@ -201,9 +201,9 @@ export default function OrderPrintPage() {
           {/* Notes */}
           {order.notes && (
             <div className="mb-8 print:mb-6">
-              <h2 className="text-xl font-bold mb-4 text-white">Notlar</h2>
-              <div className="border-2 border-zinc-800 rounded-lg p-4 bg-zinc-800">
-                <span className="whitespace-pre-wrap text-zinc-100">{order.notes}</span>
+              <h2 className="text-xl font-bold mb-4 text-black">Notlar</h2>
+              <div className="border-2 border-gray-200 rounded-lg p-4 bg-gray-50">
+                <span className="whitespace-pre-wrap text-black">{order.notes}</span>
               </div>
             </div>
           )}
@@ -214,11 +214,11 @@ export default function OrderPrintPage() {
         @media print {
           @page {
             margin: 1cm;
-            background: #000 !important;
+            background: #fff !important;
           }
           body {
-            background: #000 !important;
-            color: #fff !important;
+            background: #fff !important;
+            color: #000 !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }

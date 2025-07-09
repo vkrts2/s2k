@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Edit, Trash2, CalendarIcon, FileText, Printer, Search } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, CalendarIcon, FileText, Printer, Search, Check } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -258,6 +258,18 @@ export default function OrdersPage() {
     toast({
       title: "PDF İndiriliyor",
       description: "Sipariş PDF dosyanız yeni sekmede hazırlanıyor.",
+    });
+  };
+
+  // Siparişi tamamlandı olarak işaretle
+  const handleMarkAsDelivered = async (order: Order) => {
+    if (!user) return;
+    const updatedOrder = { ...order, status: 'delivered' };
+    await updateOrder(user.uid, updatedOrder);
+    setOrders(orders.map(o => o.id === order.id ? updatedOrder : o));
+    toast({
+      title: 'Sipariş tamamlandı olarak işaretlendi',
+      description: `${order.orderNumber} teslim edildi olarak güncellendi.`,
     });
   };
 
@@ -608,12 +620,13 @@ export default function OrdersPage() {
                           <Printer className="h-4 w-4" />
                         </Button>
                         <Button
-                          variant="outline"
+                          variant="success"
                           size="icon"
-                          title="Siparişi İndir"
-                          onClick={() => handleDownloadOrder(order)}
+                          title="Siparişi Tamamlandı Olarak İşaretle"
+                          onClick={() => handleMarkAsDelivered(order)}
+                          disabled={order.status === 'delivered'}
                         >
-                          <FileText className="h-4 w-4" />
+                          <Check className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
