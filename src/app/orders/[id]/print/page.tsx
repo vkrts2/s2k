@@ -166,7 +166,7 @@ export default function OrderPrintPage() {
                           <div className="text-xs text-gray-500 mt-1">{item.specifications}</div>
                         )}
                       </td>
-                      <td className="border border-black p-3 text-center text-black">{item.quantity} {item.unit === 'top' ? 'Top' : item.unit === 'kg' ? 'Kg' : item.unit === 'mt' ? 'Mt' : ''}</td>
+                      <td className="border border-black p-3 text-center text-black">{item.quantity} {item.unit === 'top' ? 'Top' : item.unit === 'kg' ? 'Kg' : item.unit === 'mt' ? 'Mt' : (item.unit ? item.unit : '-')}</td>
                     </tr>
                   ))}
                 </tbody>
