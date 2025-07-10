@@ -124,7 +124,7 @@ export function QuotationPrintView({ quotation, customer }: QuotationPrintViewPr
                   <tr key={index}>
                     <td className="border border-black py-1 px-2">{index + 1}.</td>
                     <td className="border border-black py-1 px-2">{item.description || item.productName}</td>
-                    <td className="border border-black py-1 px-2 text-right">{quantity}{item.unit ? ` ${item.unit}` : ''}</td>
+                    <td className="border border-black py-1 px-2 text-right">{quantity} {item.unit || 'adet'}</td>
                     <td className="border border-black py-1 px-2 text-right">{formatCurrency(unitPrice, quotation.currency)}</td>
                     <td className="border border-black py-1 px-2 text-right">{taxRate}</td>
                     <td className="border border-black py-1 px-2 text-right">{formatCurrency(quantity * unitPrice, quotation.currency)}</td>
