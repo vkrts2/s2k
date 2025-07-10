@@ -492,10 +492,13 @@ export function QuotationForm({
                       <FormItem className="flex-1">
                         <FormLabel>Birim</FormLabel>
                         <Select
-                          onValueChange={field.onChange}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            form.setValue(`items.${index}.unit`, value, { shouldDirty: true });
+                          }}
                           value={field.value || "adet"}
                           defaultValue={field.value || "adet"}
-                          disabled={locked}
+                          // locked olsa bile birim seçimi yapılabilsin
                         >
                           <FormControl>
                             <SelectTrigger>
