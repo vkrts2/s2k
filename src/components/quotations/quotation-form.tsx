@@ -62,7 +62,7 @@ const quotationItemInputSchema = z.object({
     message: "Birim fiyat geçerli bir sayı olmalı veya boş olmalıdır.",
   }),
   taxRate: z.string().min(1, "KDV oranı gereklidir."),
-  unit: z.string().min(1, "Birim gereklidir.").default("adet"),
+  unit: z.string().min(1, "Birim gereklidir."),
 });
 
 const quotationFormInputSchema = z.object({
@@ -86,7 +86,7 @@ const quotationItemOutputSchema = z.object({
   quantity: z.string().transform((val: string) => parseFloat(val || "0") || 0),
   unitPrice: z.string().transform((val: string) => parseFloat(val || "0") || 0),
   taxRate: z.string().transform((val: string) => parseFloat(val || "0") || 0),
-  unit: z.string().default("adet"),
+  unit: z.string(),
 }).transform((item: any) => ({
   ...item,
   total: parseFloat((item.quantity * item.unitPrice).toFixed(2))
@@ -166,7 +166,7 @@ export function QuotationForm({
           quantity: item.quantity.toString(),
           unitPrice: item.unitPrice.toString(),
           taxRate: item.taxRate ? item.taxRate.toString() : "20",
-          unit: item.unit || "adet",
+          unit: typeof item.unit === 'string' && item.unit.length > 0 ? item.unit : 'adet',
         })),
         currency: initialData.currency,
         subTotal: initialData.subTotal,
@@ -273,11 +273,12 @@ export function QuotationForm({
   }, [watchedItems]);
 
   const processSubmit = (data: QuotationFormInputValues) => {
-    // Her item'a taxRate (string) ve description alanı ekle
+    // Her item'a taxRate (string), description ve unit alanı ekle
     const itemsWithTaxRate = data.items.map((item) => ({
       ...item,
       taxRate: item.taxRate !== undefined && item.taxRate !== '' ? item.taxRate : '0',
       description: item.productName,
+      unit: item.unit || 'adet',
     }));
     const selectedCustomer = customers.find((c) => c.name === data.customerName);
     const outputData = {
