@@ -270,7 +270,7 @@ export default function OrdersPage() {
           id: Math.random().toString(36).substr(2, 9),
           productName: '',
           quantity: 1,
-          unit: 'adet',
+          unit: 'top',
           specifications: '',
         },
       ],
