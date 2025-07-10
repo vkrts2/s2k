@@ -146,7 +146,11 @@ export default function OrdersPage() {
       priority: order.priority,
       currency: order.currency,
       notes: order.notes || '',
-      items: order.items
+      items: order.items.map(item => ({
+        ...item,
+        quantity: typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 1,
+        unit: item.unit || 'top',
+      })),
     });
     setShowOrderModal(true);
   };
