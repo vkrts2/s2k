@@ -330,6 +330,7 @@ export interface QuotationItem {
   unitPrice: number;
   total: number;
   taxRate: number; // KDV oranı (ör: 10 veya 20)
+  unit?: string; // Birim (ör: mt, kg, top)
 }
 
 export interface Quotation {

@@ -42,7 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Command, CommandInput, CommandList, CommandItem, CommandEmpty } from "@/components/ui/command";
 import type { JSX } from 'react';
 
-// 1. Adım: Form Giriş Değerleri İçin Zod Şeması (string olarak tutulur)
+// 1. Adım: Form Giriş Değerleri İçin Zod şeması (string olarak tutulur)
 const quotationItemInputSchema = z.object({
   id: z.string().optional(),
   stockItemId: z.string().optional(),
@@ -62,6 +62,7 @@ const quotationItemInputSchema = z.object({
     message: "Birim fiyat geçerli bir sayı olmalı veya boş olmalıdır.",
   }),
   taxRate: z.string().min(1, "KDV oranı gereklidir."),
+  unit: z.string().min(1, "Birim gereklidir.").default("adet"),
 });
 
 const quotationFormInputSchema = z.object({
@@ -77,7 +78,7 @@ const quotationFormInputSchema = z.object({
   notes: z.string().optional(),
 });
 
-// 2. Adım: Çıktı Değerleri İçin Zod Şeması (transformasyonları içerir)
+// 2. Adım: Çıktı Değerleri İçin Zod şeması (transformasyonları içerir)
 const quotationItemOutputSchema = z.object({
   id: z.string().optional(),
   stockItemId: z.string().optional().transform((val: string | undefined) => val === "manual" || !val ? undefined : val),
@@ -85,6 +86,7 @@ const quotationItemOutputSchema = z.object({
   quantity: z.string().transform((val: string) => parseFloat(val || "0") || 0),
   unitPrice: z.string().transform((val: string) => parseFloat(val || "0") || 0),
   taxRate: z.string().transform((val: string) => parseFloat(val || "0") || 0),
+  unit: z.string().default("adet"),
 }).transform((item: any) => ({
   ...item,
   total: parseFloat((item.quantity * item.unitPrice).toFixed(2))
@@ -164,6 +166,7 @@ export function QuotationForm({
           quantity: item.quantity.toString(),
           unitPrice: item.unitPrice.toString(),
           taxRate: item.taxRate ? item.taxRate.toString() : "20",
+          unit: item.unit || "adet",
         })),
         currency: initialData.currency,
         subTotal: initialData.subTotal,
@@ -183,6 +186,7 @@ export function QuotationForm({
           quantity?: string;
           unitPrice?: string;
           taxRate: string;
+          unit: string;
         }[],
         currency: "TRY" as const,
         subTotal: 0,
@@ -435,7 +439,7 @@ export function QuotationForm({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <FormLabel>Teklif Kalemleri</FormLabel>
-            <Button type="button" variant="outline" size="sm" onClick={() => append({ productName: "", quantity: "", unitPrice: "", taxRate: "20" })}>
+            <Button type="button" variant="outline" size="sm" onClick={() => append({ productName: "", quantity: "", unitPrice: "", taxRate: "20", unit: "adet" })}>
               <PlusCircle className="mr-1 h-4 w-4" /> Kalem Ekle
             </Button>
           </div>
@@ -476,6 +480,34 @@ export function QuotationForm({
                             disabled={locked}
                           />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={`items.${index}.unit`}
+                    render={({ field }: { field: any }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Birim</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || "adet"}
+                          defaultValue={field.value || "adet"}
+                          disabled={locked}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Birim seçin" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="adet">Adet</SelectItem>
+                            <SelectItem value="mt">mt</SelectItem>
+                            <SelectItem value="kg">kg</SelectItem>
+                            <SelectItem value="top">top</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
