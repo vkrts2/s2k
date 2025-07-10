@@ -70,6 +70,13 @@ export default function OrderPrintPage() {
     return new Date();
   }
 
+  // Kalemleri normalize et: quantity ve unit yoksa varsayılan ata
+  const normalizedItems = order?.items.map(item => ({
+    ...item,
+    quantity: typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 1,
+    unit: item.unit || 'top',
+  })) || [];
+
   if (!order) {
     return (
       <div className="container mx-auto py-6">
@@ -157,7 +164,7 @@ export default function OrderPrintPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {order.items.map((item, index) => (
+                  {normalizedItems.map((item, index) => (
                     <tr key={item.id || index} className="bg-white">
                       <td className="border border-black p-3 text-black">{index + 1}</td>
                       <td className="border border-black p-3 text-black">
