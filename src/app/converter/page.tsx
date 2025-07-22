@@ -39,38 +39,42 @@ export default function ConverterPage() {
 
   return (
     <div className="max-w-xl mx-auto p-6 bg-white rounded shadow mt-8">
-      <h1 className="text-2xl font-bold mb-4 text-center">Dönüştürücü</h1>
+      <h1 className="text-2xl font-bold mb-4 text-center text-gray-800">Dönüştürücü</h1>
       <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-2">Excel'den PDF'e</h2>
-        <input
-          type="file"
-          accept=".xls,.xlsx"
-          onChange={e => setExcelFile(e.target.files?.[0] || null)}
-          className="mb-2"
-        />
-        <button
-          onClick={handleExcelToPdf}
-          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-          disabled={loading}
-        >
-          {loading ? "Dönüştürülüyor..." : "PDF'e Dönüştür"}
-        </button>
+        <h2 className="text-lg font-semibold mb-2 text-gray-700">Excel'den PDF'e</h2>
+        <div className="flex items-center gap-4 mb-2">
+          <input
+            type="file"
+            accept=".xls,.xlsx"
+            onChange={e => setExcelFile(e.target.files?.[0] || null)}
+            className=""
+          />
+          <button
+            onClick={handleExcelToPdf}
+            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+            disabled={loading}
+          >
+            {loading ? "Dönüştürülüyor..." : "PDF'e Dönüştür"}
+          </button>
+        </div>
       </div>
       <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-2">PDF'den Excel'e</h2>
-        <input
-          type="file"
-          accept=".pdf"
-          onChange={e => setPdfFile(e.target.files?.[0] || null)}
-          className="mb-2"
-        />
-        <button
-          onClick={handlePdfToExcel}
-          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-          disabled={loading}
-        >
-          {loading ? "Dönüştürülüyor..." : "Excel'e Dönüştür"}
-        </button>
+        <h2 className="text-lg font-semibold mb-2 text-gray-700">PDF'den Excel'e</h2>
+        <div className="flex items-center gap-4 mb-2">
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={e => setPdfFile(e.target.files?.[0] || null)}
+            className=""
+          />
+          <button
+            onClick={handlePdfToExcel}
+            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+            disabled={loading}
+          >
+            {loading ? "Dönüştürülüyor..." : "Excel'e Dönüştür"}
+          </button>
+        </div>
       </div>
       {error && <div className="text-red-600 mb-4">{error}</div>}
       {resultUrl && (

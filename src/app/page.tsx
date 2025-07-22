@@ -151,8 +151,8 @@ export default function HomePage() {
           ))}
           {/* Dönüştürücü kutusu */}
           <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center justify-center">
-            <h2 className="text-xl font-bold mb-2">Dönüştürücü</h2>
-            <p className="mb-4 text-center">Excel dosyanızı PDF'e veya PDF dosyanızı Excel'e dönüştürün.</p>
+            <h2 className="text-xl font-bold mb-2 text-gray-800">Dönüştürücü</h2>
+            <p className="mb-4 text-center text-gray-700">Excel dosyanızı PDF'e veya PDF dosyanızı Excel'e dönüştürün.</p>
             <Link href="/converter" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition">Dönüştürücüye Git</Link>
           </div>
         </div>
