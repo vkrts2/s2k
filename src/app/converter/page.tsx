@@ -74,7 +74,16 @@ export default function ConverterPage() {
       </div>
       {error && <div className="text-red-600 mb-4">{error}</div>}
       {resultUrl && (
-        <div className="mt-4 text-green-700 font-semibold">Dönüştürme başarılı! (Demo)</div>
+        <div className="mt-4 text-green-700 font-semibold flex flex-col items-center gap-2">
+          Dönüştürme başarılı! (Demo)
+          <a
+            href={excelFile ? "/sample.pdf" : "/sample.xlsx"}
+            download
+            className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+          >
+            {excelFile ? "PDF Dosyasını İndir" : "Excel Dosyasını İndir"}
+          </a>
+        </div>
       )}
     </div>
   );
