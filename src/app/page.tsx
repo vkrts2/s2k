@@ -133,7 +133,7 @@ export default function HomePage() {
             Çıkış Yap
           </button>
         </div>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 w-full max-w-7xl mt-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
           {navItems.map((item) => (
             <Link href={item.href} key={item.label} passHref>
               <Card className="hover:shadow-lg transition-shadow duration-300 ease-in-out cursor-pointer h-full flex flex-col justify-between text-center bg-card hover:bg-accent/10">
@@ -149,6 +149,12 @@ export default function HomePage() {
               </Card>
             </Link>
           ))}
+          {/* Dönüştürücü kutusu */}
+          <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center justify-center">
+            <h2 className="text-xl font-bold mb-2">Dönüştürücü</h2>
+            <p className="mb-4 text-center">Excel dosyanızı PDF'e veya PDF dosyanızı Excel'e dönüştürün.</p>
+            <Link href="/converter" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition">Dönüştürücüye Git</Link>
+          </div>
         </div>
       </div>
     </div>
