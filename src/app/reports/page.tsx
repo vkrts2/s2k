@@ -11,6 +11,9 @@ import { db } from '@/lib/firebase';
 import { Sale, Payment, Purchase, PaymentToSupplier } from '@/lib/types';
 import { format, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 interface MonthlyData {
   month: string;
@@ -20,36 +23,42 @@ interface MonthlyData {
 }
 
 const ReportsPage = () => {
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [totalReceivables, setTotalReceivables] = useState(0);
   const [totalDebt, setTotalDebt] = useState(0);
   const [netStatus, setNetStatus] = useState(0);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Firestore snapshot referanslarını tutmak için değişkenler
+    if (authLoading) return;
+    if (!user) return;
+    setIsLoading(true);
     let unsubscribeSales: (() => void) | null = null;
     let unsubscribePayments: (() => void) | null = null;
     let unsubscribePurchases: (() => void) | null = null;
     let unsubscribePaymentsToSuppliers: (() => void) | null = null;
+    let sales: Sale[] = [];
+    let payments: Payment[] = [];
+    let purchases: Purchase[] = [];
+    let paymentsToSuppliers: PaymentToSupplier[] = [];
 
-    const fetchData = (sales: Sale[], payments: Payment[], purchases: Purchase[], paymentsToSuppliers: PaymentToSupplier[]) => {
+    const fetchData = () => {
       // Calculate total receivables
       const totalSales = sales.reduce((acc, sale) => acc + sale.amount, 0);
       const totalPayments = payments.reduce((acc, payment) => acc + payment.amount, 0);
       const receivables = totalSales - totalPayments;
       setTotalReceivables(receivables);
-
       // Calculate total debt
       const totalPurchases = purchases.reduce((acc, purchase) => acc + purchase.amount, 0);
       const totalPaymentsToSuppliers = paymentsToSuppliers.reduce((acc, payment) => acc + payment.amount, 0);
       const debt = totalPurchases - totalPaymentsToSuppliers;
       setTotalDebt(debt);
-
       // Calculate net status
       setNetStatus(receivables - debt);
-
       // Populate available years for filter
       const years = new Set<number>();
       [...sales, ...purchases].forEach(item => {
@@ -58,46 +67,40 @@ const ReportsPage = () => {
         }
       });
       setAvailableYears(Array.from(years).sort((a, b) => b - a));
+      setIsLoading(false);
     };
 
-    // Gerçek zamanlı dinleyiciler
-    let sales: Sale[] = [];
-    let payments: Payment[] = [];
-    let purchases: Purchase[] = [];
-    let paymentsToSuppliers: PaymentToSupplier[] = [];
-
-    unsubscribeSales = onSnapshot(collection(db, 'sales'), (snapshot: QuerySnapshot<DocumentData>) => {
+    unsubscribeSales = onSnapshot(collection(db, `users/${user.uid}/sales`), (snapshot: QuerySnapshot<DocumentData>) => {
       sales = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Sale));
-      fetchData(sales, payments, purchases, paymentsToSuppliers);
+      fetchData();
     });
-    unsubscribePayments = onSnapshot(collection(db, 'payments'), (snapshot: QuerySnapshot<DocumentData>) => {
+    unsubscribePayments = onSnapshot(collection(db, `users/${user.uid}/payments`), (snapshot: QuerySnapshot<DocumentData>) => {
       payments = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Payment));
-      fetchData(sales, payments, purchases, paymentsToSuppliers);
+      fetchData();
     });
-    unsubscribePurchases = onSnapshot(collection(db, 'purchases'), (snapshot: QuerySnapshot<DocumentData>) => {
+    unsubscribePurchases = onSnapshot(collection(db, `users/${user.uid}/purchases`), (snapshot: QuerySnapshot<DocumentData>) => {
       purchases = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Purchase));
-      fetchData(sales, payments, purchases, paymentsToSuppliers);
+      fetchData();
     });
-    unsubscribePaymentsToSuppliers = onSnapshot(collection(db, 'paymentsToSuppliers'), (snapshot: QuerySnapshot<DocumentData>) => {
+    unsubscribePaymentsToSuppliers = onSnapshot(collection(db, `users/${user.uid}/paymentsToSuppliers`), (snapshot: QuerySnapshot<DocumentData>) => {
       paymentsToSuppliers = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as PaymentToSupplier));
-      fetchData(sales, payments, purchases, paymentsToSuppliers);
+      fetchData();
     });
-
     return () => {
       if (unsubscribeSales) unsubscribeSales();
       if (unsubscribePayments) unsubscribePayments();
       if (unsubscribePurchases) unsubscribePurchases();
       if (unsubscribePaymentsToSuppliers) unsubscribePaymentsToSuppliers();
     };
-  }, []);
+  }, [user, authLoading]);
 
   useEffect(() => {
-    // Aylık analiz için de gerçek zamanlı dinleyici
+    if (authLoading) return;
+    if (!user) return;
     let unsubscribeSales: (() => void) | null = null;
     let unsubscribePurchases: (() => void) | null = null;
     let sales: Sale[] = [];
     let purchases: Purchase[] = [];
-
     const calculateMonthlyData = () => {
       const data: MonthlyData[] = [];
       for (let i = 0; i < 12; i++) {
@@ -123,21 +126,32 @@ const ReportsPage = () => {
       }
       setMonthlyData(data);
     };
-
-    unsubscribeSales = onSnapshot(collection(db, 'sales'), (snapshot: QuerySnapshot<DocumentData>) => {
+    unsubscribeSales = onSnapshot(collection(db, `users/${user.uid}/sales`), (snapshot: QuerySnapshot<DocumentData>) => {
       sales = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Sale));
       calculateMonthlyData();
     });
-    unsubscribePurchases = onSnapshot(collection(db, 'purchases'), (snapshot: QuerySnapshot<DocumentData>) => {
+    unsubscribePurchases = onSnapshot(collection(db, `users/${user.uid}/purchases`), (snapshot: QuerySnapshot<DocumentData>) => {
       purchases = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Purchase));
       calculateMonthlyData();
     });
-
     return () => {
       if (unsubscribeSales) unsubscribeSales();
       if (unsubscribePurchases) unsubscribePurchases();
     };
-  }, [selectedYear]);
+  }, [user, authLoading, selectedYear]);
+
+  if (authLoading || isLoading) {
+    return <div>Yükleniyor...</div>;
+  }
+  if (!user) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-center p-4">
+        <h1 className="text-2xl font-bold mb-2">Giriş Yapmanız Gerekiyor</h1>
+        <p className="text-muted-foreground mb-4">Bu sayfayı görüntülemek için lütfen giriş yapın.</p>
+        <Link href="/login" className="px-4 py-2 bg-indigo-600 text-white rounded">Giriş Yap</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4 space-y-8">
