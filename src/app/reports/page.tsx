@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Sale, Payment, Purchase, PaymentToSupplier } from '@/lib/types';
 import { format, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
@@ -242,7 +242,7 @@ const ReportsPage = () => {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="month" />
                         <YAxis tickFormatter={(value: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', notation: 'compact' }).format(value)} />
-                        <Tooltip formatter={(value: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value)} />
+                        <Tooltip formatter={(value: any) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(Number(value))} />
                         <Legend />
                         <Bar dataKey="sales" fill="#22C55E" name="Satışlar" />
                         <Bar dataKey="purchases" fill="#EF4444" name="Alışlar" />

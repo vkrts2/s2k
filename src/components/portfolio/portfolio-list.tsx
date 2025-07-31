@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Briefcase, Edit, Trash2, UserPlus } from "lucide-react";
+import { Briefcase, Edit, Trash2, UserPlus, Check, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,9 +31,10 @@ interface PortfolioListProps {
   onEdit: (item: PortfolioItem) => void;
   onDelete: (itemId: string) => void;
   onAddToCustomers?: (item: PortfolioItem) => void;
+  onContactedChange?: (item: PortfolioItem, contacted: boolean) => void;
 }
 
-export function PortfolioList({ items, onEdit, onDelete, onAddToCustomers }: PortfolioListProps) {
+export function PortfolioList({ items, onEdit, onDelete, onAddToCustomers, onContactedChange }: PortfolioListProps) {
   const [selectedItem, setSelectedItem] = useState<PortfolioItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -77,75 +78,95 @@ export function PortfolioList({ items, onEdit, onDelete, onAddToCustomers }: Por
         <CardTitle>Portföy Kayıtları</CardTitle>
         <CardDescription>Eklenen tüm portföy kayıtlarınız (veya filtre sonuçlarınız) burada listelenir.</CardDescription>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Firma İsmi</TableHead>
-              <TableHead>Bulunduğu İl</TableHead>
+      <CardContent className="p-0">
+        <p className="text-xs text-muted-foreground mb-2 ml-2">Tablonun tamamını görmek için sağa kaydırın &rarr;</p>
+        <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-200" style={{ scrollbarWidth: 'thin', overflowX: 'auto' }}>
+          <Table className="min-w-[1500px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Firma İsmi</TableHead>
+                <TableHead>Bulunduğu İl</TableHead>
                 <TableHead>İlçe</TableHead>
-                <TableHead>Adres</TableHead>
+                <TableHead className="max-w-[100px]">Adres</TableHead>
                 <TableHead>Telefon</TableHead>
                 <TableHead>E-posta</TableHead>
                 <TableHead>Web</TableHead>
-              <TableHead>Sektör</TableHead>
-                <TableHead>Notlar</TableHead>
+                <TableHead>Sektör</TableHead>
+                <TableHead className="max-w-[100px]">Notlar</TableHead>
                 <TableHead className="text-right">İşlemler</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">
-                  <Link href={`/portfolio/${item.id}`} className="hover:underline text-primary">
-                      {item.companyName}
-                  </Link>
-                </TableCell>
-                <TableCell>{item.city || "-"}</TableCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="font-medium">
+                    <Link href={`/portfolio/${item.id}`} className="hover:underline text-primary">
+                        {item.companyName}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{item.city || "-"}</TableCell>
                   <TableCell>{item.district || "-"}</TableCell>
-                  <TableCell>{item.address || "-"}</TableCell>
+                  <TableCell className="max-w-[100px] truncate">{item.address || "-"}</TableCell>
                   <TableCell>{item.phone || "-"}</TableCell>
                   <TableCell>{item.email || "-"}</TableCell>
                   <TableCell>{item.website || "-"}</TableCell>
                   <TableCell>{item.sector || "-"}</TableCell>
-                  <TableCell>{item.notes || "-"}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end space-x-2">
-                    {onAddToCustomers && (
+                  <TableCell className="max-w-[100px] truncate">{item.notes || "-"}</TableCell>
+                  <TableCell>
+                    {onContactedChange && (
+                      <Button
+                        variant={item.contacted ? "default" : "outline"}
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onContactedChange(item, !item.contacted)}
+                        aria-label={item.contacted ? "Görüşme Yapıldı" : "Görüşme Yapılmadı"}
+                      >
+                        {item.contacted ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <X className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end space-x-2">
+                      {onAddToCustomers && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-muted-foreground hover:text-primary" 
+                          onClick={() => handleAddToCustomers(item)}
+                          aria-label="Müşterilere Ekle"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         className="h-8 w-8 text-muted-foreground hover:text-primary" 
-                        onClick={() => handleAddToCustomers(item)}
-                        aria-label="Müşterilere Ekle"
+                        onClick={() => onEdit(item)}
+                        aria-label="Düzenle"
                       >
-                        <UserPlus className="h-4 w-4" />
+                        <Edit className="h-4 w-4" />
                       </Button>
-                    )}
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-muted-foreground hover:text-primary" 
-                      onClick={() => onEdit(item)}
-                      aria-label="Düzenle"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-destructive" 
-                      onClick={() => setDeleteConfirmId(item.id)}
-                      aria-label="Sil"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-destructive" 
+                        onClick={() => setDeleteConfirmId(item.id)}
+                        aria-label="Sil"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
 

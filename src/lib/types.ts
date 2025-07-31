@@ -287,6 +287,7 @@ export interface PortfolioItem {
   notes?: string;
   taxId?: string;
   taxOffice?: string;
+  contacted?: boolean; // Görüşme durumunu takip etmek için eklendi
   createdAt: string; // ISO string format
   updatedAt: string; // ISO string format
 }

@@ -6,18 +6,20 @@ import { useParams, useRouter } from 'next/navigation';
 import type { PortfolioItem } from '@/lib/types';
 import { getPortfolioItemById, updatePortfolioItem } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'; // CardFooter eklendi
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast";
 import { Briefcase, ArrowLeft, Save } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { useAuth } from "@/contexts/AuthContext"; // Bu satırı ekleyin
 
 export default function PortfolioItemDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth(); // Bu satırı ekleyin
   const itemId = typeof params.id === 'string' ? params.id : undefined;
 
   const [portfolioItem, setPortfolioItem] = useState<PortfolioItem | null>(null);
@@ -26,15 +28,15 @@ export default function PortfolioItemDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadPortfolioItem = useCallback(() => {
-    if (!itemId) {
-      setError("Portföy kaydı ID bulunamadı.");
+  const loadPortfolioItem = useCallback(async () => { // async ekleyin
+    if (!itemId || !user) { // user kontrolü ekleyin
+      setError("Portföy kaydı ID bulunamadı veya oturum açılmamış.");
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     try {
-      const item = getPortfolioItemById(itemId);
+      const item = await getPortfolioItemById(user.uid, itemId); // await ve user.uid ekleyin
       if (item) {
         setPortfolioItem(item);
         setNotes(item.notes || '');
@@ -50,7 +52,7 @@ export default function PortfolioItemDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [itemId]);
+  }, [itemId, user]); // user bağımlılığını ekleyin
 
   useEffect(() => {
     if (typeof window !== "undefined") { // Ensure runs on client
@@ -59,11 +61,11 @@ export default function PortfolioItemDetailPage() {
   }, [loadPortfolioItem]);
 
   const handleSaveNotes = useCallback(async () => {
-    if (!portfolioItem) return;
+    if (!portfolioItem || !user) return; // user kontrolü ekleyin
     setIsSaving(true);
     try {
       const updatedItem = { ...portfolioItem, notes: notes };
-      updatePortfolioItem(updatedItem);
+      await updatePortfolioItem(user.uid, updatedItem); // await ve user.uid ekleyin
       setPortfolioItem(updatedItem); // Update local state immediately
       toast({
         title: "Notlar Kaydedildi",
@@ -79,7 +81,7 @@ export default function PortfolioItemDetailPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [portfolioItem, notes, toast]);
+  }, [portfolioItem, notes, toast, user]); // user bağımlılığını ekleyin
   
   const safeFormatDate = (dateString: string | undefined) => {
     if (!dateString) return "Bilinmiyor";

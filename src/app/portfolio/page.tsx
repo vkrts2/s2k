@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,19 +54,7 @@ export default function PortfolioPage() {
   const [selectedCity, setSelectedCity] = useState(ALL_CITIES_VALUE);
   const { user } = useAuth();
 
-  // Form state
-  const [companyName, setCompanyName] = useState("");
-  const [gsm, setGsm] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [website, setWebsite] = useState("");
-  const [sector, setSector] = useState<string>("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [district, setDistrict] = useState("");
-  const [notes, setNotes] = useState("");
-  const [taxId, setTaxId] = useState("");
-  const [taxOffice, setTaxOffice] = useState("");
+
 
   const [confirmAddCustomerItem, setConfirmAddCustomerItem] = useState<PortfolioItem | null>(null);
 
@@ -96,118 +84,12 @@ export default function PortfolioPage() {
     getPortfolioItems(user.uid).then(items => setPortfolioItems(items));
   }, [user]);
 
-  const handleAddItem = async () => {
-    if (!companyName || !city || !district) {
-      toast({
-        title: "Hata",
-        description: "Lütfen firma ismi, il ve ilçe alanlarını doldurun.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!sector) {
-      toast({
-        title: "Hata",
-        description: "Lütfen sektör bilgisini girin.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!user) return;
-    const newItem = {
-      companyName,
-      address,
-      city,
-      district,
-      gsm,
-      phone,
-      email,
-      website,
-      sector,
-      notes,
-      taxId,
-      taxOffice,
-    };
-    try {
-      const added = await addPortfolioItem(user.uid, newItem);
-      // Otomatik olarak müşteri olarak da ekle KALDIRILDI
-      setPortfolioItems((prev: PortfolioItem[]) => [added as PortfolioItem, ...prev]);
-      setShowItemModal(false);
-      resetForm();
-      toast({
-        title: "Başarılı",
-        description: "Portföy kaydı başarıyla eklendi.",
-      });
-    } catch (error) {
-      toast({
-        title: "Hata",
-        description: "Kayıt sırasında bir hata oluştu.",
-        variant: "destructive",
-      });
-    }
-  };
+
 
   const handleEditItem = (item: PortfolioItem) => {
     console.log('DÜZENLEME MODU AÇILIYOR', item);
     setEditingItem(item);
-    setCompanyName(item.companyName || "");
-    setAddress(item.address || "");
-    setCity(item.city || "");
-    setDistrict(item.district || "");
-    setGsm(item.gsm || "");
-    setPhone(item.phone || "");
-    setEmail(item.email || "");
-    setWebsite(item.website || "");
-    setSector(item.sector || "");
-    setNotes(item.notes || "");
-    setTaxId(item.taxId || "");
-    setTaxOffice(item.taxOffice || "");
     setShowItemModal(true);
-  };
-
-  const handleUpdateItem = async () => {
-    if (!editingItem || !user) return;
-    if (!sector || !portfolioSectors.includes(sector)) {
-      toast({
-        title: "Hata",
-        description: "Lütfen geçerli bir sektör seçin.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const updatedItem: PortfolioItem = {
-      ...editingItem,
-      companyName,
-      address,
-      city,
-      district,
-      gsm,
-      phone,
-      email,
-      website,
-      sector: sector as PortfolioSector,
-      notes,
-      taxId,
-      taxOffice,
-      createdAt: editingItem.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    console.log('GÜNCELLEME BAŞLIYOR', updatedItem);
-    try {
-      await updatePortfolioItem(user.uid, updatedItem);
-      console.log('GÜNCELLEME BAŞARILI', updatedItem);
-      // Güncelleme sonrası listeyi yenile
-      const items = await getPortfolioItems(user.uid);
-      setPortfolioItems(items);
-      setShowItemModal(false);
-      resetForm();
-      toast({
-        title: "Başarılı",
-        description: "Portföy kaydı başarıyla güncellendi.",
-      });
-    } catch (error) {
-      console.error('GÜNCELLEME HATASI', error);
-    }
   };
 
   const handleDeleteItem = async (itemId: string) => {
@@ -222,18 +104,6 @@ export default function PortfolioPage() {
 
   const resetForm = () => {
     setEditingItem(null);
-    setCompanyName("");
-    setGsm("");
-    setPhone("");
-    setEmail("");
-    setWebsite("");
-    setSector("");
-    setAddress("");
-    setCity("");
-    setDistrict("");
-    setNotes("");
-    setTaxId("");
-    setTaxOffice("");
   };
 
   const filteredItems = portfolioItems.filter((item: PortfolioItem) =>
@@ -316,46 +186,31 @@ export default function PortfolioPage() {
     window.URL.revokeObjectURL(url);
   };
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    switch (name) {
-      case 'companyName':
-        setCompanyName(value);
-        break;
-      case 'gsm':
-        setGsm(value);
-        break;
-      case 'phone':
-        setPhone(value);
-        break;
-      case 'email':
-        setEmail(value);
-        break;
-      case 'website':
-        setWebsite(value);
-        break;
-      case 'address':
-        setAddress(value);
-        break;
-      case 'city':
-        setCity(value);
-        break;
-      case 'district':
-        setDistrict(value);
-        break;
-      case 'sector':
-        setSector(value);
-        break;
-      case 'taxId':
-        setTaxId(value);
-        break;
-      case 'taxOffice':
-        setTaxOffice(value);
-        break;
+
+
+  // Görüşme durumu değiştiğinde çağrılacak fonksiyon
+  const handleContactedChange = async (updatedItem: PortfolioItem, contacted: boolean) => {
+    // Portföy öğelerini güncelle
+    setPortfolioItems(prevItems => 
+      prevItems.map(item => 
+        item.id === updatedItem.id ? {...item, contacted} : item
+      )
+    );
+
+    // Veritabanında da güncelle
+    if (user) {
+      const newItem = { ...updatedItem, contacted };
+      await updatePortfolioItem(user.uid, newItem);
     }
+
+    // Bildirim göster
+    toast({
+      title: contacted ? "Görüşme kaydedildi" : "Görüşme durumu kaldırıldı",
+      description: `${updatedItem.companyName} firması için görüşme durumu güncellendi.`,
+    });
   };
 
-  console.log('FORM RENDER', { editingItem });
+
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -368,7 +223,7 @@ export default function PortfolioPage() {
         <Dialog open={showItemModal} onOpenChange={setShowItemModal}>
           <DialogTrigger asChild>
             <Button onClick={() => { setEditingItem(null); resetForm(); setShowItemModal(true); }}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Yeni Portföy Kaydı
+              <PlusCircle className="mr-2 h-4 w-4" /> Yeni Portföy Kaydını Düzenle
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -379,33 +234,47 @@ export default function PortfolioPage() {
               initialData={editingItem ? editingItem : undefined}
               onSubmit={async (data: PortfolioFormValues) => {
                 if (!user) return;
-                if (editingItem) {
-                  // Güncelleme
-                  const updatedItem: PortfolioItem = {
-                    ...editingItem,
-                    ...data,
-                    sector: data.sector as PortfolioSector,
-                    createdAt: editingItem.createdAt,
-                    updatedAt: new Date().toISOString(),
-                  };
-                  await updatePortfolioItem(user.uid, updatedItem);
-                  const items = await getPortfolioItems(user.uid);
-                  setPortfolioItems(items);
-                  setShowItemModal(false);
-                  resetForm();
-                  toast({ title: "Başarılı", description: "Portföy kaydı başarıyla güncellendi." });
-                } else {
-                  // Ekleme
-                  const newItem = {
-                    ...data,
-                    sector: data.sector as PortfolioSector,
-                  };
-                  const added = await addPortfolioItem(user.uid, newItem);
-                  const items = await getPortfolioItems(user.uid);
-                  setPortfolioItems(items);
-                  setShowItemModal(false);
-                  resetForm();
-                  toast({ title: "Başarılı", description: "Portföy kaydı başarıyla eklendi." });
+                try {
+                  if (editingItem) {
+                    // Güncelleme
+                    const updatedItem: PortfolioItem = {
+                      ...editingItem,
+                      ...data,
+                      sector: data.sector as PortfolioSector,
+                      createdAt: editingItem.createdAt,
+                      updatedAt: new Date().toISOString(),
+                    };
+                    console.log('GÜNCELLEME BAŞLIYOR', updatedItem);
+                    console.log('ORIGINAL ITEM', editingItem);
+                    console.log('FORM DATA', data);
+                    await updatePortfolioItem(user.uid, updatedItem);
+                    console.log('GÜNCELLEME BAŞARILI');
+                    const items = await getPortfolioItems(user.uid);
+                    console.log('YENİ LİSTE', items);
+                    setPortfolioItems(items);
+                    setShowItemModal(false);
+                    resetForm();
+                    toast({ title: "Başarılı", description: "Portföy kaydı başarıyla güncellendi." });
+                  } else {
+                    // Ekleme
+                    const newItem = {
+                      ...data,
+                      sector: data.sector as PortfolioSector,
+                    };
+                    const added = await addPortfolioItem(user.uid, newItem);
+                    const items = await getPortfolioItems(user.uid);
+                    setPortfolioItems(items);
+                    setShowItemModal(false);
+                    resetForm();
+                    toast({ title: "Başarılı", description: "Portföy kaydı başarıyla eklendi." });
+                  }
+                } catch (error) {
+                  console.error('PORTFÖY İŞLEM HATASI', error);
+                  toast({ 
+                    title: "Hata", 
+                    description: "İşlem sırasında bir hata oluştu.", 
+                    variant: "destructive" 
+                  });
                 }
               }}
             />
@@ -458,11 +327,13 @@ export default function PortfolioPage() {
               </Select>
             </div>
           </div>
-          <PortfolioList
-            items={filteredItems as import('@/lib/types').PortfolioItem[]}
-            onEdit={handleEditItem as (item: import('@/lib/types').PortfolioItem) => void}
-            onDelete={handleDeleteItem}
-            onAddToCustomers={handleAddToCustomers as (item: import('@/lib/types').PortfolioItem) => void}
+          {/* PortfolioList bileşenine onContactedChange prop'unu ekleyin */}
+          <PortfolioList 
+            items={filteredItems} 
+            onEdit={handleEditItem} 
+            onDelete={handleDeleteItem} 
+            onAddToCustomers={handleAddToCustomers}
+            onContactedChange={handleContactedChange}
           />
         </CardContent>
       </Card>
@@ -525,6 +396,41 @@ export function PortfolioForm({ initialData, onSubmit }: { initialData?: Portfol
       notes: "",
     },
   });
+
+  // Form reset işlemi için useEffect
+  React.useEffect(() => {
+    if (initialData) {
+      form.reset({
+        companyName: initialData.companyName,
+        taxId: initialData.taxId || "",
+        taxOffice: initialData.taxOffice || "",
+        gsm: initialData.gsm || "",
+        phone: initialData.phone || "",
+        email: initialData.email || "",
+        website: initialData.website || "",
+        address: initialData.address || "",
+        sector: initialData.sector || "",
+        city: initialData.city || "",
+        district: initialData.district || "",
+        notes: initialData.notes || "",
+      });
+    } else {
+      form.reset({
+        companyName: "",
+        taxId: "",
+        taxOffice: "",
+        gsm: "",
+        phone: "",
+        email: "",
+        website: "",
+        address: "",
+        sector: "",
+        city: "",
+        district: "",
+        notes: "",
+      });
+    }
+  }, [initialData, form]);
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 py-2">
