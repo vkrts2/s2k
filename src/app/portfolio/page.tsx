@@ -235,22 +235,25 @@ export default function PortfolioPage() {
               onSubmit={async (data: PortfolioFormValues) => {
                 if (!user) return;
                 try {
+                  // Form verilerini temizle - undefined değerleri null'a çevir
+                  const cleanedData = { ...data };
+                  Object.keys(cleanedData).forEach(key => {
+                    if (cleanedData[key as keyof PortfolioFormValues] === undefined || cleanedData[key as keyof PortfolioFormValues] === '') {
+                      (cleanedData as any)[key] = null;
+                    }
+                  });
+
                   if (editingItem) {
                     // Güncelleme
                     const updatedItem: PortfolioItem = {
                       ...editingItem,
-                      ...data,
-                      sector: data.sector as PortfolioSector,
+                      ...cleanedData,
+                      sector: cleanedData.sector as PortfolioSector,
                       createdAt: editingItem.createdAt,
                       updatedAt: new Date().toISOString(),
                     };
-                    console.log('GÜNCELLEME BAŞLIYOR', updatedItem);
-                    console.log('ORIGINAL ITEM', editingItem);
-                    console.log('FORM DATA', data);
                     await updatePortfolioItem(user.uid, updatedItem);
-                    console.log('GÜNCELLEME BAŞARILI');
                     const items = await getPortfolioItems(user.uid);
-                    console.log('YENİ LİSTE', items);
                     setPortfolioItems(items);
                     setShowItemModal(false);
                     resetForm();
@@ -258,8 +261,8 @@ export default function PortfolioPage() {
                   } else {
                     // Ekleme
                     const newItem = {
-                      ...data,
-                      sector: data.sector as PortfolioSector,
+                      ...cleanedData,
+                      sector: cleanedData.sector as PortfolioSector,
                     };
                     const added = await addPortfolioItem(user.uid, newItem);
                     const items = await getPortfolioItems(user.uid);

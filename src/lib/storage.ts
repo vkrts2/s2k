@@ -724,6 +724,14 @@ export const addPortfolioItem = async (uid: string, itemData: Omit<PortfolioItem
     createdAt: now,
     updatedAt: now,
   };
+  
+  // undefined değerleri temizle
+  Object.keys(newItemData).forEach(key => {
+    if (newItemData[key as keyof typeof newItemData] === undefined) {
+      (newItemData as any)[key] = null;
+    }
+  });
+  
   const docRef = await addDoc(_getUserCollectionRef(uid, "portfolioItems"), newItemData);
 
   // Portföydeki müşteri companyName'i mevcut müşterilerde name ile eşleşiyorsa, müşteriyi güncelle
@@ -734,21 +742,31 @@ export const addPortfolioItem = async (uid: string, itemData: Omit<PortfolioItem
     for (const docSnap of querySnapshot.docs) {
       const customerId = docSnap.id;
       const customerData = docSnap.data();
-      const updatedCustomer = {
+      
+      // undefined değerleri temizle
+      const updatedCustomer: any = {
         ...customerData,
         name: itemData.companyName,
-        phone: itemData.gsm || itemData.phone || customerData.phone,
-        email: itemData.email || customerData.email,
-        address: itemData.address || customerData.address,
-        taxNumber: itemData.taxId || customerData.taxNumber,
-        taxOffice: itemData.taxOffice || customerData.taxOffice,
-        notes: itemData.notes || customerData.notes,
-        city: itemData.city || customerData.city,
-        district: itemData.district || customerData.district,
-        website: itemData.website || customerData.website,
-        sector: itemData.sector || customerData.sector,
+        phone: itemData.gsm || itemData.phone || customerData.phone || null,
+        email: itemData.email || customerData.email || null,
+        address: itemData.address || customerData.address || null,
+        taxNumber: itemData.taxId || customerData.taxNumber || null,
+        taxOffice: itemData.taxOffice || customerData.taxOffice || null,
+        notes: itemData.notes || customerData.notes || null,
+        city: itemData.city || customerData.city || null,
+        district: itemData.district || customerData.district || null,
+        website: itemData.website || customerData.website || null,
+        sector: itemData.sector || customerData.sector || null,
         updatedAt: now,
       };
+      
+      // undefined değerleri null'a çevir
+      Object.keys(updatedCustomer).forEach(key => {
+        if (updatedCustomer[key] === undefined) {
+          updatedCustomer[key] = null;
+        }
+      });
+      
       await updateDoc(doc(customersRef, customerId), updatedCustomer);
     }
   }
@@ -760,10 +778,20 @@ export const updatePortfolioItem = async (uid: string, updatedItem: PortfolioIte
   const now = formatISO(new Date());
   const portfolioItemDocRef = doc(_getUserCollectionRef(uid, "portfolioItems"), updatedItem.id);
   const { id, ...restOfUpdatedItem } = updatedItem;
+  
+  // undefined değerleri temizle
   const dataForFirestore: any = {
     ...restOfUpdatedItem,
     updatedAt: now,
   };
+  
+  // undefined değerleri null'a çevir veya kaldır
+  Object.keys(dataForFirestore).forEach(key => {
+    if (dataForFirestore[key] === undefined) {
+      dataForFirestore[key] = null;
+    }
+  });
+  
   await updateDoc(portfolioItemDocRef, dataForFirestore);
 
   // Portföydeki müşteri companyName'i mevcut müşterilerde name ile eşleşiyorsa, müşteriyi güncelle
@@ -774,21 +802,31 @@ export const updatePortfolioItem = async (uid: string, updatedItem: PortfolioIte
     for (const docSnap of querySnapshot.docs) {
       const customerId = docSnap.id;
       const customerData = docSnap.data();
-      const updatedCustomer = {
+      
+      // undefined değerleri temizle
+      const updatedCustomer: any = {
         ...customerData,
         name: updatedItem.companyName,
-        phone: updatedItem.gsm || updatedItem.phone || customerData.phone,
-        email: updatedItem.email || customerData.email,
-        address: updatedItem.address || customerData.address,
-        taxNumber: updatedItem.taxId || customerData.taxNumber,
-        taxOffice: updatedItem.taxOffice || customerData.taxOffice,
-        notes: updatedItem.notes || customerData.notes,
-        city: updatedItem.city || customerData.city,
-        district: updatedItem.district || customerData.district,
-        website: updatedItem.website || customerData.website,
-        sector: updatedItem.sector || customerData.sector,
+        phone: updatedItem.gsm || updatedItem.phone || customerData.phone || null,
+        email: updatedItem.email || customerData.email || null,
+        address: updatedItem.address || customerData.address || null,
+        taxNumber: updatedItem.taxId || customerData.taxNumber || null,
+        taxOffice: updatedItem.taxOffice || customerData.taxOffice || null,
+        notes: updatedItem.notes || customerData.notes || null,
+        city: updatedItem.city || customerData.city || null,
+        district: updatedItem.district || customerData.district || null,
+        website: updatedItem.website || customerData.website || null,
+        sector: updatedItem.sector || customerData.sector || null,
         updatedAt: now,
       };
+      
+      // undefined değerleri null'a çevir
+      Object.keys(updatedCustomer).forEach(key => {
+        if (updatedCustomer[key] === undefined) {
+          updatedCustomer[key] = null;
+        }
+      });
+      
       await updateDoc(doc(customersRef, customerId), updatedCustomer);
     }
   }
