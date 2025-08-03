@@ -18,10 +18,20 @@ interface ExchangeRate {
   symbol: string;
 }
 
+interface ApiResponse {
+  success: boolean;
+  rates: ExchangeRate[];
+  source: string;
+  timestamp: string;
+  error?: string;
+}
+
 export default function ExchangeRatesPage() {
   const { toast } = useToast();
   const [rates, setRates] = useState<ExchangeRate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [dataSource, setDataSource] = useState<string>('');
+  const [lastUpdate, setLastUpdate] = useState<string>('');
   const [converter, setConverter] = useState({
     fromCurrency: 'TRY',
     toCurrency: 'USD',
@@ -38,43 +48,36 @@ export default function ExchangeRatesPage() {
     { code: 'CHF', name: 'İsviçre Frangı', symbol: 'CHF' }
   ];
 
-  // Doviz.com'dan güncel veriler (web scraping simülasyonu)
-  const fetchRatesFromDoviz = async () => {
+  // API'den güncel verileri çek
+  const fetchRatesFromAPI = async () => {
     setLoading(true);
     try {
-      // Simüle edilmiş doviz.com verileri (gerçek uygulamada API veya web scraping kullanılır)
-      const dovizData = [
-        { currency: 'USD', rate: 40.6470, change: 0.02, symbol: '$' },
-        { currency: 'EUR', rate: 47.1602, change: 1.43, symbol: '€' },
-        { currency: 'GBP', rate: 54.0369, change: 0.44, symbol: '£' },
-        { currency: 'JPY', rate: 0.27, change: -0.01, symbol: '¥' },
-        { currency: 'CHF', rate: 46.14, change: 0.05, symbol: 'CHF' }
-      ];
+      const response = await fetch('/api/exchange-rates');
+      const data: ApiResponse = await response.json();
 
-      const exchangeRates: ExchangeRate[] = dovizData.map(item => ({
-        ...item,
-        lastUpdate: new Date().toISOString()
-      }));
-
-      setRates(exchangeRates);
-      toast({
-        title: "Kurlar Güncellendi",
-        description: "Doviz.com'dan güncel kurlar yüklendi.",
-      });
+      if (data.success) {
+        setRates(data.rates);
+        setDataSource(data.source);
+        setLastUpdate(data.timestamp);
+        toast({
+          title: "Kurlar Güncellendi",
+          description: `${data.source} kaynağından güncel kurlar yüklendi.`,
+        });
+      } else {
+        setRates(data.rates);
+        setDataSource(data.source);
+        setLastUpdate(data.timestamp);
+        toast({
+          title: "Fallback Veriler",
+          description: data.error || "API erişilemedi, fallback veriler kullanılıyor.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
-      console.error('Doviz.com API Error:', error);
-      // Fallback: Güncel mock data
-      const mockRates: ExchangeRate[] = [
-        { currency: 'USD', rate: 40.6470, change: 0.02, lastUpdate: new Date().toISOString(), symbol: '$' },
-        { currency: 'EUR', rate: 47.1602, change: 1.43, lastUpdate: new Date().toISOString(), symbol: '€' },
-        { currency: 'GBP', rate: 54.0369, change: 0.44, lastUpdate: new Date().toISOString(), symbol: '£' },
-        { currency: 'JPY', rate: 0.27, change: -0.01, lastUpdate: new Date().toISOString(), symbol: '¥' },
-        { currency: 'CHF', rate: 46.14, change: 0.05, lastUpdate: new Date().toISOString(), symbol: 'CHF' }
-      ];
-      setRates(mockRates);
+      console.error('API Error:', error);
       toast({
-        title: "Mock Veriler Yüklendi",
-        description: "Doviz.com erişilemedi, örnek veriler gösteriliyor.",
+        title: "Hata",
+        description: "Veriler yüklenirken bir hata oluştu.",
         variant: "destructive",
       });
     } finally {
@@ -105,7 +108,7 @@ export default function ExchangeRatesPage() {
   };
 
   useEffect(() => {
-    fetchRatesFromDoviz();
+    fetchRatesFromAPI();
   }, []);
 
   useEffect(() => {
@@ -127,6 +130,10 @@ export default function ExchangeRatesPage() {
     window.open('https://www.doviz.com/', '_blank');
   };
 
+  const formatLastUpdate = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString('tr-TR');
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <BackToHomeButton />
@@ -137,7 +144,7 @@ export default function ExchangeRatesPage() {
             <ExternalLink className="mr-2 h-4 w-4" />
             Doviz.com
           </Button>
-          <Button onClick={fetchRatesFromDoviz} disabled={loading}>
+          <Button onClick={fetchRatesFromAPI} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Kurları Güncelle
           </Button>
@@ -150,7 +157,16 @@ export default function ExchangeRatesPage() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Güncel Kurlar (₺)</span>
-              <span className="text-sm text-muted-foreground">Kaynak: Doviz.com</span>
+              <div className="text-right">
+                <div className="text-sm text-muted-foreground">
+                  Kaynak: {dataSource || 'Yükleniyor...'}
+                </div>
+                {lastUpdate && (
+                  <div className="text-xs text-muted-foreground">
+                    Son güncelleme: {formatLastUpdate(lastUpdate)}
+                  </div>
+                )}
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -178,9 +194,6 @@ export default function ExchangeRatesPage() {
                   </div>
                 </div>
               ))}
-            </div>
-            <div className="mt-4 text-xs text-muted-foreground">
-              Son güncelleme: {new Date().toLocaleString('tr-TR')}
             </div>
           </CardContent>
         </Card>
