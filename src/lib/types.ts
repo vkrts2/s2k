@@ -119,9 +119,9 @@ export type SaleFormValues = {
   quantity?: string;
   unitPrice?: string;
   dateInput?: string; // Klavyeden tarih girerken geçici string alan
-  taxRate?: string; // KDV oranı
-  taxAmount?: string; // KDV tutarı
-  subtotal?: string; // Ara toplam
+  taxRate?: string; // KDV oranı (faturalı satış için)
+  invoiceType?: 'normal' | 'invoice'; // Satış türü
+  invoiceFile?: File | null; // Fatura dosyası
 };
 
 export interface PurchaseFormValues {

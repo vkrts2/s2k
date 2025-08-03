@@ -294,10 +294,32 @@ export default function OrdersPage() {
     });
   };
 
-  const filteredOrders = orders.filter(order =>
-    order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.customerName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOrders = orders
+    .filter(order =>
+      order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Tamamlanan siparişleri alta al, bekleyen siparişleri üste al
+      const statusPriority = {
+        'pending': 1,
+        'confirmed': 2,
+        'in_production': 3,
+        'ready': 4,
+        'delivered': 5,
+        'cancelled': 6
+      };
+      
+      const aPriority = statusPriority[a.status] || 7;
+      const bPriority = statusPriority[b.status] || 7;
+      
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority;
+      }
+      
+      // Aynı durumda olan siparişleri tarihe göre sırala (en yeni üstte)
+      return new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime();
+    });
 
   return (
     <div className="container mx-auto py-6 space-y-6">

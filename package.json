@@ -86,7 +86,7 @@
     "@types/date-fns": "^2.6.3",
     "@types/exceljs": "^0.5.3",
     "@types/jest": "^30.0.0",
-    "@types/node": "^20.19.2",
+    "@types/node": "^20.19.9",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@types/recharts": "^1.8.29",

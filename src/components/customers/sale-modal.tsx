@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SaleFormValues, StockItem } from "@/lib/types";
 import { format, parse, isValid } from "date-fns";
-import { CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
+import { CalendarIcon, Check, ChevronsUpDown, Receipt, ShoppingCart } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
@@ -29,6 +29,11 @@ enum SaleType {
   MANUAL = 'manual',
 }
 
+enum InvoiceType {
+  NORMAL = 'normal',
+  INVOICE = 'invoice',
+}
+
 export function SaleModal({
   isOpen,
   onClose,
@@ -39,29 +44,21 @@ export function SaleModal({
 }: SaleModalProps) {
   const [openCombobox, setOpenCombobox] = React.useState(false)
   const [saleType, setSaleType] = React.useState<SaleType>(SaleType.STOCK);
+  const [invoiceType, setInvoiceType] = React.useState<InvoiceType>(InvoiceType.NORMAL);
+  const [showTypeSelection, setShowTypeSelection] = React.useState(true);
+  const [invoiceFile, setInvoiceFile] = React.useState<File | null>(null);
 
-  // Otomatik tutar hesaplama (KDV dahil)
+  // Otomatik tutar hesaplama
   React.useEffect(() => {
     const quantity = parseFloat(formValues.quantity as any);
     const unitPrice = parseFloat(formValues.unitPrice as any);
-    const taxRate = parseFloat((formValues as any).taxRate || '0');
-    
     if (!isNaN(quantity) && !isNaN(unitPrice)) {
-      const subtotal = quantity * unitPrice;
-      const taxAmount = (subtotal * taxRate) / 100;
-      const total = subtotal + taxAmount;
-      
-      const calculated = total.toFixed(2);
+      const calculated = (quantity * unitPrice).toFixed(2);
       if (formValues.amount !== calculated) {
-        setFormValues(prev => ({ 
-          ...prev, 
-          amount: calculated,
-          taxAmount: taxAmount.toFixed(2),
-          subtotal: subtotal.toFixed(2)
-        }));
+        setFormValues(prev => ({ ...prev, amount: calculated }));
       }
     }
-  }, [formValues.quantity, formValues.unitPrice, (formValues as any).taxRate]);
+  }, [formValues.quantity, formValues.unitPrice]);
 
   // Tarih inputu için değişiklik:
   // Eğer formValues.dateInput yoksa, date'ten otomatik doldur
@@ -104,9 +101,8 @@ export function SaleModal({
         ...formValues,
         amountNumber: parseFloat(String(formValues.amount).replace(',', '.')),
         unitPriceNumber: formValues.unitPrice !== undefined ? parseFloat(String(formValues.unitPrice).replace(',', '.')) : undefined,
-        taxRate: parseFloat((formValues as any).taxRate || '0'),
-        taxAmount: parseFloat((formValues as any).taxAmount || '0'),
-        subtotal: parseFloat((formValues as any).subtotal || '0'),
+        invoiceType: invoiceType,
+        invoiceFile: invoiceFile,
       };
       await onSubmit(submitValues);
     } catch (error) {
@@ -114,12 +110,64 @@ export function SaleModal({
     }
   };
 
+  const handleTypeSelection = (type: InvoiceType) => {
+    setInvoiceType(type);
+    setShowTypeSelection(false);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type === 'application/pdf') {
+      setInvoiceFile(file);
+    } else {
+      alert('Lütfen sadece PDF dosyası yükleyin.');
+    }
+  };
+
+  if (showTypeSelection) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Satış Türü Seçin</DialogTitle>
+            <DialogDescription>Hangi tür satış yapmak istiyorsunuz?</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Button 
+              onClick={() => handleTypeSelection(InvoiceType.NORMAL)}
+              className="h-20 flex flex-col items-center justify-center space-y-2"
+            >
+              <ShoppingCart className="h-8 w-8" />
+              <span>Normal Satış</span>
+              <span className="text-sm text-muted-foreground">Standart satış işlemi</span>
+            </Button>
+            <Button 
+              onClick={() => handleTypeSelection(InvoiceType.INVOICE)}
+              className="h-20 flex flex-col items-center justify-center space-y-2"
+            >
+              <Receipt className="h-8 w-8" />
+              <span>Faturalı Satış</span>
+              <span className="text-sm text-muted-foreground">KDV dahil, fatura yükleme</span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Satış Ekle</DialogTitle>
-          <DialogDescription>Yeni bir satış işlemi ekleyin veya mevcut bir satışı düzenleyin.</DialogDescription>
+          <DialogTitle>
+            {invoiceType === InvoiceType.INVOICE ? 'Faturalı Satış Ekle' : 'Satış Ekle'}
+          </DialogTitle>
+          <DialogDescription>
+            {invoiceType === InvoiceType.INVOICE 
+              ? 'KDV dahil faturalı satış işlemi ekleyin.' 
+              : 'Yeni bir satış işlemi ekleyin veya mevcut bir satışı düzenleyin.'
+            }
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4">
@@ -221,49 +269,44 @@ export function SaleModal({
               />
               <span className="text-xs text-muted-foreground">Negatif değer girebilirsiniz (devreden bakiye için).</span>
             </div>
+            {invoiceType === InvoiceType.INVOICE && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="taxRate">KDV Oranı (%)</Label>
+                  <Select 
+                    value={(formValues as any).taxRate || '18'} 
+                    onValueChange={(value) => setFormValues(prev => ({ ...prev, taxRate: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="KDV oranı seçin..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">%0 (KDV Yok)</SelectItem>
+                      <SelectItem value="1">%1</SelectItem>
+                      <SelectItem value="8">%8</SelectItem>
+                      <SelectItem value="10">%10</SelectItem>
+                      <SelectItem value="18">%18</SelectItem>
+                      <SelectItem value="20">%20</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="invoiceFile">Fatura Dosyası (PDF)</Label>
+                  <Input
+                    id="invoiceFile"
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileUpload}
+                    required
+                  />
+                  <span className="text-xs text-muted-foreground">Sadece PDF dosyası yükleyebilirsiniz.</span>
+                </div>
+              </>
+            )}
             <div className="grid gap-2">
-              <Label htmlFor="taxRate">KDV Oranı (%)</Label>
-              <Select 
-                value={(formValues as any).taxRate || '0'} 
-                onValueChange={(value) => setFormValues(prev => ({ ...prev, taxRate: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="KDV oranı seçin..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">%0 (KDV Yok)</SelectItem>
-                  <SelectItem value="1">%1</SelectItem>
-                  <SelectItem value="8">%8</SelectItem>
-                  <SelectItem value="10">%10</SelectItem>
-                  <SelectItem value="18">%18</SelectItem>
-                  <SelectItem value="20">%20</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="subtotal">Ara Toplam</Label>
-              <Input
-                id="subtotal"
-                type="number"
-                step="0.01"
-                value={(formValues as any).subtotal || '0.00'}
-                readOnly
-                className="bg-gray-50"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="taxAmount">KDV Tutarı</Label>
-              <Input
-                id="taxAmount"
-                type="number"
-                step="0.01"
-                value={(formValues as any).taxAmount || '0.00'}
-                readOnly
-                className="bg-gray-50"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="amount">Toplam Tutar (KDV Dahil)</Label>
+              <Label htmlFor="amount">
+                {invoiceType === InvoiceType.INVOICE ? 'Toplam Tutar (KDV Dahil)' : 'Tutar'}
+              </Label>
               <Input
                 id="amount"
                 type="number"
