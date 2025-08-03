@@ -14,6 +14,8 @@ import {
 } from "@/lib/storage";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -34,8 +36,24 @@ import {
 
 import { CostList } from "@/components/costs/cost-list";
 import { CostForm } from "@/components/costs/cost-form";
-import { PlusCircle, ClipboardList, Loader2 } from "lucide-react";
+import { PlusCircle, ClipboardList, Loader2, TrendingUp, Building, BarChart3 } from "lucide-react";
 import BackToHomeButton from '@/components/common/back-to-home-button';
+
+interface ProfitMarginData {
+  productName: string;
+  revenue: number;
+  cost: number;
+  profit: number;
+  margin: number;
+}
+
+interface CostCenterData {
+  department: string;
+  totalCost: number;
+  budget: number;
+  variance: number;
+  percentage: number;
+}
 
 export default function CostsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -48,6 +66,22 @@ export default function CostsPage() {
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingCost, setEditingCost] = useState<Cost | undefined>(undefined);
   const [deletingCostId, setDeletingCostId] = useState<string | null>(null);
+
+  // Mock data for profit margin analysis
+  const profitMarginData: ProfitMarginData[] = [
+    { productName: "Ürün A", revenue: 50000, cost: 35000, profit: 15000, margin: 30 },
+    { productName: "Ürün B", revenue: 75000, cost: 45000, profit: 30000, margin: 40 },
+    { productName: "Ürün C", revenue: 30000, cost: 25000, profit: 5000, margin: 16.7 },
+    { productName: "Ürün D", revenue: 45000, cost: 40000, profit: 5000, margin: 11.1 }
+  ];
+
+  // Mock data for cost centers
+  const costCenterData: CostCenterData[] = [
+    { department: "Satış", totalCost: 25000, budget: 30000, variance: -5000, percentage: 83.3 },
+    { department: "Üretim", totalCost: 45000, budget: 40000, variance: 5000, percentage: 112.5 },
+    { department: "Pazarlama", totalCost: 15000, budget: 20000, variance: -5000, percentage: 75 },
+    { department: "İdari", totalCost: 20000, budget: 18000, variance: 2000, percentage: 111.1 }
+  ];
 
   const loadCosts = useCallback(async () => {
     if (!user) return;
@@ -159,13 +193,116 @@ export default function CostsPage() {
           </Button>
         </div>
         
-        {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        ) : (
-          <CostList items={costs} onEdit={openEditModal} onDelete={setDeletingCostId} />
-        )}
+        <Tabs defaultValue="costs" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="costs">Maliyetler</TabsTrigger>
+            <TabsTrigger value="profit-margin">Kâr Marjı</TabsTrigger>
+            <TabsTrigger value="cost-centers">Maliyet Merkezleri</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="costs" className="space-y-4">
+            {isLoading ? (
+              <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
+              <CostList items={costs} onEdit={openEditModal} onDelete={setDeletingCostId} />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="profit-margin" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <TrendingUp className="mr-2 h-5 w-5" />
+                  Kâr Marjı Analizi
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {profitMarginData.map((item, index) => (
+                    <div key={index} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium">{item.productName}</h3>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          item.margin > 25 ? 'bg-green-100 text-green-800' :
+                          item.margin > 15 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          %{item.margin.toFixed(1)}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Gelir:</span>
+                          <div className="font-medium">₺{item.revenue.toLocaleString()}</div>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Maliyet:</span>
+                          <div className="font-medium">₺{item.cost.toLocaleString()}</div>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Kâr:</span>
+                          <div className="font-medium text-green-600">₺{item.profit.toLocaleString()}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="cost-centers" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Building className="mr-2 h-5 w-5" />
+                  Maliyet Merkezi Analizi
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {costCenterData.map((item, index) => (
+                    <div key={index} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <h3 className="font-medium">{item.department}</h3>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          item.variance < 0 ? 'bg-green-100 text-green-800' :
+                          item.variance > 0 ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {item.variance > 0 ? '+' : ''}₺{item.variance.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Toplam Maliyet:</span>
+                          <span className="font-medium">₺{item.totalCost.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Bütçe:</span>
+                          <span className="font-medium">₺{item.budget.toLocaleString()}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full ${
+                              item.percentage > 100 ? 'bg-red-500' : 'bg-green-500'
+                            }`}
+                            style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-muted-foreground text-center">
+                          Bütçe kullanımı: %{item.percentage.toFixed(1)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         <Dialog open={showFormModal} onOpenChange={(isOpen) => {
           if (!isOpen) setEditingCost(undefined);
