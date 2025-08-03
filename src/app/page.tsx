@@ -2,7 +2,7 @@
 // src/app/page.tsx
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Truck, Settings, Calculator, AreaChart, CheckSquare, Briefcase, FolderArchive, LinkIcon, Package, FileText, ReceiptText, Search, BarChart3, TrendingUp, DollarSign, ClipboardList, ShoppingCart } from 'lucide-react';
+import { Users, Truck, Settings, Calculator, AreaChart, CheckSquare, Briefcase, FolderArchive, LinkIcon, Package, FileText, ReceiptText, Search, BarChart3, TrendingUp, DollarSign, ClipboardList, ShoppingCart, Brain, Database, Bot } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import React, { useEffect, useState } from 'react';
 
@@ -34,7 +34,7 @@ const navItems = [
   {
     href: '/costs',
     label: 'Maliyet Yönetimi',
-    description: 'Genel gider ve maliyetlerinizi yönetin.',
+    description: 'Kâr marjı analizi ve maliyet merkezi yönetimi.',
     icon: <ClipboardList className="h-8 w-8 mb-2 text-primary" />,
   },
   {
@@ -48,6 +48,30 @@ const navItems = [
     label: 'Raporlar',
     description: 'Finansal özetlerinizi görüntüleyin.',
     icon: <AreaChart className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
+    href: '/business-intelligence',
+    label: 'İş Zekası',
+    description: 'Dashboard widgetları ve KPI takibi.',
+    icon: <Brain className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
+    href: '/data-mining',
+    label: 'Veri Madenciliği',
+    description: 'Müşteri davranış analizi ve tahminleme.',
+    icon: <Database className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
+    href: '/ai',
+    label: 'AI Yapay Zeka',
+    description: 'Otomatik işlemler ve akıllı özellikler.',
+    icon: <Bot className="h-8 w-8 mb-2 text-primary" />,
+  },
+  {
+    href: '/exchange-rates',
+    label: 'Döviz Kurları',
+    description: 'Güncel kur bilgileri ve döviz çevirici.',
+    icon: <DollarSign className="h-8 w-8 mb-2 text-primary" />,
   },
   {
     href: '/portfolio',
@@ -133,7 +157,7 @@ export default function HomePage() {
             Çıkış Yap
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-8">
           {navItems.map((item) => (
             <Link href={item.href} key={item.label} passHref>
               <Card className="hover:shadow-lg transition-shadow duration-300 ease-in-out cursor-pointer h-full flex flex-col justify-between text-center bg-card hover:bg-accent/10">
