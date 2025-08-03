@@ -119,6 +119,9 @@ export type SaleFormValues = {
   quantity?: string;
   unitPrice?: string;
   dateInput?: string; // Klavyeden tarih girerken geçici string alan
+  taxRate?: string; // KDV oranı
+  taxAmount?: string; // KDV tutarı
+  subtotal?: string; // Ara toplam
 };
 
 export interface PurchaseFormValues {
@@ -190,6 +193,9 @@ export interface Sale {
   stockItemId?: string | null;
   quantity?: number | null;
   unitPrice?: number | null;
+  taxRate?: number; // KDV oranı
+  taxAmount?: number; // KDV tutarı
+  subtotal?: number; // Ara toplam
   createdAt: string; // ISO 8601 format
   updatedAt: string; // ISO 8601 format
 }

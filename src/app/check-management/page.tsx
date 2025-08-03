@@ -60,13 +60,48 @@ export default function CheckManagementPage() {
     // Load checks from localStorage
     const savedChecks = localStorage.getItem('ermay_checks');
     if (savedChecks) {
-      setChecks(JSON.parse(savedChecks));
+      try {
+        const parsedChecks = JSON.parse(savedChecks);
+        console.log('Loaded checks:', parsedChecks);
+        setChecks(parsedChecks);
+      } catch (error) {
+        console.error('Error parsing checks:', error);
+        setChecks([]);
+      }
+    } else {
+      console.log('No checks found in localStorage');
+      setChecks([]);
     }
   }, []);
 
   const saveChecks = (newChecks: Check[]) => {
+    console.log('Saving checks:', newChecks);
     localStorage.setItem('ermay_checks', JSON.stringify(newChecks));
     setChecks(newChecks);
+  };
+
+  // Debug function to add sample data
+  const addSampleData = () => {
+    const sampleCheck: Check = {
+      id: crypto.randomUUID(),
+      checkNumber: 'CHK-2024001',
+      bankName: 'Örnek Banka',
+      branchName: 'Merkez Şube',
+      accountNumber: '1234567890',
+      amount: 5000,
+      issueDate: new Date(),
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      status: 'pending',
+      partyName: 'Örnek Müşteri',
+      partyType: 'customer',
+      description: 'Örnek çek'
+    };
+    
+    saveChecks([...checks, sampleCheck]);
+    toast({
+      title: "Örnek Veri Eklendi",
+      description: "Test için örnek çek eklendi.",
+    });
   };
 
   const handleAddCheck = () => {
@@ -203,178 +238,183 @@ export default function CheckManagementPage() {
       <BackToHomeButton />
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Çek Yönetimi</h2>
-        <Dialog open={showCheckModal} onOpenChange={setShowCheckModal}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { setEditingCheck(null); resetForm(); setShowCheckModal(true); }}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Yeni Çek
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>{editingCheck ? "Çek Düzenle" : "Yeni Çek Ekle"}</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="checkNumber">Çek Numarası</Label>
-                  <Input
-                    id="checkNumber"
-                    value={checkNumber}
-                    onChange={(e) => setCheckNumber(e.target.value)}
-                  />
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={addSampleData}>
+            Örnek Veri Ekle
+          </Button>
+          <Dialog open={showCheckModal} onOpenChange={setShowCheckModal}>
+            <DialogTrigger asChild>
+              <Button onClick={() => { setEditingCheck(null); resetForm(); setShowCheckModal(true); }}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Yeni Çek
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>{editingCheck ? "Çek Düzenle" : "Yeni Çek Ekle"}</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="checkNumber">Çek Numarası</Label>
+                    <Input
+                      id="checkNumber"
+                      value={checkNumber}
+                      onChange={(e) => setCheckNumber(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bankName">Banka Adı</Label>
+                    <Input
+                      id="bankName"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bankName">Banka Adı</Label>
-                  <Input
-                    id="bankName"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="branchName">Şube Adı</Label>
+                    <Input
+                      id="branchName"
+                      value={branchName}
+                      onChange={(e) => setBranchName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="accountNumber">Hesap Numarası</Label>
+                    <Input
+                      id="accountNumber"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="branchName">Şube Adı</Label>
-                  <Input
-                    id="branchName"
-                    value={branchName}
-                    onChange={(e) => setBranchName(e.target.value)}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Tutar</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Durum</Label>
+                    <Select value={status} onValueChange={(value: Check['status']) => setStatus(value)}>
+                      <SelectTrigger id="status">
+                        <SelectValue placeholder="Durum seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Beklemede</SelectItem>
+                        <SelectItem value="cleared">Tahsil Edildi</SelectItem>
+                        <SelectItem value="bounced">Karşılıksız</SelectItem>
+                        <SelectItem value="cancelled">İptal Edildi</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="accountNumber">Hesap Numarası</Label>
-                  <Input
-                    id="accountNumber"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Tutar</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Durum</Label>
-                  <Select value={status} onValueChange={(value: Check['status']) => setStatus(value)}>
-                    <SelectTrigger id="status">
-                      <SelectValue placeholder="Durum seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Beklemede</SelectItem>
-                      <SelectItem value="cleared">Tahsil Edildi</SelectItem>
-                      <SelectItem value="bounced">Karşılıksız</SelectItem>
-                      <SelectItem value="cancelled">İptal Edildi</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="issueDate">Keşide Tarihi</Label>
-                  <Input
-                    type="text"
-                    placeholder="gg.aa.yyyy"
-                    value={issueDateInput}
-                    onChange={e => {
-                      let val = e.target.value.replace(/\D/g, "");
-                      if (val.length > 8) val = val.slice(0, 8);
-                      if (val.length >= 5) val = val.replace(/(\d{2})(\d{2})(\d{0,4})/, "$1.$2.$3");
-                      else if (val.length >= 3) val = val.replace(/(\d{2})(\d{0,2})/, "$1.$2");
-                      setIssueDateInput(val);
-                      if (val.length === 10) {
-                        const parsed = parse(val, 'dd.MM.yyyy', new Date());
-                        if (isValid(parsed)) {
-                          setIssueDate(parsed);
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="issueDate">Keşide Tarihi</Label>
+                    <Input
+                      type="text"
+                      placeholder="gg.aa.yyyy"
+                      value={issueDateInput}
+                      onChange={e => {
+                        let val = e.target.value.replace(/\D/g, "");
+                        if (val.length > 8) val = val.slice(0, 8);
+                        if (val.length >= 5) val = val.replace(/(\d{2})(\d{2})(\d{0,4})/, "$1.$2.$3");
+                        else if (val.length >= 3) val = val.replace(/(\d{2})(\d{0,2})/, "$1.$2");
+                        setIssueDateInput(val);
+                        if (val.length === 10) {
+                          const parsed = parse(val, 'dd.MM.yyyy', new Date());
+                          if (isValid(parsed)) {
+                            setIssueDate(parsed);
+                          }
+                        } else {
+                          setIssueDate(undefined);
                         }
-                      } else {
-                        setIssueDate(undefined);
-                      }
-                    }}
-                    className="w-32 mt-2"
-                    maxLength={10}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dueDate">Vade Tarihi</Label>
-                  <Input
-                    type="text"
-                    placeholder="gg.aa.yyyy"
-                    value={dueDateInput}
-                    onChange={e => {
-                      let val = e.target.value.replace(/\D/g, "");
-                      if (val.length > 8) val = val.slice(0, 8);
-                      if (val.length >= 5) val = val.replace(/(\d{2})(\d{2})(\d{0,4})/, "$1.$2.$3");
-                      else if (val.length >= 3) val = val.replace(/(\d{2})(\d{0,2})/, "$1.$2");
-                      setDueDateInput(val);
-                      if (val.length === 10) {
-                        const parsed = parse(val, 'dd.MM.yyyy', new Date());
-                        if (isValid(parsed)) {
-                          setDueDate(parsed);
+                      }}
+                      className="w-32 mt-2"
+                      maxLength={10}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dueDate">Vade Tarihi</Label>
+                    <Input
+                      type="text"
+                      placeholder="gg.aa.yyyy"
+                      value={dueDateInput}
+                      onChange={e => {
+                        let val = e.target.value.replace(/\D/g, "");
+                        if (val.length > 8) val = val.slice(0, 8);
+                        if (val.length >= 5) val = val.replace(/(\d{2})(\d{2})(\d{0,4})/, "$1.$2.$3");
+                        else if (val.length >= 3) val = val.replace(/(\d{2})(\d{0,2})/, "$1.$2");
+                        setDueDateInput(val);
+                        if (val.length === 10) {
+                          const parsed = parse(val, 'dd.MM.yyyy', new Date());
+                          if (isValid(parsed)) {
+                            setDueDate(parsed);
+                          } else {
+                            setDueDate(undefined);
+                          }
                         } else {
                           setDueDate(undefined);
                         }
-                      } else {
-                        setDueDate(undefined);
-                      }
-                    }}
-                    className="w-32 mt-2"
-                    maxLength={10}
-                  />
+                      }}
+                      className="w-32 mt-2"
+                      maxLength={10}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="partyType">Taraf Tipi</Label>
-                  <Select value={partyType} onValueChange={(value: 'customer' | 'supplier') => setPartyType(value)}>
-                    <SelectTrigger id="partyType">
-                      <SelectValue placeholder="Taraf tipi seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="customer">Müşteri</SelectItem>
-                      <SelectItem value="supplier">Tedarikçi</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="partyType">Taraf Tipi</Label>
+                    <Select value={partyType} onValueChange={(value: 'customer' | 'supplier') => setPartyType(value)}>
+                      <SelectTrigger id="partyType">
+                        <SelectValue placeholder="Taraf tipi seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="customer">Müşteri</SelectItem>
+                        <SelectItem value="supplier">Tedarikçi</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="partyName">Taraf Adı</Label>
+                    <Input
+                      id="partyName"
+                      value={partyName}
+                      onChange={(e) => setPartyName(e.target.value)}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="partyName">Taraf Adı</Label>
+                  <Label htmlFor="description">Açıklama</Label>
                   <Input
-                    id="partyName"
-                    value={partyName}
-                    onChange={(e) => setPartyName(e.target.value)}
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Açıklama</Label>
-                <Input
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCheckModal(false)}>
-                İptal
-              </Button>
-              <Button onClick={editingCheck ? handleUpdateCheck : handleAddCheck}>
-                {editingCheck ? "Güncelle" : "Ekle"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCheckModal(false)}>
+                  İptal
+                </Button>
+                <Button onClick={editingCheck ? handleUpdateCheck : handleAddCheck}>
+                  {editingCheck ? "Güncelle" : "Ekle"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Çekler</CardTitle>
+          <CardTitle>Çekler ({checks.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-4">

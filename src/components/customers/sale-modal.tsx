@@ -40,17 +40,28 @@ export function SaleModal({
   const [openCombobox, setOpenCombobox] = React.useState(false)
   const [saleType, setSaleType] = React.useState<SaleType>(SaleType.STOCK);
 
-  // Otomatik tutar hesaplama
+  // Otomatik tutar hesaplama (KDV dahil)
   React.useEffect(() => {
     const quantity = parseFloat(formValues.quantity as any);
     const unitPrice = parseFloat(formValues.unitPrice as any);
+    const taxRate = parseFloat((formValues as any).taxRate || '0');
+    
     if (!isNaN(quantity) && !isNaN(unitPrice)) {
-      const calculated = (quantity * unitPrice).toFixed(2);
+      const subtotal = quantity * unitPrice;
+      const taxAmount = (subtotal * taxRate) / 100;
+      const total = subtotal + taxAmount;
+      
+      const calculated = total.toFixed(2);
       if (formValues.amount !== calculated) {
-        setFormValues(prev => ({ ...prev, amount: calculated }));
+        setFormValues(prev => ({ 
+          ...prev, 
+          amount: calculated,
+          taxAmount: taxAmount.toFixed(2),
+          subtotal: subtotal.toFixed(2)
+        }));
       }
     }
-  }, [formValues.quantity, formValues.unitPrice]);
+  }, [formValues.quantity, formValues.unitPrice, (formValues as any).taxRate]);
 
   // Tarih inputu için değişiklik:
   // Eğer formValues.dateInput yoksa, date'ten otomatik doldur
@@ -93,6 +104,9 @@ export function SaleModal({
         ...formValues,
         amountNumber: parseFloat(String(formValues.amount).replace(',', '.')),
         unitPriceNumber: formValues.unitPrice !== undefined ? parseFloat(String(formValues.unitPrice).replace(',', '.')) : undefined,
+        taxRate: parseFloat((formValues as any).taxRate || '0'),
+        taxAmount: parseFloat((formValues as any).taxAmount || '0'),
+        subtotal: parseFloat((formValues as any).subtotal || '0'),
       };
       await onSubmit(submitValues);
     } catch (error) {
@@ -208,7 +222,48 @@ export function SaleModal({
               <span className="text-xs text-muted-foreground">Negatif değer girebilirsiniz (devreden bakiye için).</span>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="amount">Tutar</Label>
+              <Label htmlFor="taxRate">KDV Oranı (%)</Label>
+              <Select 
+                value={(formValues as any).taxRate || '0'} 
+                onValueChange={(value) => setFormValues(prev => ({ ...prev, taxRate: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="KDV oranı seçin..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">%0 (KDV Yok)</SelectItem>
+                  <SelectItem value="1">%1</SelectItem>
+                  <SelectItem value="8">%8</SelectItem>
+                  <SelectItem value="10">%10</SelectItem>
+                  <SelectItem value="18">%18</SelectItem>
+                  <SelectItem value="20">%20</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="subtotal">Ara Toplam</Label>
+              <Input
+                id="subtotal"
+                type="number"
+                step="0.01"
+                value={(formValues as any).subtotal || '0.00'}
+                readOnly
+                className="bg-gray-50"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="taxAmount">KDV Tutarı</Label>
+              <Input
+                id="taxAmount"
+                type="number"
+                step="0.01"
+                value={(formValues as any).taxAmount || '0.00'}
+                readOnly
+                className="bg-gray-50"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="amount">Toplam Tutar (KDV Dahil)</Label>
               <Input
                 id="amount"
                 type="number"

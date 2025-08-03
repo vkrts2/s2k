@@ -107,6 +107,9 @@ export default function CustomerDetailPage() {
                     stockItemId: values.stockItemId || null,
                     quantity: !isNaN(qty) ? qty : null,
                     unitPrice: !isNaN(price) ? price : null,
+                    taxRate: parseFloat((values as any).taxRate || '0'),
+                    taxAmount: parseFloat((values as any).taxAmount || '0'),
+                    subtotal: parseFloat((values as any).subtotal || '0'),
                     updatedAt: new Date().toISOString()
                 };
                 const updatedSale = await storage.updateSale(user.uid, saleData);
@@ -125,6 +128,9 @@ export default function CustomerDetailPage() {
                   stockItemId: values.stockItemId || null,
                   quantity: !isNaN(qty) ? qty : null,
                   unitPrice: !isNaN(price) ? price : null,
+                  taxRate: parseFloat((values as any).taxRate || '0'),
+                  taxAmount: parseFloat((values as any).taxAmount || '0'),
+                  subtotal: parseFloat((values as any).subtotal || '0'),
                   category: 'satis',
                   tags: [],
                 };

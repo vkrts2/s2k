@@ -67,7 +67,17 @@ export default function QuotationsPage() {
     // Load quotations from localStorage
     const savedQuotations = localStorage.getItem('ermay_quotations');
     if (savedQuotations) {
-      setQuotations(JSON.parse(savedQuotations));
+      try {
+        const parsedQuotations = JSON.parse(savedQuotations);
+        console.log('Loaded quotations:', parsedQuotations);
+        setQuotations(parsedQuotations);
+      } catch (error) {
+        console.error('Error parsing quotations:', error);
+        setQuotations([]);
+      }
+    } else {
+      console.log('No quotations found in localStorage');
+      setQuotations([]);
     }
   }, []);
 
@@ -80,8 +90,48 @@ export default function QuotationsPage() {
   }, [user]);
 
   const saveQuotations = (newQuotations: Quotation[]) => {
+    console.log('Saving quotations:', newQuotations);
     localStorage.setItem('ermay_quotations', JSON.stringify(newQuotations));
     setQuotations(newQuotations);
+  };
+
+  // Debug function to add sample data
+  const addSampleData = () => {
+    const sampleQuotation: Quotation = {
+      id: crypto.randomUUID(),
+      quotationNumber: 'TQ-2024001',
+      customerName: 'Örnek Müşteri',
+      customerId: 'sample-customer',
+      date: new Date(),
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      status: 'draft',
+      totalAmount: 1000,
+      currency: 'TRY',
+      items: [
+        {
+          id: '1',
+          productName: 'Örnek Ürün',
+          quantity: 10,
+          unitPrice: 100,
+          total: 1000,
+          unit: 'adet',
+          taxRate: 18
+        }
+      ],
+      notes: 'Örnek fiyat teklifi',
+      subTotal: 847.46,
+      grandTotal: 1000,
+      taxRate: 18,
+      taxAmount: 152.54,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    saveQuotations([...quotations, sampleQuotation]);
+    toast({
+      title: "Örnek Veri Eklendi",
+      description: "Test için örnek fiyat teklifi eklendi.",
+    });
   };
 
   const handleAddQuotation = (formData: any) => {
@@ -207,48 +257,53 @@ export default function QuotationsPage() {
       <BackToHomeButton />
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Fiyat Teklifleri</h2>
-        <Dialog open={showQuotationModal} onOpenChange={setShowQuotationModal}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { setEditingQuotation(null); setShowQuotationModal(true); }}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Yeni Teklif
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-screen-md w-full max-h-[90vh] overflow-y-auto">
-            <DialogHeader className="sticky top-0 bg-background z-50 pb-4 border-b">
-              <DialogTitle>{editingQuotation ? "Teklif Düzenle" : "Yeni Teklif"}</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <QuotationForm
-                onSubmit={editingQuotation ? handleUpdateQuotation : handleAddQuotation}
-                initialData={editingQuotation ? {
-                  ...editingQuotation,
-                  date: typeof editingQuotation.date === 'string' ? editingQuotation.date : editingQuotation.date.toISOString(),
-                  validUntil: editingQuotation.validUntil ? (typeof editingQuotation.validUntil === 'string' ? editingQuotation.validUntil : editingQuotation.validUntil.toISOString()) : undefined,
-                  subTotal: editingQuotation.subTotal ?? 0,
-                  grandTotal: editingQuotation.grandTotal ?? 0,
-                  taxRate: editingQuotation.taxRate ?? 0,
-                  taxAmount: editingQuotation.taxAmount ?? 0,
-                  createdAt: editingQuotation.createdAt ?? new Date().toISOString(),
-                  updatedAt: editingQuotation.updatedAt ?? new Date().toISOString(),
-                  currency: ['TRY', 'USD', 'EUR'].includes(editingQuotation.currency) ? editingQuotation.currency as 'TRY' | 'USD' | 'EUR' : 'TRY',
-                  status: ['Taslak', 'Gönderildi', 'Kabul Edildi', 'Reddedildi', 'Süresi Doldu'].includes(editingQuotation.status) ? editingQuotation.status as 'Taslak' | 'Gönderildi' | 'Kabul Edildi' | 'Reddedildi' | 'Süresi Doldu' : 'Taslak',
-                  items: (editingQuotation.items as any[]).map(item => ({
-                    ...item,
-                    description: item.description || item.productName,
-                    taxRate: item.taxRate ?? 0,
-                  })),
-                } : undefined}
-                customers={portfolioCustomers}
-                className="w-full"
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={addSampleData}>
+            Örnek Veri Ekle
+          </Button>
+          <Dialog open={showQuotationModal} onOpenChange={setShowQuotationModal}>
+            <DialogTrigger asChild>
+              <Button onClick={() => { setEditingQuotation(null); setShowQuotationModal(true); }}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Yeni Teklif
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-screen-md w-full max-h-[90vh] overflow-y-auto">
+              <DialogHeader className="sticky top-0 bg-background z-50 pb-4 border-b">
+                <DialogTitle>{editingQuotation ? "Teklif Düzenle" : "Yeni Teklif"}</DialogTitle>
+              </DialogHeader>
+              <div className="py-4">
+                <QuotationForm
+                  onSubmit={editingQuotation ? handleUpdateQuotation : handleAddQuotation}
+                  initialData={editingQuotation ? {
+                    ...editingQuotation,
+                    date: typeof editingQuotation.date === 'string' ? editingQuotation.date : editingQuotation.date.toISOString(),
+                    validUntil: editingQuotation.validUntil ? (typeof editingQuotation.validUntil === 'string' ? editingQuotation.validUntil : editingQuotation.validUntil.toISOString()) : undefined,
+                    subTotal: editingQuotation.subTotal ?? 0,
+                    grandTotal: editingQuotation.grandTotal ?? 0,
+                    taxRate: editingQuotation.taxRate ?? 0,
+                    taxAmount: editingQuotation.taxAmount ?? 0,
+                    createdAt: editingQuotation.createdAt ?? new Date().toISOString(),
+                    updatedAt: editingQuotation.updatedAt ?? new Date().toISOString(),
+                    currency: ['TRY', 'USD', 'EUR'].includes(editingQuotation.currency) ? editingQuotation.currency as 'TRY' | 'USD' | 'EUR' : 'TRY',
+                    status: ['Taslak', 'Gönderildi', 'Kabul Edildi', 'Reddedildi', 'Süresi Doldu'].includes(editingQuotation.status) ? editingQuotation.status as 'Taslak' | 'Gönderildi' | 'Kabul Edildi' | 'Reddedildi' | 'Süresi Doldu' : 'Taslak',
+                    items: (editingQuotation.items as any[]).map(item => ({
+                      ...item,
+                      description: item.description || item.productName,
+                      taxRate: item.taxRate ?? 0,
+                    })),
+                  } : undefined}
+                  customers={portfolioCustomers}
+                  className="w-full"
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Teklifler</CardTitle>
+          <CardTitle>Teklifler ({quotations.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
