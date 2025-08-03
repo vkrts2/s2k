@@ -17,6 +17,12 @@ interface ExchangeRate {
   lastUpdate: string;
 }
 
+interface ApiResponse {
+  success: boolean;
+  rates: Record<string, number>;
+  timestamp: number;
+}
+
 export default function ExchangeRatesPage() {
   const { toast } = useToast();
   const [rates, setRates] = useState<ExchangeRate[]>([]);
@@ -28,6 +34,9 @@ export default function ExchangeRatesPage() {
     result: 0
   });
 
+  const API_KEY = '2809075e75b36c6b3b096151fd8201e4';
+  const API_BASE_URL = 'http://api.exchangerate.host';
+
   const currencies = [
     { code: 'TRY', name: 'Türk Lirası', symbol: '₺' },
     { code: 'USD', name: 'Amerikan Doları', symbol: '$' },
@@ -37,30 +46,57 @@ export default function ExchangeRatesPage() {
     { code: 'CHF', name: 'İsviçre Frangı', symbol: 'CHF' }
   ];
 
-  // Mock exchange rates (gerçek uygulamada API'den gelecek)
-  const mockRates: ExchangeRate[] = [
-    { currency: 'USD', rate: 32.45, change: 0.15, lastUpdate: new Date().toISOString() },
-    { currency: 'EUR', rate: 35.20, change: -0.08, lastUpdate: new Date().toISOString() },
-    { currency: 'GBP', rate: 41.30, change: 0.22, lastUpdate: new Date().toISOString() },
-    { currency: 'JPY', rate: 0.21, change: -0.01, lastUpdate: new Date().toISOString() },
-    { currency: 'CHF', rate: 36.80, change: 0.05, lastUpdate: new Date().toISOString() }
-  ];
-
-  useEffect(() => {
-    fetchRates();
-  }, []);
-
   const fetchRates = async () => {
     setLoading(true);
     try {
-      // Simüle edilmiş API çağrısı
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setRates(mockRates);
-      toast({
-        title: "Kurlar Güncellendi",
-        description: "Güncel döviz kurları yüklendi.",
-      });
+      // Gerçek API'den veri çek
+      const response = await fetch(`${API_BASE_URL}/latest?base=TRY&apikey=${API_KEY}`);
+      const data: ApiResponse = await response.json();
+
+      if (data.success) {
+        const exchangeRates: ExchangeRate[] = [
+          { 
+            currency: 'USD', 
+            rate: 1 / data.rates.USD, 
+            change: Math.random() * 2 - 1, // Mock değişim
+            lastUpdate: new Date(data.timestamp * 1000).toISOString() 
+          },
+          { 
+            currency: 'EUR', 
+            rate: 1 / data.rates.EUR, 
+            change: Math.random() * 2 - 1,
+            lastUpdate: new Date(data.timestamp * 1000).toISOString() 
+          },
+          { 
+            currency: 'GBP', 
+            rate: 1 / data.rates.GBP, 
+            change: Math.random() * 2 - 1,
+            lastUpdate: new Date(data.timestamp * 1000).toISOString() 
+          },
+          { 
+            currency: 'JPY', 
+            rate: 1 / data.rates.JPY, 
+            change: Math.random() * 2 - 1,
+            lastUpdate: new Date(data.timestamp * 1000).toISOString() 
+          },
+          { 
+            currency: 'CHF', 
+            rate: 1 / data.rates.CHF, 
+            change: Math.random() * 2 - 1,
+            lastUpdate: new Date(data.timestamp * 1000).toISOString() 
+          }
+        ];
+
+        setRates(exchangeRates);
+        toast({
+          title: "Kurlar Güncellendi",
+          description: "Güncel döviz kurları yüklendi.",
+        });
+      } else {
+        throw new Error('API yanıtı başarısız');
+      }
     } catch (error) {
+      console.error('API Error:', error);
       toast({
         title: "Hata",
         description: "Kurlar yüklenirken bir hata oluştu.",
@@ -71,23 +107,41 @@ export default function ExchangeRatesPage() {
     }
   };
 
-  const convertCurrency = () => {
+  const convertCurrency = async () => {
     if (converter.fromCurrency === converter.toCurrency) {
       setConverter(prev => ({ ...prev, result: prev.amount }));
       return;
     }
 
-    const fromRate = converter.fromCurrency === 'TRY' ? 1 : 
-      rates.find(r => r.currency === converter.fromCurrency)?.rate || 1;
-    const toRate = converter.toCurrency === 'TRY' ? 1 : 
-      rates.find(r => r.currency === converter.toCurrency)?.rate || 1;
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/convert?from=${converter.fromCurrency}&to=${converter.toCurrency}&amount=${converter.amount}&apikey=${API_KEY}`
+      );
+      const data = await response.json();
 
-    const result = (converter.amount * fromRate) / toRate;
-    setConverter(prev => ({ ...prev, result }));
+      if (data.success) {
+        setConverter(prev => ({ ...prev, result: data.result }));
+      } else {
+        throw new Error('Dönüştürme başarısız');
+      }
+    } catch (error) {
+      console.error('Conversion Error:', error);
+      toast({
+        title: "Hata",
+        description: "Para birimi dönüştürülürken bir hata oluştu.",
+        variant: "destructive",
+      });
+    }
   };
 
   useEffect(() => {
-    convertCurrency();
+    fetchRates();
+  }, []);
+
+  useEffect(() => {
+    if (converter.amount > 0) {
+      convertCurrency();
+    }
   }, [converter.fromCurrency, converter.toCurrency, converter.amount]);
 
   const formatCurrency = (amount: number, currency: string) => {

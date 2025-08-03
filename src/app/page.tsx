@@ -2,7 +2,7 @@
 // src/app/page.tsx
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Truck, Settings, Calculator, AreaChart, CheckSquare, Briefcase, FolderArchive, LinkIcon, Package, FileText, ReceiptText, Search, BarChart3, TrendingUp, DollarSign, ClipboardList, ShoppingCart, Brain, Database, Bot } from 'lucide-react';
+import { Users, Truck, Settings, Calculator, AreaChart, CheckSquare, Briefcase, FolderArchive, LinkIcon, Package, FileText, ReceiptText, Search, BarChart3, TrendingUp, DollarSign, ClipboardList, ShoppingCart, Brain } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import React, { useEffect, useState } from 'react';
 
@@ -54,18 +54,6 @@ const navItems = [
     label: 'İş Zekası',
     description: 'Dashboard widgetları ve KPI takibi.',
     icon: <Brain className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
-    href: '/data-mining',
-    label: 'Veri Madenciliği',
-    description: 'Müşteri davranış analizi ve tahminleme.',
-    icon: <Database className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
-    href: '/ai',
-    label: 'AI Yapay Zeka',
-    description: 'Otomatik işlemler ve akıllı özellikler.',
-    icon: <Bot className="h-8 w-8 mb-2 text-primary" />,
   },
   {
     href: '/exchange-rates',

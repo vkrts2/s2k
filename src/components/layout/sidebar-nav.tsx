@@ -17,8 +17,6 @@ import {
   ClipboardList,
   Brain,
   DollarSign,
-  Database,
-  Bot,
 } from "lucide-react";
 
 export function SidebarNav() {
@@ -95,26 +93,6 @@ export function SidebarNav() {
       >
         <Brain className="h-4 w-4" />
         İş Zekası
-      </Link>
-      <Link
-        href="/data-mining"
-        className={cn(
-          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-          pathname === "/data-mining" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-        )}
-      >
-        <Database className="h-4 w-4" />
-        Veri Madenciliği
-      </Link>
-      <Link
-        href="/ai"
-        className={cn(
-          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-          pathname === "/ai" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-        )}
-      >
-        <Bot className="h-4 w-4" />
-        AI Yapay Zeka
       </Link>
       <Link
         href="/exchange-rates"
