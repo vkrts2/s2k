@@ -56,12 +56,6 @@ const navItems = [
     icon: <Brain className="h-8 w-8 mb-2 text-primary" />,
   },
   {
-    href: '/exchange-rates',
-    label: 'Döviz Kurları',
-    description: 'Güncel kur bilgileri ve döviz çevirici.',
-    icon: <DollarSign className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
     href: '/portfolio',
     label: 'Portföy Listesi',
     description: 'Portföyünüzü yönetin ve takip edin.',

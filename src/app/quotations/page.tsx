@@ -211,7 +211,7 @@ export default function QuotationsPage() {
       createdAt: editingQuotation?.createdAt || now,
       updatedAt: now,
     };
-    const newQuotations = quotations.map(quotation =>
+    const newQuotations = quotations.map((quotation: Quotation) =>
       quotation.id === updatedQuotation.id ? updatedQuotation : quotation
     );
     if (!editingQuotation) {
@@ -227,7 +227,7 @@ export default function QuotationsPage() {
   };
 
   const handleDeleteQuotation = (quotationId: string) => {
-    const updatedQuotations = quotations.filter(quotation => quotation.id !== quotationId);
+    const updatedQuotations = quotations.filter((quotation: Quotation) => quotation.id !== quotationId);
     saveQuotations(updatedQuotations);
     toast({
       title: "Başarılı",
@@ -247,7 +247,7 @@ export default function QuotationsPage() {
     window.open(`/quotations/${quotation.id}/print?data=${data}`, '_blank');
   };
 
-  const filteredQuotations = quotations.filter(quotation =>
+  const filteredQuotations = quotations.filter((quotation: Quotation) =>
     quotation.quotationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
     quotation.customerName.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -310,7 +310,7 @@ export default function QuotationsPage() {
             <Input
               placeholder="Teklif ara..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
             />
           </div>
           <div className="rounded-md border">
@@ -327,7 +327,7 @@ export default function QuotationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredQuotations.map((quotation) => (
+                {filteredQuotations.map((quotation: Quotation) => (
                   <TableRow key={quotation.id}>
                     <TableCell>{quotation.quotationNumber}</TableCell>
                     <TableCell>{quotation.customerName}</TableCell>

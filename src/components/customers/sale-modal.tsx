@@ -135,19 +135,23 @@ export function SaleModal({
           <div className="grid gap-4 py-4">
             <Button 
               onClick={() => handleTypeSelection(InvoiceType.NORMAL)}
-              className="h-20 flex flex-col items-center justify-center space-y-2"
+              className="h-24 flex flex-col items-center justify-center gap-2 p-4"
             >
-              <ShoppingCart className="h-8 w-8" />
-              <span>Normal Satış</span>
-              <span className="text-sm text-muted-foreground">Standart satış işlemi</span>
+              <ShoppingCart className="h-6 w-6" />
+              <div className="flex flex-col items-center">
+                <span className="font-medium">Normal Satış</span>
+                <span className="text-xs text-white/90">Standart satış işlemi</span>
+              </div>
             </Button>
             <Button 
               onClick={() => handleTypeSelection(InvoiceType.INVOICE)}
-              className="h-20 flex flex-col items-center justify-center space-y-2"
+              className="h-24 flex flex-col items-center justify-center gap-2 p-4"
             >
-              <Receipt className="h-8 w-8" />
-              <span>Faturalı Satış</span>
-              <span className="text-sm text-muted-foreground">KDV dahil, fatura yükleme</span>
+              <Receipt className="h-6 w-6" />
+              <div className="flex flex-col items-center">
+                <span className="font-medium">Faturalı Satış</span>
+                <span className="text-xs text-white/90">KDV dahil, fatura yükleme</span>
+              </div>
             </Button>
           </div>
         </DialogContent>

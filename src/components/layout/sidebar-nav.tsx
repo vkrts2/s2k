@@ -95,16 +95,6 @@ export function SidebarNav() {
         İş Zekası
       </Link>
       <Link
-        href="/exchange-rates"
-        className={cn(
-          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-          pathname === "/exchange-rates" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-        )}
-      >
-        <DollarSign className="h-4 w-4" />
-        Döviz Kurları
-      </Link>
-      <Link
         href="/suppliers"
         className={cn(
           "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
