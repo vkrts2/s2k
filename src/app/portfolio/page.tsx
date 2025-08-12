@@ -24,6 +24,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, Form } from "@/components/ui/form";
+import { fetchProvinces, fetchDistrictsByProvince, fetchTaxOfficesByCity } from "@/lib/turkey";
 
 const ALL_CITIES_VALUE = "all";
 const ALL_SECTORS_VALUE = "all";
@@ -400,6 +401,26 @@ export function PortfolioForm({ initialData, onSubmit }: { initialData?: Portfol
     },
   });
 
+  // Türkiye il/ilçe/vergi dairesi state'leri
+  const [provinces, setProvinces] = React.useState<string[]>([]);
+  const [districts, setDistricts] = React.useState<string[]>([]);
+  const [taxOffices, setTaxOffices] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    fetchProvinces().then((list) => { if (mounted) setProvinces(list.map(p => p.name)); });
+    return () => { mounted = false; };
+  }, []);
+
+  const selectedCity = form.watch("city") || "";
+  React.useEffect(() => {
+    let mounted = true;
+    if (!selectedCity) { setDistricts([]); setTaxOffices([]); return; }
+    fetchDistrictsByProvince(selectedCity).then((d) => { if (mounted) setDistricts(d); });
+    fetchTaxOfficesByCity(selectedCity).then((o) => { if (mounted) setTaxOffices(o); });
+    form.setValue("district", "");
+    return () => { mounted = false; };
+  }, [selectedCity]);
   // Form reset işlemi için useEffect
   React.useEffect(() => {
     if (initialData) {
@@ -503,14 +524,28 @@ export function PortfolioForm({ initialData, onSubmit }: { initialData?: Portfol
         <FormField control={form.control} name="city" render={({ field }) => (
           <FormItem>
             <FormLabel>İl</FormLabel>
-            <FormControl><Input placeholder="İl adı" {...field} /></FormControl>
+            <Select value={field.value || ""} onValueChange={(v) => field.onChange(v)}>
+              <FormControl>
+                <SelectTrigger><SelectValue placeholder="İl seçin" /></SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {provinces.map((p) => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
+              </SelectContent>
+            </Select>
             <FormMessage />
           </FormItem>
         )} />
         <FormField control={form.control} name="district" render={({ field }) => (
           <FormItem>
             <FormLabel>İlçe</FormLabel>
-            <FormControl><Input placeholder="İlçe adı" {...field} /></FormControl>
+            <Select value={field.value || ""} onValueChange={(v) => field.onChange(v)} disabled={!selectedCity}>
+              <FormControl>
+                <SelectTrigger><SelectValue placeholder={selectedCity ? "İlçe seçin" : "Önce il seçin"} /></SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {districts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+              </SelectContent>
+            </Select>
             <FormMessage />
           </FormItem>
         )} />

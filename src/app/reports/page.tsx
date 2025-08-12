@@ -14,6 +14,7 @@ import { tr } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import BackToHomeButton from '@/components/common/back-to-home-button';
 
 interface MonthlyData {
   month: string;
@@ -155,6 +156,7 @@ const ReportsPage = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-8">
+      <BackToHomeButton />
       <h1 className="text-3xl font-bold">Genel Raporlar</h1>
       
       {/* Financial Summary Cards */}

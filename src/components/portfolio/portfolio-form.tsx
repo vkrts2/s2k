@@ -1,7 +1,7 @@
 // src/components/portfolio/portfolio-form.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -24,9 +24,10 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
-import type { PortfolioItem, PortfolioSector } from "@/lib/types";
+import type { PortfolioItem } from "@/lib/types";
 import { portfolioSectors } from "@/lib/types";
 import { Save } from "lucide-react";
+import { fetchProvinces, fetchDistrictsByProvince } from "@/lib/turkey";
 
 const portfolioItemFormSchema = z.object({
   companyName: z.string().min(2, "Firma adı en az 2 karakter olmalıdır."),
@@ -38,6 +39,8 @@ const portfolioItemFormSchema = z.object({
   district: z.string().optional(),
   sector: z.string().min(2, "Sektör en az 2 karakter olmalı"),
   notes: z.string().optional(),
+  taxOffice: z.string().optional(),
+  taxId: z.string().optional(),
 });
 
 type PortfolioItemFormValues = z.infer<typeof portfolioItemFormSchema>;
@@ -48,11 +51,7 @@ interface PortfolioFormProps {
   className?: string;
 }
 
-export function PortfolioForm({
-  onSubmit,
-  initialData,
-  className,
-}: PortfolioFormProps) {
+export function PortfolioForm({ onSubmit, initialData, className }: PortfolioFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const defaultValues: Partial<PortfolioItemFormValues> = initialData
@@ -66,6 +65,8 @@ export function PortfolioForm({
         district: initialData.district || "",
         sector: initialData.sector,
         notes: initialData.notes || "",
+        taxOffice: initialData.taxOffice || "",
+        taxId: initialData.taxId || "",
       }
     : {
         companyName: "",
@@ -77,6 +78,8 @@ export function PortfolioForm({
         district: "",
         sector: portfolioSectors[0],
         notes: "",
+        taxOffice: "",
+        taxId: "",
       };
 
   const form = useForm<PortfolioItemFormValues>({
@@ -85,12 +88,34 @@ export function PortfolioForm({
     mode: "onChange",
   });
 
+  // İl/İlçe verileri
+  const [provinces, setProvinces] = useState<string[]>([]);
+  const [districts, setDistricts] = useState<string[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchProvinces().then((list) => {
+      if (!mounted) return;
+      setProvinces(list.map((p) => p.name));
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  const selectedCity = form.watch("city") || "";
+  useEffect(() => {
+    let mounted = true;
+    if (!selectedCity) {
+      setDistricts([]);
+      return;
+    }
+    fetchDistrictsByProvince(selectedCity).then((d) => { if (mounted) setDistricts(d); });
+    form.setValue("district", "");
+    return () => { mounted = false; };
+  }, [selectedCity, form]);
+
   const handleSubmit = async (data: PortfolioItemFormValues) => {
     setIsSubmitting(true);
-    const portfolioDataToSubmit = initialData
-      ? { ...initialData, ...data }
-      : data;
-    
+    const portfolioDataToSubmit = initialData ? { ...initialData, ...data } : data;
     try {
       await onSubmit(portfolioDataToSubmit);
       if (!initialData) {
@@ -105,127 +130,121 @@ export function PortfolioForm({
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(handleSubmit)}
-        className={cn("space-y-4 max-w-md mx-auto w-full", className)}
-      >
-        <FormField
-          control={form.control}
-          name="companyName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Firma İsmi</FormLabel>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-4 max-w-md mx-auto w-full", className)}>
+        <FormField control={form.control} name="companyName" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Firma İsmi</FormLabel>
+            <FormControl><Input placeholder="Firma adı girin" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="phone" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Telefon Numarası</FormLabel>
+            <FormControl><Input placeholder="Telefon numarası" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="email" render={({ field }) => (
+          <FormItem>
+            <FormLabel>E-posta Adresi</FormLabel>
+            <FormControl><Input placeholder="E-posta adresi" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="website" render={({ field }) => (
+          <FormItem>
+            <FormLabel>İnternet Sitesi</FormLabel>
+            <FormControl><Input placeholder="https://firma.com" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="address" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Adres</FormLabel>
+            <FormControl><Textarea placeholder="Firma adresi" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="sector" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Sektör</FormLabel>
+            <FormControl><Input placeholder="Sektör girin" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        {/* İl seçimi */}
+        <FormField control={form.control} name="city" render={({ field }) => (
+          <FormItem>
+            <FormLabel>İl</FormLabel>
+            <Select value={field.value || ""} onValueChange={(v) => field.onChange(v)}>
               <FormControl>
-                <Input placeholder="Firma adı girin" {...field} />
+                <SelectTrigger>
+                  <SelectValue placeholder="İl seçin" />
+                </SelectTrigger>
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Telefon Numarası</FormLabel>
+              <SelectContent>
+                {provinces.map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        {/* İlçe seçimi */}
+        <FormField control={form.control} name="district" render={({ field }) => (
+          <FormItem>
+            <FormLabel>İlçe</FormLabel>
+            <Select value={field.value || ""} onValueChange={(v) => field.onChange(v)} disabled={!selectedCity}>
               <FormControl>
-                <Input placeholder="Telefon numarası" {...field} />
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedCity ? "İlçe seçin" : "Önce il seçin"} />
+                </SelectTrigger>
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>E-posta Adresi</FormLabel>
-              <FormControl>
-                <Input placeholder="E-posta adresi" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="website"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>İnternet Sitesi</FormLabel>
-              <FormControl>
-                <Input placeholder="https://firma.com" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="address"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Adres</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Firma adresi" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="sector"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Sektör</FormLabel>
-              <FormControl>
-                <Input placeholder="Sektör girin" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="city"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>İl</FormLabel>
-              <FormControl>
-                <Input placeholder="İl adı" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="district"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>İlçe</FormLabel>
-              <FormControl>
-                <Input placeholder="İlçe adı" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notlar</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Bu portföy kaydıyla ilgili ek notlar..." {...field} rows={3} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+              <SelectContent>
+                {districts.map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        {/* Vergi dairesi: basit metin alanı */}
+        <FormField control={form.control} name="taxOffice" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Vergi Dairesi</FormLabel>
+            <FormControl><Input placeholder="Vergi Dairesi" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        {/* VKN */}
+        <FormField control={form.control} name="taxId" render={({ field }) => (
+          <FormItem>
+            <FormLabel>VKN/TCKN</FormLabel>
+            <FormControl><Input placeholder="Vergi/TC Kimlik No" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="notes" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Notlar</FormLabel>
+            <FormControl><Textarea placeholder="Bu portföy kaydıyla ilgili ek notlar..." {...field} rows={3} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
         <div className="flex justify-end pt-2">
           <Button type="submit" disabled={isSubmitting}>
             <Save className="mr-2 h-4 w-4" />

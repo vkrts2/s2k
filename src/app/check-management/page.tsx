@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Edit, Trash2, CalendarIcon } from 'lucide-react';
+import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { format, parse, isValid } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -16,30 +16,22 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import BackToHomeButton from '@/components/common/back-to-home-button';
+import { useAuth } from '@/contexts/AuthContext';
+import type { BankCheck } from '@/lib/types';
+import { getChecks, addCheck as addCheckToDb, updateCheck as updateCheckInDb, deleteCheck as deleteCheckFromDb } from '@/lib/storage';
 
-interface Check {
-  id: string;
-  checkNumber: string;
-  bankName: string;
-  branchName: string;
-  accountNumber: string;
-  amount: number;
-  issueDate: Date;
-  dueDate: Date;
-  status: 'pending' | 'cleared' | 'bounced' | 'cancelled';
-  partyName: string;
-  partyType: 'customer' | 'supplier';
-  description?: string;
-}
+type Check = BankCheck;
 
 export default function CheckManagementPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [checks, setChecks] = useState<Check[]>([]);
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [editingCheck, setEditingCheck] = useState<Check | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [checkIdToDelete, setCheckIdToDelete] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Form state
   const [checkNumber, setCheckNumber] = useState("");
@@ -56,28 +48,121 @@ export default function CheckManagementPage() {
   const [issueDateInput, setIssueDateInput] = useState('');
   const [dueDateInput, setDueDateInput] = useState('');
 
-  useEffect(() => {
-    // Load checks from localStorage
-    const savedChecks = localStorage.getItem('ermay_checks');
-    if (savedChecks) {
-      try {
-        const parsedChecks = JSON.parse(savedChecks);
-        console.log('Loaded checks:', parsedChecks);
-        setChecks(parsedChecks);
-      } catch (error) {
-        console.error('Error parsing checks:', error);
-        setChecks([]);
-      }
-    } else {
-      console.log('No checks found in localStorage');
-      setChecks([]);
-    }
-  }, []);
+  const refresh = async () => {
+    if (!user) return;
+    const list = await getChecks(user.uid);
+    setChecks(list);
+  };
 
-  const saveChecks = (newChecks: Check[]) => {
-    console.log('Saving checks:', newChecks);
-    localStorage.setItem('ermay_checks', JSON.stringify(newChecks));
-    setChecks(newChecks);
+  useEffect(() => {
+    if (!user) return;
+    // 1) Firestore'dan çek
+    refresh();
+
+    // 2) LocalStorage'ta eski kayıt varsa bir kez Firestore'a taşı
+    const MIGRATION_KEY = 'ermay_checks_migrated';
+    if (localStorage.getItem(MIGRATION_KEY) === '1') return;
+
+    try {
+      const savedChecks = localStorage.getItem('ermay_checks');
+      if (!savedChecks) return;
+      const parsed: any[] = JSON.parse(savedChecks);
+      if (!Array.isArray(parsed) || parsed.length === 0) return;
+
+      const toIso = (val: any) => {
+        if (!val) return new Date().toISOString();
+        try { return new Date(val).toISOString(); } catch { return new Date().toISOString(); }
+      };
+
+      const migrate = async () => {
+        for (const c of parsed) {
+          const payload: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'> = {
+            checkNumber: String(c.checkNumber || ''),
+            bankName: String(c.bankName || ''),
+            branchName: c.branchName ? String(c.branchName) : undefined,
+            accountNumber: c.accountNumber ? String(c.accountNumber) : undefined,
+            amount: Number(c.amount) || 0,
+            issueDate: toIso(c.issueDate),
+            dueDate: toIso(c.dueDate),
+            status: (c.status as any) || 'pending',
+            partyName: String(c.partyName || ''),
+            partyType: (c.partyType === 'supplier' ? 'supplier' : 'customer'),
+            description: c.description ? String(c.description) : undefined,
+          };
+          await addCheckToDb(user.uid, payload);
+        }
+        localStorage.setItem(MIGRATION_KEY, '1');
+        await refresh();
+        toast({ title: 'Eski çek verileri aktarıldı', description: 'LocalStorage kayıtları Firestore\'a taşındı.' });
+      };
+
+      migrate();
+    } catch (e) {
+      console.error('Check migration error', e);
+    }
+  }, [user]);
+
+  // LocalStorage ve JSON'dan içe aktarma
+  const normalizeToIso = (val: any) => {
+    if (!val) return new Date().toISOString();
+    try {
+      const d = typeof val === 'string' ? new Date(val) : val;
+      return new Date(d).toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  };
+
+  const importArrayToFirestore = async (arr: any[]) => {
+    if (!user) return;
+    for (const c of arr) {
+      const payload: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'> = {
+        checkNumber: String(c.checkNumber || ''),
+        bankName: String(c.bankName || ''),
+        branchName: c.branchName ? String(c.branchName) : undefined,
+        accountNumber: c.accountNumber ? String(c.accountNumber) : undefined,
+        amount: Number(c.amount) || 0,
+        issueDate: normalizeToIso(c.issueDate),
+        dueDate: normalizeToIso(c.dueDate),
+        status: (c.status as any) || 'pending',
+        partyName: String(c.partyName || ''),
+        partyType: (c.partyType === 'supplier' ? 'supplier' : 'customer'),
+        description: c.description ? String(c.description) : undefined,
+      };
+      await addCheckToDb(user.uid, payload);
+    }
+    await refresh();
+  };
+
+  const handleImportFromLocal = async () => {
+    try {
+      const raw = localStorage.getItem('ermay_checks');
+      if (!raw) {
+        toast({ title: 'Veri bulunamadı', description: 'Bu alan adında localStorage\'da eski çek verisi yok.' });
+        return;
+      }
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr) || arr.length === 0) {
+        toast({ title: 'Veri bulunamadı', description: 'LocalStorage\'da geçerli çek verisi yok.' });
+        return;
+      }
+      await importArrayToFirestore(arr);
+      toast({ title: 'İçe aktarıldı', description: 'LocalStorage\'daki çekler Firestore\'a aktarıldı.' });
+    } catch (e) {
+      toast({ title: 'Hata', description: 'İçe aktarma sırasında bir hata oluştu.', variant: 'destructive' });
+    }
+  };
+
+  const handleImportFromJson = async (file: File) => {
+    try {
+      const text = await file.text();
+      const arr = JSON.parse(text);
+      if (!Array.isArray(arr)) throw new Error('Geçersiz dosya');
+      await importArrayToFirestore(arr);
+      toast({ title: 'İçe aktarıldı', description: 'JSON dosyasından çekler aktarıldı.' });
+    } catch (e) {
+      toast({ title: 'Hata', description: 'JSON okuma/aktarma hatası.', variant: 'destructive' });
+    }
   };
 
   // Debug function to add sample data
@@ -97,14 +182,14 @@ export default function CheckManagementPage() {
       description: 'Örnek çek'
     };
     
-    saveChecks([...checks, sampleCheck]);
+    // saveChecks([...checks, sampleCheck]); // This line is removed as per the edit hint
     toast({
       title: "Örnek Veri Eklendi",
       description: "Test için örnek çek eklendi.",
     });
   };
 
-  const handleAddCheck = () => {
+  const handleAddCheck = async () => {
     if (!checkNumber || !bankName || !amount || !issueDate || !dueDate || !partyName) {
       toast({
         title: "Hata",
@@ -114,22 +199,22 @@ export default function CheckManagementPage() {
       return;
     }
 
-    const newCheck: Check = {
-      id: Date.now().toString(),
+    if (!user) return;
+    const payload: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'> = {
       checkNumber,
       bankName,
       branchName,
       accountNumber,
       amount: parseFloat(amount),
-      issueDate: issueDate,
-      dueDate: dueDate,
+      issueDate: (issueDate as Date).toISOString(),
+      dueDate: (dueDate as Date).toISOString(),
       status,
       partyName,
       partyType,
       description,
     };
-
-    saveChecks([...checks, newCheck]);
+    await addCheckToDb(user.uid, payload);
+    await refresh();
     setShowCheckModal(false);
     resetForm();
     toast({
@@ -155,29 +240,27 @@ export default function CheckManagementPage() {
     setDueDateInput(check.dueDate ? format(new Date(check.dueDate), 'dd.MM.yyyy') : '');
   };
 
-  const handleUpdateCheck = () => {
+  const handleUpdateCheck = async () => {
     if (!editingCheck) return;
-
-    const updatedChecks = checks.map(check =>
-      check.id === editingCheck.id
-        ? {
-            ...check,
-            checkNumber,
-            bankName,
-            branchName,
-            accountNumber,
-            amount: parseFloat(amount),
-            issueDate: issueDate!,
-            dueDate: dueDate!,
-            status,
-            partyName,
-            partyType,
-            description,
-          }
-        : check
-    );
-
-    saveChecks(updatedChecks);
+    if (!user) return;
+    const updated: BankCheck = {
+      id: editingCheck.id,
+      checkNumber,
+      bankName,
+      branchName,
+      accountNumber,
+      amount: parseFloat(amount),
+      issueDate: (issueDate as Date).toISOString(),
+      dueDate: (dueDate as Date).toISOString(),
+      status,
+      partyName,
+      partyType,
+      description,
+      createdAt: editingCheck.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    await updateCheckInDb(user.uid, updated);
+    await refresh();
     setShowCheckModal(false);
     resetForm();
     toast({
@@ -191,10 +274,10 @@ export default function CheckManagementPage() {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDeleteCheck = () => {
-    if (!checkIdToDelete) return;
-    const updatedChecks = checks.filter(check => check.id !== checkIdToDelete);
-    saveChecks(updatedChecks);
+  const confirmDeleteCheck = async () => {
+    if (!checkIdToDelete || !user) return;
+    await deleteCheckFromDb(user.uid, checkIdToDelete);
+    await refresh();
     setDeleteDialogOpen(false);
     setCheckIdToDelete(null);
     toast({
@@ -239,9 +322,10 @@ export default function CheckManagementPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Çek Yönetimi</h2>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={addSampleData}>
-            Örnek Veri Ekle
-          </Button>
+          <Button variant="outline" onClick={addSampleData}>Örnek Veri Ekle</Button>
+          <Button variant="secondary" onClick={handleImportFromLocal}>Local'dan İçe Aktar</Button>
+          <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>JSON'dan İçe Aktar</Button>
+          <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFromJson(f); }} />
           <Dialog open={showCheckModal} onOpenChange={setShowCheckModal}>
             <DialogTrigger asChild>
               <Button onClick={() => { setEditingCheck(null); resetForm(); setShowCheckModal(true); }}>
@@ -442,7 +526,7 @@ export default function CheckManagementPage() {
                   <TableRow key={check.id}>
                     <TableCell>{check.checkNumber}</TableCell>
                     <TableCell>{check.bankName}</TableCell>
-                    <TableCell>{check.amount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</TableCell>
+                    <TableCell>{Number(check.amount).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</TableCell>
                     <TableCell>{format(new Date(check.dueDate), "dd.MM.yyyy", { locale: tr })}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs ${

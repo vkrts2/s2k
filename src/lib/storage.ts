@@ -4,6 +4,7 @@ import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, o
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { formatISO, parseISO, format, addDays } from 'date-fns';
 import type { Customer, Sale, Payment, Currency, Supplier, Purchase, PaymentToSupplier, TodoItem, PortfolioItem, ArchivedFile, UsefulLink, StockItem, Price, Quotation, QuotationItem, ContactHistoryItem, SupplierTask, Cost, Order, OrderItem } from "./types";
+import type { BankCheck } from "./types";
 // import { storeFileInDB, deleteFileFromDB } from './indexedDBStorage'; // Firebase Storage kullanılacaksa bu kısım değişecek
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -907,6 +908,38 @@ export const addUsefulLink = async (uid: string, linkData: Omit<UsefulLink, 'id'
 export const deleteUsefulLink = async (uid: string, linkId: string): Promise<void> => {
   const linkDocRef = doc(_getUserCollectionRef(uid, "usefulLinks"), linkId);
   await deleteDoc(linkDocRef);
+};
+
+// Check (Çek) Management Functions
+export const getChecks = async (uid: string): Promise<BankCheck[]> => {
+  if (!uid) return [];
+  try {
+    const q = query(_getUserCollectionRef(uid, "checks"), orderBy("dueDate", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as BankCheck));
+  } catch (e) {
+    console.error("Error fetching checks", e);
+    return [];
+  }
+};
+
+export const addCheck = async (uid: string, data: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'>): Promise<BankCheck> => {
+  const now = new Date().toISOString();
+  const payload: Omit<BankCheck, 'id'> = { ...data, createdAt: now, updatedAt: now };
+  const refDoc = await addDoc(_getUserCollectionRef(uid, "checks"), payload as any);
+  return { ...payload, id: refDoc.id } as BankCheck;
+};
+
+export const updateCheck = async (uid: string, data: BankCheck): Promise<BankCheck> => {
+  const docRef = doc(_getUserCollectionRef(uid, "checks"), data.id);
+  const payload = { ...data, updatedAt: new Date().toISOString() };
+  await updateDoc(docRef, payload as any);
+  return payload as BankCheck;
+};
+
+export const deleteCheck = async (uid: string, id: string): Promise<void> => {
+  const docRef = doc(_getUserCollectionRef(uid, "checks"), id);
+  await deleteDoc(docRef);
 };
 
 // Quotation Functions

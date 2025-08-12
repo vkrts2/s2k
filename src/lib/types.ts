@@ -440,3 +440,21 @@ export interface Order {
   createdAt?: string;
   updatedAt?: string;
 }
+
+// Yeni: Çek yönetimi tipi
+export interface BankCheck {
+  id: string;
+  checkNumber: string;
+  bankName: string;
+  branchName?: string;
+  accountNumber?: string;
+  amount: number;
+  issueDate: string; // ISO
+  dueDate: string; // ISO
+  status: 'pending' | 'cleared' | 'bounced' | 'cancelled';
+  partyName: string;
+  partyType: 'customer' | 'supplier';
+  description?: string;
+  createdAt?: string; // ISO
+  updatedAt?: string; // ISO
+}
