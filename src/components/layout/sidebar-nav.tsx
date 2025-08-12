@@ -6,17 +6,17 @@ import { cn } from "@/lib/utils";
 import {
   BarChart3,
   Users,
-  Package,
+  Truck,
+  ClipboardList,
   FileText,
   LineChart,
-  Truck,
+  Brain,
+  Calculator,
+  Package,
+  DollarSign,
   Archive,
-  ListTodo,
   Settings,
   Link2,
-  ClipboardList,
-  Brain,
-  DollarSign,
 } from "lucide-react";
 
 export function SidebarNav() {
@@ -45,14 +45,24 @@ export function SidebarNav() {
         Müşteriler
       </Link>
       <Link
-        href="/stock"
+        href="/suppliers"
         className={cn(
           "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-          pathname === "/stock" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+          pathname === "/suppliers" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
         )}
       >
-        <Package className="h-4 w-4" />
-        Stok Kalemleri
+        <Truck className="h-4 w-4" />
+        Tedarikçiler
+      </Link>
+      <Link
+        href="/orders"
+        className={cn(
+          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+          pathname === "/orders" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+        )}
+      >
+        <ClipboardList className="h-4 w-4" />
+        Sipariş Yönetimi
       </Link>
       <Link
         href="/quotations"
@@ -62,17 +72,7 @@ export function SidebarNav() {
         )}
       >
         <FileText className="h-4 w-4" />
-        Teklifler
-      </Link>
-      <Link
-        href="/costs"
-        className={cn(
-          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-          pathname === "/costs" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-        )}
-      >
-        <ClipboardList className="h-4 w-4" />
-        Maliyet Yönetimi
+        Fiyat Teklifleri
       </Link>
       <Link
         href="/reports"
@@ -95,14 +95,44 @@ export function SidebarNav() {
         İş Zekası
       </Link>
       <Link
-        href="/suppliers"
+        href="/calculator"
         className={cn(
           "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-          pathname === "/suppliers" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+          pathname === "/calculator" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
         )}
       >
-        <Truck className="h-4 w-4" />
-        Tedarikçiler
+        <Calculator className="h-4 w-4" />
+        Hesap Makinesi
+      </Link>
+      <Link
+        href="/portfolio"
+        className={cn(
+          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+          pathname === "/portfolio" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+        )}
+      >
+        <Package className="h-4 w-4" />
+        Portföy Listesi
+      </Link>
+      <Link
+        href="/costs"
+        className={cn(
+          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+          pathname === "/costs" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+        )}
+      >
+        <DollarSign className="h-4 w-4" />
+        Maliyet Yönetimi
+      </Link>
+      <Link
+        href="/check-management"
+        className={cn(
+          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
+          pathname === "/check-management" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+        )}
+      >
+        <ClipboardList className="h-4 w-4" />
+        Çek Yönetimi
       </Link>
       <Link
         href="/archive"
@@ -112,7 +142,7 @@ export function SidebarNav() {
         )}
       >
         <Archive className="h-4 w-4" />
-        Arşiv
+        Dosya Arşivi
       </Link>
       <Link
         href="/settings"

@@ -942,6 +942,21 @@ export const getChecks = async (uid: string): Promise<BankCheck[]> => {
   }
 };
 
+export const getCheckById = async (uid: string, checkId: string): Promise<BankCheck | null> => {
+  if (!uid || !checkId) return null;
+  try {
+    const checkDocRef = doc(_getUserCollectionRef(uid, "checks"), checkId);
+    const docSnap = await getDoc(checkDocRef);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as BankCheck;
+    }
+    return null;
+  } catch (e) {
+    console.error("Error fetching check by ID", e);
+    return null;
+  }
+};
+
 export const addCheck = async (uid: string, data: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'>): Promise<BankCheck> => {
   try {
     const now = new Date().toISOString();

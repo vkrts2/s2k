@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, FileText } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { format, parse, isValid } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -48,6 +48,7 @@ export default function CheckManagementPage() {
   const [description, setDescription] = useState("");
   const [issueDateInput, setIssueDateInput] = useState('');
   const [dueDateInput, setDueDateInput] = useState('');
+  const [images, setImages] = useState<File[]>([]);
 
   const refresh = async () => {
     if (!user) return;
@@ -215,6 +216,7 @@ export default function CheckManagementPage() {
         partyName,
         partyType,
         description,
+        images: images.map(img => img.name), // Add images to payload
       };
       
       await addCheckToDb(user.uid, payload);
@@ -250,6 +252,7 @@ export default function CheckManagementPage() {
     setDescription(check.description || "");
     setShowCheckModal(true);
     setDueDateInput(check.dueDate ? format(new Date(check.dueDate), 'dd.MM.yyyy') : '');
+    setImages(check.images ? check.images.map(name => new File([], name)) : []); // Set images for editing
   };
 
   const handleUpdateCheck = async () => {
@@ -268,6 +271,7 @@ export default function CheckManagementPage() {
       partyName,
       partyType,
       description,
+      images: images.map(img => img.name), // Update images in payload
       createdAt: editingCheck.createdAt,
       updatedAt: new Date().toISOString(),
     };
@@ -312,6 +316,16 @@ export default function CheckManagementPage() {
     setPartyType('customer');
     setDescription("");
     setDueDateInput('');
+    setImages([]);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setImages(prev => [...prev, ...files]);
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const filteredChecks = checks.filter(check =>
@@ -334,10 +348,6 @@ export default function CheckManagementPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Çek Yönetimi</h2>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={addSampleData}>Örnek Veri Ekle</Button>
-          <Button variant="secondary" onClick={handleImportFromLocal}>Local'dan İçe Aktar</Button>
-          <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>JSON'dan İçe Aktar</Button>
-          <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFromJson(f); }} />
           <Dialog open={showCheckModal} onOpenChange={setShowCheckModal}>
             <DialogTrigger asChild>
               <Button onClick={() => { setEditingCheck(null); resetForm(); setShowCheckModal(true); }}>
@@ -494,6 +504,32 @@ export default function CheckManagementPage() {
                     onChange={(e) => setDescription(e.target.value)}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="images">Ekli Resimler</Label>
+                  <input
+                    type="file"
+                    id="images"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                  {images.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {images.map((image, index) => (
+                        <div key={index} className="flex items-center bg-gray-100 rounded-md p-2">
+                          <span>{image.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="ml-2 text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCheckModal(false)}>
@@ -556,6 +592,14 @@ export default function CheckManagementPage() {
                     <TableCell>{check.partyName}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => window.open(`/check-management/${check.id}`, '_blank')}
+                          title="Çek Detaylarını Görüntüle"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

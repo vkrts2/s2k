@@ -442,19 +442,17 @@ export interface Order {
 }
 
 // Yeni: Çek yönetimi tipi
-export interface BankCheck {
-  id: string;
+export interface BankCheck extends BaseEntity {
   checkNumber: string;
   bankName: string;
   branchName?: string;
   accountNumber?: string;
   amount: number;
-  issueDate: string; // ISO
-  dueDate: string; // ISO
+  issueDate: string | Date;
+  dueDate: string | Date;
   status: 'pending' | 'cleared' | 'bounced' | 'cancelled';
   partyName: string;
   partyType: 'customer' | 'supplier';
   description?: string;
-  createdAt?: string; // ISO
-  updatedAt?: string; // ISO
+  images?: string[]; // Array of image file names or URLs
 }

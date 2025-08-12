@@ -97,10 +97,13 @@ export function CustomerList({
     // Bakiye hesapla (TRY + USD)
     const aBalance = (sales.filter(s => s.customerId === a.id).reduce((sum, s) => sum + (s.amount || 0), 0) - payments.filter(p => p.customerId === a.id).reduce((sum, p) => sum + (p.amount || 0), 0));
     const bBalance = (sales.filter(s => s.customerId === b.id).reduce((sum, s) => sum + (s.amount || 0), 0) - payments.filter(p => p.customerId === b.id).reduce((sum, p) => sum + (p.amount || 0), 0));
-    // Sıfır bakiyeliler en alta
-    if (aBalance === 0 && bBalance !== 0) return 1;
-    if (aBalance !== 0 && bBalance === 0) return -1;
-    // İkisi de sıfır veya ikisi de sıfır değilse A-Z sırala
+    
+    // Önce bakiyeye göre sırala (en yüksek bakiye üstte)
+    if (aBalance !== bBalance) {
+      return bBalance - aBalance; // Azalan sıralama (yüksekten düşüğe)
+    }
+    
+    // Bakiye eşitse alfabetik sırala
     return a.name.localeCompare(b.name, 'tr', { sensitivity: 'base' });
   });
 
