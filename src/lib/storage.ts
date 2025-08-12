@@ -84,6 +84,25 @@ export const getCustomerById = async (uid: string, customerId: string): Promise<
   return undefined;
 };
 
+export const getCustomerByName = async (uid: string, customerName: string): Promise<Customer | null> => {
+  if (!uid || !customerName) {
+    console.error("getCustomerByName: User ID or customer name is missing.");
+    return null;
+  }
+  try {
+    const customersQuery = query(_getUserCollectionRef(uid, "customers"), where("name", "==", customerName));
+    const customersSnapshot = await getDocs(customersQuery);
+    if (!customersSnapshot.empty) {
+      const customerDoc = customersSnapshot.docs[0];
+      return { id: customerDoc.id, ...customerDoc.data() as Omit<Customer, 'id'> };
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching customer by name:", error);
+    return null;
+  }
+};
+
 export const addCustomer = async (uid: string, customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>): Promise<Customer> => {
   const now = formatISO(new Date());
   const newCustomerData = {

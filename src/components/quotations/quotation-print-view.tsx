@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import type { Quotation, PortfolioItem } from '@/lib/types';
+import type { Quotation, Customer } from '@/lib/types';
 import { format, parseISO, isValid } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,7 @@ const safeFormatDate = (date: string | Date | undefined, formatStr: string = "dd
 
 interface QuotationPrintViewProps {
   quotation: Quotation;
-  customer?: PortfolioItem | null;
+  customer?: Customer | null;
 }
 
 export function QuotationPrintView({ quotation, customer }: QuotationPrintViewProps) {
@@ -84,18 +84,23 @@ export function QuotationPrintView({ quotation, customer }: QuotationPrintViewPr
             </div>
             {/* Müşteri Bilgileri Kutusu */}
             <div className="flex flex-col justify-start leading-tight border border-black p-3 min-h-[140px]">
-              {customer && (() => {
-                const c = customer as any;
-                return <>
-                  {(c.companyName || c.name) && <p>{c.companyName || c.name}</p>}
-                  {c.address && <p>Adres: {c.address}</p>}
-                  {(c.taxNumber || c.taxnumber || c.tax_number) && <p>VKN: {c.taxNumber || c.taxnumber || c.tax_number}</p>}
-                  {(c.taxOffice || c.taxoffice || c.tax_office) && <p>Vergi Dairesi: {c.taxOffice || c.taxoffice || c.tax_office}</p>}
-                  {c.phone && <p>Telefon: {c.phone}</p>}
-                  {c.website && <p>Web Sitesi: {c.website}</p>}
-                  {c.email && <p>E-Posta: {c.email}</p>}
-                </>;
-              })()}
+              {customer ? (
+                <>
+                  <p>{customer.name}</p>
+                  {customer.address && <p>Adres: {customer.address}</p>}
+                  {customer.taxNumber && <p>VKN: {customer.taxNumber}</p>}
+                  {customer.taxOffice && <p>Vergi Dairesi: {customer.taxOffice}</p>}
+                  {customer.phone && <p>Telefon: {customer.phone}</p>}
+                  {customer.email && <p>E-Posta: {customer.email}</p>}
+                </>
+              ) : (
+                <>
+                  <p>{quotation.customerName}</p>
+                  {quotation.customerAddress && <p>Adres: {quotation.customerAddress}</p>}
+                  {quotation.customerTaxOffice && <p>Vergi Dairesi: {quotation.customerTaxOffice}</p>}
+                  {quotation.customerPhone && <p>Telefon: {quotation.customerPhone}</p>}
+                </>
+              )}
             </div>
           </div>
 
