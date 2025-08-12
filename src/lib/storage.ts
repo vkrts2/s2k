@@ -943,10 +943,17 @@ export const getChecks = async (uid: string): Promise<BankCheck[]> => {
 };
 
 export const addCheck = async (uid: string, data: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'>): Promise<BankCheck> => {
-  const now = new Date().toISOString();
-  const payload: Omit<BankCheck, 'id'> = { ...data, createdAt: now, updatedAt: now };
-  const refDoc = await addDoc(_getUserCollectionRef(uid, "checks"), payload as any);
-  return { ...payload, id: refDoc.id } as BankCheck;
+  try {
+    const now = new Date().toISOString();
+    const payload: Omit<BankCheck, 'id'> = { ...data, createdAt: now, updatedAt: now };
+    console.log('Adding check to Firestore:', payload);
+    const refDoc = await addDoc(_getUserCollectionRef(uid, "checks"), payload as any);
+    console.log('Check added successfully with ID:', refDoc.id);
+    return { ...payload, id: refDoc.id } as BankCheck;
+  } catch (error) {
+    console.error('Error adding check to Firestore:', error);
+    throw error;
+  }
 };
 
 export const updateCheck = async (uid: string, data: BankCheck): Promise<BankCheck> => {
