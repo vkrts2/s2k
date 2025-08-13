@@ -78,11 +78,19 @@ export default function PaymentDetailPage() {
         {payment.description && <p><strong>Açıklama:</strong> {payment.description}</p>}
         {payment.checkSerialNumber && <p><strong>Çek Seri No:</strong> {payment.checkSerialNumber}</p>}
         {payment.checkDate && <p><strong>Çek Tarihi:</strong> {format(new Date(payment.checkDate), 'dd.MM.yyyy', { locale: tr })}</p>}
-        {payment as any && (payment as any).checkImageUrl && (
+        {payment.checkImageUrl && (
           <div>
             <strong>Çek Görseli:</strong>
             <div className="mt-2">
-              <a href={(payment as any).checkImageUrl as string} target="_blank" className="text-blue-500 underline">Görseli aç</a>
+              <a href={payment.checkImageUrl} target="_blank" className="text-blue-500 underline">Görseli yeni sekmede aç</a>
+              <div className="mt-3">
+                {/* Görsel ise küçük önizleme göster */}
+                {payment.checkImageUrl.match(/\.(png|jpe?g|gif|webp)$/i) ? (
+                  <img src={payment.checkImageUrl} alt="Çek Görseli" className="max-h-64 rounded border" />
+                ) : (
+                  <iframe src={payment.checkImageUrl} className="w-full h-64 border rounded" />
+                )}
+              </div>
             </div>
           </div>
         )}

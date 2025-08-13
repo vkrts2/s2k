@@ -213,6 +213,7 @@ export interface Payment {
   referenceNumber?: string | null;
   checkDate?: string | null;
   checkSerialNumber?: string | null;
+  checkImageUrl?: string | null;
   category: TransactionCategory;
   tags: TransactionTag[];
   createdAt: string; // ISO 8601 format

@@ -365,7 +365,10 @@ export function CustomerDetailPageClient({
                   {unifiedTransactions
                     .filter(item => typeof item.amount === 'number' && !isNaN(item.amount))
                     .map((item) => (
-                      <TableRow key={`${item.transactionType}-${item.id}`} className="cursor-pointer" onClick={() => {
+                      <TableRow key={`${item.transactionType}-${item.id}`} className="cursor-pointer" onClick={(e) => {
+                        // Eğer tıklanan element sil butonu veya içi ise gezinme yapma
+                        const target = e.target as HTMLElement;
+                        if (target.closest('[data-action="delete"]')) return;
                         if (item.transactionType === 'sale') {
                           window.location.href = `/customers/${customer.id}/sales/${item.id}`
                         } else {
@@ -394,7 +397,7 @@ export function CustomerDetailPageClient({
                           <Button variant="ghost" size="sm" onClick={() => item.transactionType === 'sale' ? handleSaleFormOpen(item as Sale) : handlePaymentFormOpen(item as Payment)}>
                               <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => item.transactionType === 'sale' ? setDeletingSaleId(item.id) : setDeletingPaymentId(item.id)}>
+                          <Button variant="ghost" size="sm" data-action="delete" onClick={(ev) => { ev.stopPropagation(); item.transactionType === 'sale' ? setDeletingSaleId(item.id) : setDeletingPaymentId(item.id) }}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </TableCell>
