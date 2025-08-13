@@ -3,19 +3,21 @@ import { adminBucket } from '@/lib/firebaseAdmin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 20;
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    const uid = formData.get('uid') as string | null;
-    if (!file || !uid) {
-      return NextResponse.json({ error: 'file and uid required' }, { status: 400 });
+    const uid = (formData.get('uid') as string | null) || 'public';
+    if (!file) {
+      return NextResponse.json({ error: 'file required' }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const filename = `${uid}/checks/${Date.now()}_${file.name}`;
+    const safeName = encodeURIComponent(file.name);
+    const filename = `${uid}/checks/${Date.now()}_${safeName}`;
 
     const fileRef = adminBucket.file(filename);
     await fileRef.save(buffer, {

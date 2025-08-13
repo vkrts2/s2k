@@ -191,8 +191,8 @@ export function PaymentModal({
                     try {
                       // Sunucu tarafı upload: CORS problemi yaşamamak için
                       const body = new FormData();
-                      // uid istemcide AuthContext'ten alınır; yoksa boş geçeriz ve API 400 döner
-                      const uid = (window as any).currentUserId || '';
+                      // uid istemcide AuthContext'ten alınır; yoksa 'public' kullanır.
+                      const uid = (window as any).currentUserId || 'public';
                       body.append('uid', uid);
                       body.append('file', file);
                       const res = await fetch('/api/upload-check-image', { method: 'POST', body });
