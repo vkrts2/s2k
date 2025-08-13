@@ -205,6 +205,22 @@ export function SaleModal({
   const [showTypeSelection, setShowTypeSelection] = React.useState(!editingSale);
   const [invoiceFile, setInvoiceFile] = React.useState<File | null>(null);
 
+  // Düzenleme modunda mevcut satışın tipine göre doğru formu aç
+  React.useEffect(() => {
+    if (!editingSale) return;
+    const isInvoice = (editingSale as any).invoiceType === 'invoice' || (Array.isArray((editingSale as any).items) && (editingSale as any).items.length > 0);
+    if (isInvoice) {
+      setInvoiceType(InvoiceType.INVOICE);
+      setShowTypeSelection(false);
+    } else {
+      setInvoiceType(InvoiceType.NORMAL);
+      setShowTypeSelection(false);
+      // Manuel formda alt seçim: stok/manuel tahmini
+      if ((editingSale as any).stockItemId) setSaleType(SaleType.STOCK);
+      else setSaleType(SaleType.MANUAL);
+    }
+  }, [editingSale]);
+
   // Otomatik tutar hesaplama
   React.useEffect(() => {
     const quantity = parseFloat(formValues.quantity as any);
