@@ -4,6 +4,117 @@ const LazyQuotationForm = dynamic(
   () => import("@/components/quotations/quotation-form").then(m => m.QuotationForm),
   { ssr: false, loading: () => <div>Yükleniyor...</div> }
 );
+
+// Basit hata yakalayıcı
+class Boundary extends React.Component<{ children: React.ReactNode, fallback: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any) {
+    console.error('Faturalı satış formu yüklenirken hata:', error);
+  }
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children as any;
+  }
+}
+
+// Dinamik import başarısız olursa kullanılacak hafif teklif formu
+function LightweightInvoiceForm({
+  onSubmit,
+  customerName,
+}: { onSubmit: (data: any) => void; customerName: string }) {
+  const [date, setDate] = React.useState<Date>(new Date());
+  const [currency, setCurrency] = React.useState<'TRY' | 'USD' | 'EUR'>('TRY');
+  const [items, setItems] = React.useState<Array<{ id: string; productName: string; quantity: string; unitPrice: string; taxRate: string; unit: string }>>([]);
+
+  const addItem = () => setItems(prev => [...prev, { id: `${Date.now()}`, productName: '', quantity: '', unitPrice: '', taxRate: '20', unit: 'adet' }]);
+  const removeItem = (id: string) => setItems(prev => prev.filter(i => i.id !== id));
+  const updateItem = (id: string, patch: Partial<{ productName: string; quantity: string; unitPrice: string; taxRate: string; unit: string }>) =>
+    setItems(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i));
+
+  const totals = React.useMemo(() => {
+    let subTotal = 0;
+    let taxAmount = 0;
+    for (const it of items) {
+      const q = parseFloat(it.quantity || '0') || 0;
+      const p = parseFloat(it.unitPrice || '0') || 0;
+      const t = parseFloat(it.taxRate || '0') || 0;
+      const line = q * p;
+      subTotal += line;
+      taxAmount += line * (t / 100);
+    }
+    const grandTotal = subTotal + taxAmount;
+    return { subTotal, taxAmount, grandTotal };
+  }, [items]);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-2">
+        <Label>Müşteri</Label>
+        <Input value={customerName} disabled />
+      </div>
+      <div className="grid gap-2">
+        <Label>Tarih</Label>
+        <Input type="date" value={date.toISOString().slice(0,10)} onChange={e => setDate(new Date(e.target.value))} className="w-48" />
+      </div>
+      <div className="grid gap-2">
+        <Label>Para Birimi</Label>
+        <Select value={currency} onValueChange={(v) => setCurrency(v as any)}>
+          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="TRY">TRY</SelectItem>
+            <SelectItem value="USD">USD</SelectItem>
+            <SelectItem value="EUR">EUR</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Kalemler</Label>
+          <Button type="button" variant="outline" size="sm" onClick={addItem}>Kalem Ekle</Button>
+        </div>
+        {items.length === 0 && <div className="text-sm text-muted-foreground">Henüz kalem eklenmedi.</div>}
+        {items.map(it => (
+          <div key={it.id} className="grid grid-cols-5 gap-2">
+            <Input placeholder="Ürün/Hizmet" value={it.productName} onChange={e => updateItem(it.id, { productName: e.target.value })} />
+            <Input type="number" placeholder="Miktar" value={it.quantity} onChange={e => updateItem(it.id, { quantity: e.target.value })} />
+            <Input type="number" placeholder="Birim Fiyat" value={it.unitPrice} onChange={e => updateItem(it.id, { unitPrice: e.target.value })} />
+            <Select value={it.taxRate} onValueChange={v => updateItem(it.id, { taxRate: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">%0</SelectItem>
+                <SelectItem value="1">%1</SelectItem>
+                <SelectItem value="10">%10</SelectItem>
+                <SelectItem value="20">%20</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-1 text-right">
+        <div className="text-sm">Ara Toplam: {totals.subTotal.toFixed(2)}</div>
+        <div className="text-sm">KDV Tutarı: {totals.taxAmount.toFixed(2)}</div>
+        <div className="font-semibold">Genel Toplam: {totals.grandTotal.toFixed(2)}</div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={() => onSubmit({
+          date,
+          currency,
+          items,
+          subTotal: totals.subTotal,
+          taxAmount: totals.taxAmount,
+          grandTotal: totals.grandTotal,
+        })}>Kaydet</Button>
+      </div>
+    </div>
+  );
+}
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -178,6 +289,23 @@ export function SaleModal({
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
+            <Boundary fallback={<LightweightInvoiceForm onSubmit={(data: any) => {
+              try {
+                const desc = Array.isArray(data.items) && data.items.length > 0
+                  ? `${data.items[0].productName}${data.items.length > 1 ? ` +${data.items.length - 1} kalem` : ''}`
+                  : (formValues.description || 'Faturalı Satış');
+                const submitValues: any = {
+                  amount: String(data.grandTotal ?? 0),
+                  date: data.date,
+                  currency: data.currency ?? 'TRY',
+                  description: desc,
+                  subtotal: data.subTotal ?? data.subTotal ?? 0,
+                  taxAmount: data.taxAmount ?? 0,
+                  invoiceType: 'invoice',
+                };
+                onSubmit(submitValues);
+              } catch (e) { console.error(e); }
+            }} customerName={customer?.name || ''} />}>
             <LazyQuotationForm
               onSubmit={(data: any) => {
                 try {
@@ -217,6 +345,7 @@ export function SaleModal({
               customers={customer ? [customer] : []}
               className="w-full"
             />
+            </Boundary>
           </div>
         </DialogContent>
       </Dialog>
