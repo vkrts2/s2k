@@ -29,6 +29,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(user);
       setLoading(false);
       console.log("Firebase Auth State Changed: Loading =", false);
+      // window üzerinden uid'i yüklemeler için paylaş
+      if (typeof window !== 'undefined') {
+        (window as any).currentUserId = user?.uid || '';
+      }
     });
 
     return unsubscribe;

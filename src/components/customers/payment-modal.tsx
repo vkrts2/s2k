@@ -185,10 +185,28 @@ export function PaymentModal({
                   id="checkImage"
                   type="file"
                   accept="image/*,.pdf"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0] || null;
-                    // Geçici olarak dosyayı form state'ine koyuyoruz; storage.ts tarafında opsiyonel yükleme yapılabilir
-                    setFormValues({ ...formValues, checkImageFile: file as any });
+                    if (!file) return;
+                    try {
+                      // Sunucu tarafı upload: CORS problemi yaşamamak için
+                      const body = new FormData();
+                      // uid istemcide AuthContext'ten alınır; yoksa boş geçeriz ve API 400 döner
+                      const uid = (window as any).currentUserId || '';
+                      body.append('uid', uid);
+                      body.append('file', file);
+                      const res = await fetch('/api/upload-check-image', { method: 'POST', body });
+                      const json = await res.json();
+                      if (res.ok && json.url) {
+                        setFormValues({ ...formValues, checkImageFile: file as any, checkImageUrl: json.url as any });
+                      } else {
+                        console.error('Dosya yüklenemedi', json);
+                        alert('Çek görseli yüklenemedi. Lütfen tekrar deneyin.');
+                      }
+                    } catch (err) {
+                      console.error('Upload error', err);
+                      alert('Çek görseli yüklenemedi.');
+                    }
                   }}
                   required={false}
                 />

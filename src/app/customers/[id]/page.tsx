@@ -180,8 +180,9 @@ export default function CustomerDetailPage() {
                 };
                 // Çek görseli varsa ekle (storage.addPayment içinde yüklenir)
                 const maybeWithFile: any = { ...newPaymentData };
-                if ((values as any).checkImageFile) {
-                  maybeWithFile.checkImageFile = (values as any).checkImageFile;
+                if ((values as any).checkImageUrl) {
+                  // URL server upload ile gelmişse doğrudan kaydedelim
+                  (maybeWithFile as any).checkImageUrl = (values as any).checkImageUrl;
                 }
                 const newPayment = await storage.addPayment(user.uid, { ...maybeWithFile, createdAt: now, updatedAt: now } as any);
                 setPayments(prev => [newPayment, ...prev]);

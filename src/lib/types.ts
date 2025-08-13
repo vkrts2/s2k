@@ -148,6 +148,7 @@ export type PaymentFormValues = {
   checkDate?: Date | null;
   checkSerialNumber?: string | null;
   checkImageFile?: File | null;
+  checkImageUrl?: string | null;
 };
 
 export interface PaymentToSupplierFormValues {
