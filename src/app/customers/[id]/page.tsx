@@ -131,6 +131,8 @@ export default function CustomerDetailPage() {
                   taxRate: parseFloat((values as any).taxRate || '0'),
                   taxAmount: parseFloat((values as any).taxAmount || '0'),
                   subtotal: parseFloat((values as any).subtotal || '0'),
+                  items: (values as any).items || undefined,
+                  invoiceType: (values as any).invoiceType || undefined,
                   category: 'satis',
                   tags: [],
                 };

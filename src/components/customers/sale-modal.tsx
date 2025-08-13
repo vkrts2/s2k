@@ -311,6 +311,7 @@ export function SaleModal({
                     description: desc,
                     subtotal: data.subTotal ?? 0,
                     taxAmount: data.taxAmount ?? 0,
+                    items: data.items || [],
                     invoiceType: 'invoice',
                   };
                   onSubmit(submitValues);

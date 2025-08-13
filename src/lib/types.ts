@@ -200,6 +200,8 @@ export interface Sale {
   taxRate?: number; // KDV oranı
   taxAmount?: number; // KDV tutarı
   subtotal?: number; // Ara toplam
+  items?: QuotationItem[]; // Faturalı satış kalemleri
+  invoiceType?: 'normal' | 'invoice';
   createdAt: string; // ISO 8601 format
   updatedAt: string; // ISO 8601 format
 }

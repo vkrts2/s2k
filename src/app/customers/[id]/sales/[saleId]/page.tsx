@@ -10,6 +10,7 @@ import { tr } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function SaleDetailPage() {
   const { id: customerId, saleId } = useParams() as { id: string, saleId: string };
@@ -74,16 +75,25 @@ export default function SaleDetailPage() {
       <h1 className="text-3xl font-bold mb-6">Satış Detayı</h1>
       <div className="grid gap-4">
         <p><strong>Tutar:</strong> {sale.amount} {sale.currency}</p>
-        <Label htmlFor="date">Tarih</Label>
-        <Input
-          type="text"
-          placeholder="gg.aa.yyyy"
-          // value ve onChange ile manuel tarih girişi
-        />
-        {sale.stockItemId && <p><strong>Stok Kalemi ID:</strong> {sale.stockItemId}</p>}
+        <p><strong>Tarih:</strong> {format(new Date(sale.date), 'dd.MM.yyyy', { locale: tr })}</p>
         {sale.description && <p><strong>Açıklama:</strong> {sale.description}</p>}
-        {sale.quantity && <p><strong>Miktar:</strong> {sale.quantity}</p>}
-        {sale.unitPrice && <p><strong>Birim Fiyat:</strong> {sale.unitPrice}</p>}
+        {typeof sale.subtotal === 'number' && <p><strong>Ara Toplam:</strong> {sale.subtotal.toFixed(2)} {sale.currency}</p>}
+        {typeof sale.taxAmount === 'number' && <p><strong>KDV Tutarı:</strong> {sale.taxAmount.toFixed(2)} {sale.currency}</p>}
+        {sale.items && sale.items.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle>Kalemler</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {sale.items.map((it, idx) => (
+                  <div key={idx} className="flex justify-between text-sm">
+                    <span>{it.productName} ({it.unit || 'adet'})</span>
+                    <span>{it.quantity} x {it.unitPrice} = {it.total.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
         <p><strong>Oluşturulma Tarihi:</strong> {format(new Date(sale.createdAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
         <p><strong>Son Güncelleme:</strong> {format(new Date(sale.updatedAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
       </div>
