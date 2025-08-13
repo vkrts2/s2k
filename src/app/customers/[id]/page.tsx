@@ -184,8 +184,20 @@ export default function CustomerDetailPage() {
                 if ((values as any).checkImageUrl) {
                   (maybeWithFile as any).checkImageUrl = (values as any).checkImageUrl;
                 } else if ((values as any).checkImageData) {
-                  (maybeWithFile as any).checkImageData = (values as any).checkImageData;
-                  (maybeWithFile as any).checkImageMimeType = (values as any).checkImageMimeType;
+                  // Sunucu API üzerinden dataURL ile yükle, URL'i ekle
+                  try {
+                    const body = new FormData();
+                    body.append('uid', user.uid);
+                    body.append('dataUrl', (values as any).checkImageData);
+                    if ((values as any).checkImageMimeType) body.append('mime', (values as any).checkImageMimeType);
+                    const res = await fetch('/api/upload-check-image', { method: 'POST', body });
+                    const json = await res.json();
+                    if (res.ok && json?.url) {
+                      (maybeWithFile as any).checkImageUrl = json.url;
+                    }
+                  } catch (e) {
+                    console.error('Çek görseli API yükleme hatası:', e);
+                  }
                 }
                 const newPayment = await storage.addPayment(user.uid, { ...maybeWithFile, createdAt: now, updatedAt: now } as any);
                 setPayments(prev => [newPayment, ...prev]);

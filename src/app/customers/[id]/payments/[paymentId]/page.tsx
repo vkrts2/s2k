@@ -94,6 +94,9 @@ export default function PaymentDetailPage() {
             </div>
           </div>
         )}
+        {!payment.checkImageUrl && (
+          <div className="text-sm text-muted-foreground">Çek görseli eklenmemiş veya henüz yüklenmemiş.</div>
+        )}
         <p><strong>Oluşturulma Tarihi:</strong> {format(new Date(payment.createdAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
         <p><strong>Son Güncelleme:</strong> {format(new Date(payment.updatedAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
       </div>
