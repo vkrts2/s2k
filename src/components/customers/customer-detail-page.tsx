@@ -366,9 +366,9 @@ export function CustomerDetailPageClient({
                     .filter(item => typeof item.amount === 'number' && !isNaN(item.amount))
                     .map((item) => (
                       <TableRow key={`${item.transactionType}-${item.id}`} className="cursor-pointer" onClick={(e) => {
-                        // Eğer tıklanan element sil butonu veya içi ise gezinme yapma
+                        // Eğer tıklanan element sil/düzenle butonu veya içi ise gezinme yapma
                         const target = e.target as HTMLElement;
-                        if (target.closest('[data-action="delete"]')) return;
+                        if (target.closest('[data-action="delete"], [data-action="edit"]')) return;
                         if (item.transactionType === 'sale') {
                           window.location.href = `/customers/${customer.id}/sales/${item.id}`
                         } else {
@@ -394,7 +394,7 @@ export function CustomerDetailPageClient({
                         </TableCell>
                         <TableCell className="text-right">{item.amount.toLocaleString('tr-TR', { style: 'currency', currency: item.currency })}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => item.transactionType === 'sale' ? handleSaleFormOpen(item as Sale) : handlePaymentFormOpen(item as Payment)}>
+                          <Button variant="ghost" size="sm" data-action="edit" onClick={(ev) => { ev.stopPropagation(); item.transactionType === 'sale' ? handleSaleFormOpen(item as Sale) : handlePaymentFormOpen(item as Payment) }}>
                               <Pencil className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="sm" data-action="delete" onClick={(ev) => { ev.stopPropagation(); item.transactionType === 'sale' ? setDeletingSaleId(item.id) : setDeletingPaymentId(item.id) }}>

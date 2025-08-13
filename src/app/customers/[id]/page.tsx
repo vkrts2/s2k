@@ -178,7 +178,12 @@ export default function CustomerDetailPage() {
                     category: 'odeme',
                     tags: [],
                 };
-                const newPayment = await storage.addPayment(user.uid, { ...newPaymentData, createdAt: now, updatedAt: now });
+                // Çek görseli varsa ekle (storage.addPayment içinde yüklenir)
+                const maybeWithFile: any = { ...newPaymentData };
+                if ((values as any).checkImageFile) {
+                  maybeWithFile.checkImageFile = (values as any).checkImageFile;
+                }
+                const newPayment = await storage.addPayment(user.uid, { ...maybeWithFile, createdAt: now, updatedAt: now } as any);
                 setPayments(prev => [newPayment, ...prev]);
                 toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
             }
