@@ -1,5 +1,9 @@
-// Lazy import to avoid initializing Firebase during Jest environment load
-const LazyQuotationForm = React.lazy(() => import("@/components/quotations/quotation-form").then(m => ({ default: m.QuotationForm })));
+import dynamic from 'next/dynamic';
+// Dinamik import: sadece istemcide yüklensin (SSR kapalı)
+const LazyQuotationForm = dynamic(
+  () => import("@/components/quotations/quotation-form").then(m => m.QuotationForm),
+  { ssr: false, loading: () => <div>Yükleniyor...</div> }
+);
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -174,7 +178,6 @@ export function SaleModal({
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
-            <React.Suspense fallback={<div>Yükleniyor...</div>}>
             <LazyQuotationForm
               onSubmit={(data: any) => {
                 try {
@@ -214,7 +217,6 @@ export function SaleModal({
               customers={customer ? [customer] : []}
               className="w-full"
             />
-            </React.Suspense>
           </div>
         </DialogContent>
       </Dialog>

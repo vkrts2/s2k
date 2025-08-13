@@ -141,13 +141,22 @@ export function QuotationForm({
       try {
         const fetchedItems = await getStockItems(user.uid); 
         setAvailableStockItems(fetchedItems);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Stok kalemleri yüklenirken hata oluştu:", error);
-        toast({
-          title: "Hata",
-          description: "Stok kalemleri yüklenirken bir sorun oluştu.",
-          variant: "destructive",
-        });
+        const message = typeof error?.message === 'string' ? error.message : '';
+        if (message.includes('auth/invalid-credential')) {
+          toast({
+            title: "Oturum geçersiz",
+            description: "Lütfen tekrar giriş yapın.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Hata",
+            description: "Stok kalemleri yüklenirken bir sorun oluştu.",
+            variant: "destructive",
+          });
+        }
       }
     };
 
