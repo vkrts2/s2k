@@ -447,6 +447,7 @@ export function CustomerDetailPageClient({
           formValues={saleFormValues}
           setFormValues={setSaleFormValues}
           availableStockItems={availableStockItems}
+          customer={customer}
         />
       )}
 

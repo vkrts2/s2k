@@ -1,9 +1,11 @@
+// Lazy import to avoid initializing Firebase during Jest environment load
+const LazyQuotationForm = React.lazy(() => import("@/components/quotations/quotation-form").then(m => ({ default: m.QuotationForm })));
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SaleFormValues, StockItem } from "@/lib/types";
+import { SaleFormValues, StockItem, Customer } from "@/lib/types";
 import { format, parse, isValid } from "date-fns";
 import { CalendarIcon, Check, ChevronsUpDown, Receipt, ShoppingCart } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
@@ -22,6 +24,7 @@ interface SaleModalProps {
   formValues: SaleFormValues;
   setFormValues: Dispatch<SetStateAction<SaleFormValues>>;
   availableStockItems: StockItem[];
+  customer?: Customer;
 }
 
 enum SaleType {
@@ -139,8 +142,8 @@ export function SaleModal({
             >
               <ShoppingCart className="h-6 w-6" />
               <div className="flex flex-col items-center">
-                <span className="font-medium">Normal Satış</span>
-                <span className="text-xs text-white/90">Standart satış işlemi</span>
+                <span className="font-medium">Manuel Satış</span>
+                <span className="text-xs text-white/90">Stok/manuel alanlı basit satış</span>
               </div>
             </Button>
             <Button 
@@ -150,9 +153,68 @@ export function SaleModal({
               <Receipt className="h-6 w-6" />
               <div className="flex flex-col items-center">
                 <span className="font-medium">Faturalı Satış</span>
-                <span className="text-xs text-white/90">KDV dahil, fatura yükleme</span>
+                <span className="text-xs text-white/90">Teklif formu ile detaylı satış</span>
               </div>
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Faturalı satış: Teklif formunu aç ve dönüşte satışa dönüştür
+  if (invoiceType === InvoiceType.INVOICE) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[860px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Faturalı Satış (Teklif Formu)</DialogTitle>
+            <DialogDescription>
+              Faturalı satış için teklif oluşturma formu ile kalemleri ekleyin. Kaydedince satış oluşturulacaktır.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <React.Suspense fallback={<div>Yükleniyor...</div>}>
+            <LazyQuotationForm
+              onSubmit={(data: any) => {
+                try {
+                  const desc = Array.isArray(data.items) && data.items.length > 0
+                    ? `${data.items[0].productName}${data.items.length > 1 ? ` +${data.items.length - 1} kalem` : ''}`
+                    : (formValues.description || 'Faturalı Satış');
+                  const submitValues: any = {
+                    amount: String(data.grandTotal ?? 0),
+                    date: data.date,
+                    currency: data.currency ?? 'TRY',
+                    description: desc,
+                    subtotal: data.subTotal ?? 0,
+                    taxAmount: data.taxAmount ?? 0,
+                    invoiceType: 'invoice',
+                  };
+                  onSubmit(submitValues);
+                } catch (e) {
+                  console.error('Faturalı satış (teklif) gönderim hatası:', e);
+                }
+              }}
+              initialData={{
+                id: 'temp',
+                quotationNumber: 'TEMP',
+                date: new Date(),
+                customerName: customer?.name || '',
+                items: [],
+                subTotal: 0,
+                taxRate: 0,
+                taxAmount: 0,
+                grandTotal: 0,
+                currency: 'TRY',
+                status: 'Taslak',
+                notes: '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              } as any}
+              customers={customer ? [customer] : []}
+              className="w-full"
+            />
+            </React.Suspense>
           </div>
         </DialogContent>
       </Dialog>
@@ -167,10 +229,7 @@ export function SaleModal({
             {invoiceType === InvoiceType.INVOICE ? 'Faturalı Satış Ekle' : 'Satış Ekle'}
           </DialogTitle>
           <DialogDescription>
-            {invoiceType === InvoiceType.INVOICE 
-              ? 'KDV dahil faturalı satış işlemi ekleyin.' 
-              : 'Yeni bir satış işlemi ekleyin veya mevcut bir satışı düzenleyin.'
-            }
+            {'Yeni bir satış işlemi ekleyin veya mevcut bir satışı düzenleyin.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -273,40 +332,7 @@ export function SaleModal({
               />
               <span className="text-xs text-muted-foreground">Negatif değer girebilirsiniz (devreden bakiye için).</span>
             </div>
-            {invoiceType === InvoiceType.INVOICE && (
-              <>
-                <div className="grid gap-2">
-                  <Label htmlFor="taxRate">KDV Oranı (%)</Label>
-                  <Select 
-                    value={(formValues as any).taxRate || '18'} 
-                    onValueChange={(value) => setFormValues(prev => ({ ...prev, taxRate: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="KDV oranı seçin..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">%0 (KDV Yok)</SelectItem>
-                      <SelectItem value="1">%1</SelectItem>
-                      <SelectItem value="8">%8</SelectItem>
-                      <SelectItem value="10">%10</SelectItem>
-                      <SelectItem value="18">%18</SelectItem>
-                      <SelectItem value="20">%20</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="invoiceFile">Fatura Dosyası (PDF)</Label>
-                  <Input
-                    id="invoiceFile"
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileUpload}
-                    required
-                  />
-                  <span className="text-xs text-muted-foreground">Sadece PDF dosyası yükleyebilirsiniz.</span>
-                </div>
-              </>
-            )}
+            {/* Faturalı modda artık QuotationForm kullanılıyor, bu yüzden KDV ve dosya alanları burada gösterilmiyor */}
             <div className="grid gap-2">
               <Label htmlFor="amount">
                 {invoiceType === InvoiceType.INVOICE ? 'Toplam Tutar (KDV Dahil)' : 'Tutar'}
