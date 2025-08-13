@@ -169,7 +169,11 @@ export function CustomerDetailPageClient({
         description: sale.description || '',
         quantity: sale.quantity != null ? sale.quantity.toString() : undefined,
         unitPrice: sale.unitPrice != null ? sale.unitPrice.toString() : undefined,
+        // faturalı satış düzenleme ipucu alanları
+        taxRate: sale.taxRate != null ? String(sale.taxRate) : undefined,
       });
+      // sale-modal içinde tür seçim ekranının atlanması için invoiceType işaretini state'e not düşmek adına gerekirse formValues'ta tutuyoruz
+      // invoiceType bilgisi sale-modal içinde editingSale üzerinden okunuyor
     } else {
       setEditingSale(null);
       setSaleFormValues({

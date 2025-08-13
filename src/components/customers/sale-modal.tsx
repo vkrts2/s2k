@@ -27,10 +27,39 @@ class Boundary extends React.Component<{ children: React.ReactNode, fallback: Re
 function LightweightInvoiceForm({
   onSubmit,
   customerName,
-}: { onSubmit: (data: any) => void; customerName: string }) {
+  initialItems,
+  initialDate,
+  initialCurrency,
+}: {
+  onSubmit: (data: any) => void;
+  customerName: string;
+  initialItems?: Array<{ id?: string; productName: string; description?: string; quantity: number; unitPrice: number; taxRate?: number; unit?: string }>;
+  initialDate?: Date | string;
+  initialCurrency?: 'TRY' | 'USD' | 'EUR';
+}) {
   const [date, setDate] = React.useState<Date>(new Date());
   const [currency, setCurrency] = React.useState<'TRY' | 'USD' | 'EUR'>('TRY');
   const [items, setItems] = React.useState<Array<{ id: string; productName: string; quantity: string; unitPrice: string; taxRate: string; unit: string }>>([]);
+
+  React.useEffect(() => {
+    if (initialDate) {
+      const d = initialDate instanceof Date ? initialDate : new Date(initialDate);
+      if (!isNaN(d.getTime())) setDate(d);
+    }
+    if (initialCurrency) setCurrency(initialCurrency);
+    if (initialItems && Array.isArray(initialItems)) {
+      setItems(
+        initialItems.map((it, idx) => ({
+          id: String(it.id || idx + 1),
+          productName: it.productName,
+          quantity: String(it.quantity ?? ''),
+          unitPrice: String(it.unitPrice ?? ''),
+          taxRate: String(it.taxRate ?? '20'),
+          unit: it.unit || 'adet',
+        }))
+      );
+    }
+  }, [initialDate, initialCurrency, initialItems]);
 
 	const addItem = () => setItems(prev => [...prev, { id: `${Date.now()}`, productName: '', quantity: '', unitPrice: '', taxRate: '20', unit: 'adet' }]);
   const removeItem = (id: string) => setItems(prev => prev.filter(i => i.id !== id));
@@ -301,6 +330,9 @@ export function SaleModal({
           <div className="py-2">
             <LightweightInvoiceForm
               customerName={customer?.name || ''}
+              initialItems={editingSale?.items}
+              initialDate={editingSale ? new Date(editingSale.date) : undefined}
+              initialCurrency={editingSale?.currency}
               onSubmit={(data: any) => {
                 try {
                   const desc = Array.isArray(data.items) && data.items.length > 0
@@ -331,7 +363,7 @@ export function SaleModal({
       <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {invoiceType === InvoiceType.INVOICE ? 'Faturalı Satış Ekle' : 'Satış Ekle'}
+            {editingSale ? 'Satışı Düzenle' : (invoiceType === InvoiceType.INVOICE ? 'Faturalı Satış Ekle' : 'Satış Ekle')}
           </DialogTitle>
           <DialogDescription>
             {'Yeni bir satış işlemi ekleyin veya mevcut bir satışı düzenleyin.'}
