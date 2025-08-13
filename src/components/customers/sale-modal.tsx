@@ -159,6 +159,7 @@ export function SaleModal({
   formValues,
   setFormValues,
   availableStockItems,
+  customer,
 }: SaleModalProps) {
   const [openCombobox, setOpenCombobox] = React.useState(false)
   const [saleType, setSaleType] = React.useState<SaleType>(SaleType.STOCK);
