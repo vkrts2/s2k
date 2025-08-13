@@ -10,6 +10,7 @@ import { tr } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { QuotationPrintView } from '@/components/quotations/quotation-print-view';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function SaleDetailPage() {
@@ -73,30 +74,32 @@ export default function SaleDetailPage() {
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">Satış Detayı</h1>
-      <div className="grid gap-4">
-        <p><strong>Tutar:</strong> {sale.amount} {sale.currency}</p>
-        <p><strong>Tarih:</strong> {format(new Date(sale.date), 'dd.MM.yyyy', { locale: tr })}</p>
-        {sale.description && <p><strong>Açıklama:</strong> {sale.description}</p>}
-        {typeof sale.subtotal === 'number' && <p><strong>Ara Toplam:</strong> {sale.subtotal.toFixed(2)} {sale.currency}</p>}
-        {typeof sale.taxAmount === 'number' && <p><strong>KDV Tutarı:</strong> {sale.taxAmount.toFixed(2)} {sale.currency}</p>}
-        {sale.items && sale.items.length > 0 && (
-          <Card>
-            <CardHeader><CardTitle>Kalemler</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {sale.items.map((it, idx) => (
-                  <div key={idx} className="flex justify-between text-sm">
-                    <span>{it.productName} ({it.unit || 'adet'})</span>
-                    <span>{it.quantity} x {it.unitPrice} = {it.total.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        <p><strong>Oluşturulma Tarihi:</strong> {format(new Date(sale.createdAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
-        <p><strong>Son Güncelleme:</strong> {format(new Date(sale.updatedAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
-      </div>
+      {sale.invoiceType === 'invoice' && sale.items && sale.items.length > 0 ? (
+        <QuotationPrintView quotation={{
+          id: sale.id,
+          quotationNumber: 'INV-'+sale.id,
+          date: sale.date,
+          customerName: '',
+          items: sale.items as any,
+          subTotal: sale.subtotal || 0,
+          taxRate: 0,
+          taxAmount: sale.taxAmount || 0,
+          grandTotal: sale.amount || 0,
+          currency: sale.currency as any,
+          status: 'Gönderildi',
+          notes: '',
+          createdAt: sale.createdAt,
+          updatedAt: sale.updatedAt,
+        }} customer={null} />
+      ) : (
+        <div className="grid gap-4">
+          <p><strong>Tutar:</strong> {sale.amount} {sale.currency}</p>
+          <p><strong>Tarih:</strong> {format(new Date(sale.date), 'dd.MM.yyyy', { locale: tr })}</p>
+          {sale.description && <p><strong>Açıklama:</strong> {sale.description}</p>}
+          <p><strong>Oluşturulma Tarihi:</strong> {format(new Date(sale.createdAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
+          <p><strong>Son Güncelleme:</strong> {format(new Date(sale.updatedAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
+        </div>
+      )}
     </div>
   );
 } 
