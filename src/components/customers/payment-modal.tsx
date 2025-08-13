@@ -178,6 +178,22 @@ export function PaymentModal({
                 />
               </div>
             )}
+            {formValues.method === 'cek' && (
+              <div className="grid gap-2">
+                <Label htmlFor="checkImage">Çek Görseli (JPG/PNG/PDF)</Label>
+                <Input
+                  id="checkImage"
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    // Geçici olarak dosyayı form state'ine koyuyoruz; storage.ts tarafında opsiyonel yükleme yapılabilir
+                    setFormValues({ ...formValues, checkImageFile: file as any });
+                  }}
+                  required={false}
+                />
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="referenceNumber">Referans No</Label>
               <Input

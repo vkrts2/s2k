@@ -365,7 +365,13 @@ export function CustomerDetailPageClient({
                   {unifiedTransactions
                     .filter(item => typeof item.amount === 'number' && !isNaN(item.amount))
                     .map((item) => (
-                      <TableRow key={`${item.transactionType}-${item.id}`}>
+                      <TableRow key={`${item.transactionType}-${item.id}`} className="cursor-pointer" onClick={() => {
+                        if (item.transactionType === 'sale') {
+                          window.location.href = `/customers/${customer.id}/sales/${item.id}`
+                        } else {
+                          window.location.href = `/customers/${customer.id}/payments/${item.id}`
+                        }
+                      }}>
                         <TableCell>{format(parseISO(item.date), 'dd.MM.yyyy', { locale: tr })}</TableCell>
                         <TableCell>
                           <Badge variant={item.transactionType === 'sale' ? 'destructive' : 'default'}>

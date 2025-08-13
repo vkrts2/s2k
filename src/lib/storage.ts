@@ -384,6 +384,15 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
     checkDate: paymentData.checkDate ?? null,
     checkSerialNumber: paymentData.checkSerialNumber ?? null,
   };
+  // Opsiyonel çek görseli yüklemesi
+  if ((paymentData as any).checkImageFile) {
+    try {
+      const fileUrl = await uploadFileToFirebaseStorage(uid, (paymentData as any).checkImageFile as File, `checks`);
+      newPaymentData.checkImageUrl = fileUrl;
+    } catch (e) {
+      console.error('Çek görseli yüklenirken hata:', e);
+    }
+  }
   Object.keys(newPaymentData).forEach(key => {
     if (newPaymentData[key] === undefined) newPaymentData[key] = null;
   });

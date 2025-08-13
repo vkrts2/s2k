@@ -32,7 +32,7 @@ function LightweightInvoiceForm({
   const [currency, setCurrency] = React.useState<'TRY' | 'USD' | 'EUR'>('TRY');
   const [items, setItems] = React.useState<Array<{ id: string; productName: string; quantity: string; unitPrice: string; taxRate: string; unit: string }>>([]);
 
-  const addItem = () => setItems(prev => [...prev, { id: `${Date.now()}`, productName: '', quantity: '', unitPrice: '', taxRate: '20', unit: 'adet' }]);
+	const addItem = () => setItems(prev => [...prev, { id: `${Date.now()}`, productName: '', quantity: '', unitPrice: '', taxRate: '20', unit: 'adet' }]);
   const removeItem = (id: string) => setItems(prev => prev.filter(i => i.id !== id));
   const updateItem = (id: string, patch: Partial<{ productName: string; quantity: string; unitPrice: string; taxRate: string; unit: string }>) =>
     setItems(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i));
@@ -79,23 +79,30 @@ function LightweightInvoiceForm({
           <Button type="button" variant="outline" size="sm" onClick={addItem}>Kalem Ekle</Button>
         </div>
         {items.length === 0 && <div className="text-sm text-muted-foreground">Henüz kalem eklenmedi.</div>}
-        {items.map(it => (
-          <div key={it.id} className="grid grid-cols-5 gap-2">
-            <Input placeholder="Ürün/Hizmet" value={it.productName} onChange={e => updateItem(it.id, { productName: e.target.value })} />
-            <Input type="number" placeholder="Miktar" value={it.quantity} onChange={e => updateItem(it.id, { quantity: e.target.value })} />
-            <Input type="number" placeholder="Birim Fiyat" value={it.unitPrice} onChange={e => updateItem(it.id, { unitPrice: e.target.value })} />
-            <Select value={it.taxRate} onValueChange={v => updateItem(it.id, { taxRate: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">%0</SelectItem>
-                <SelectItem value="1">%1</SelectItem>
-                <SelectItem value="10">%10</SelectItem>
-                <SelectItem value="20">%20</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
-          </div>
-        ))}
+		{items.map(it => (
+			<div key={it.id} className="grid grid-cols-6 gap-2">
+				<Input placeholder="Ürün/Hizmet" value={it.productName} onChange={e => updateItem(it.id, { productName: e.target.value })} />
+				<Input type="number" placeholder="Miktar" value={it.quantity} onChange={e => updateItem(it.id, { quantity: e.target.value })} />
+				<Select value={it.unit} onValueChange={v => updateItem(it.id, { unit: v })}>
+					<SelectTrigger><SelectValue placeholder="Birim" /></SelectTrigger>
+					<SelectContent>
+						<SelectItem value="kg">kg</SelectItem>
+						<SelectItem value="mt">mt</SelectItem>
+						<SelectItem value="adet">ad</SelectItem>
+						<SelectItem value="top">top</SelectItem>
+					</SelectContent>
+				</Select>
+				<Input type="number" placeholder="Birim Fiyat" value={it.unitPrice} onChange={e => updateItem(it.id, { unitPrice: e.target.value })} />
+				<Select value={it.taxRate} onValueChange={v => updateItem(it.id, { taxRate: v })}>
+					<SelectTrigger><SelectValue /></SelectTrigger>
+					<SelectContent>
+						<SelectItem value="10">%10</SelectItem>
+						<SelectItem value="20">%20</SelectItem>
+					</SelectContent>
+				</Select>
+				<Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
+			</div>
+		))}
       </div>
       <div className="space-y-1 text-right">
         <div className="text-sm">Ara Toplam: {totals.subTotal.toFixed(2)}</div>

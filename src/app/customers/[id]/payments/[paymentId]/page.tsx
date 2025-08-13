@@ -76,6 +76,16 @@ export default function PaymentDetailPage() {
         <p><strong>Yöntem:</strong> {payment.method}</p>
         {payment.referenceNumber && <p><strong>Referans No:</strong> {payment.referenceNumber}</p>}
         {payment.description && <p><strong>Açıklama:</strong> {payment.description}</p>}
+        {payment.checkSerialNumber && <p><strong>Çek Seri No:</strong> {payment.checkSerialNumber}</p>}
+        {payment.checkDate && <p><strong>Çek Tarihi:</strong> {format(new Date(payment.checkDate), 'dd.MM.yyyy', { locale: tr })}</p>}
+        {payment as any && (payment as any).checkImageUrl && (
+          <div>
+            <strong>Çek Görseli:</strong>
+            <div className="mt-2">
+              <a href={(payment as any).checkImageUrl as string} target="_blank" className="text-blue-500 underline">Görseli aç</a>
+            </div>
+          </div>
+        )}
         <p><strong>Oluşturulma Tarihi:</strong> {format(new Date(payment.createdAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
         <p><strong>Son Güncelleme:</strong> {format(new Date(payment.updatedAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
       </div>
