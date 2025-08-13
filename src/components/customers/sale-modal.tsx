@@ -283,30 +283,14 @@ export function SaleModal({
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[860px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Faturalı Satış (Teklif Formu)</DialogTitle>
+            <DialogTitle>Faturalı Satış</DialogTitle>
             <DialogDescription>
-              Faturalı satış için teklif oluşturma formu ile kalemleri ekleyin. Kaydedince satış oluşturulacaktır.
+              Kalemleri ekleyin; toplamlar otomatik hesaplanır. Kaydedince satış oluşturulur.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
-            <Boundary fallback={<LightweightInvoiceForm onSubmit={(data: any) => {
-              try {
-                const desc = Array.isArray(data.items) && data.items.length > 0
-                  ? `${data.items[0].productName}${data.items.length > 1 ? ` +${data.items.length - 1} kalem` : ''}`
-                  : (formValues.description || 'Faturalı Satış');
-                const submitValues: any = {
-                  amount: String(data.grandTotal ?? 0),
-                  date: data.date,
-                  currency: data.currency ?? 'TRY',
-                  description: desc,
-                  subtotal: data.subTotal ?? data.subTotal ?? 0,
-                  taxAmount: data.taxAmount ?? 0,
-                  invoiceType: 'invoice',
-                };
-                onSubmit(submitValues);
-              } catch (e) { console.error(e); }
-            }} customerName={customer?.name || ''} />}>
-            <LazyQuotationForm
+            <LightweightInvoiceForm
+              customerName={customer?.name || ''}
               onSubmit={(data: any) => {
                 try {
                   const desc = Array.isArray(data.items) && data.items.length > 0
@@ -322,30 +306,9 @@ export function SaleModal({
                     invoiceType: 'invoice',
                   };
                   onSubmit(submitValues);
-                } catch (e) {
-                  console.error('Faturalı satış (teklif) gönderim hatası:', e);
-                }
+                } catch (e) { console.error(e); }
               }}
-              initialData={{
-                id: 'temp',
-                quotationNumber: 'TEMP',
-                date: new Date(),
-                customerName: customer?.name || '',
-                items: [],
-                subTotal: 0,
-                taxRate: 0,
-                taxAmount: 0,
-                grandTotal: 0,
-                currency: 'TRY',
-                status: 'Taslak',
-                notes: '',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              } as any}
-              customers={customer ? [customer] : []}
-              className="w-full"
             />
-            </Boundary>
           </div>
         </DialogContent>
       </Dialog>
