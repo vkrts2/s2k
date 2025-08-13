@@ -2,9 +2,9 @@
 
 import { useParams } from 'next/navigation';
 import React, { useState, useEffect } from 'react';
-import { getSaleById } from '@/lib/storage';
+import { getSaleById, getCustomerById } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Sale } from '@/lib/types';
+import { Sale, Customer, QuotationItem } from '@/lib/types';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,7 @@ export default function SaleDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth(); // Auth context'ten user bilgisini al
+  const [customer, setCustomer] = useState<Customer | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -40,6 +41,9 @@ export default function SaleDetailPage() {
         const fetchedSale = await getSaleById(user.uid, saleId);
         if (fetchedSale) {
           setSale(fetchedSale);
+          // Müşteriyi de getir
+          const cust = await getCustomerById(user.uid, customerId);
+          if (cust) setCustomer(cust);
         } else {
           setError("Satış bulunamadı.");
         }
@@ -74,32 +78,49 @@ export default function SaleDetailPage() {
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">Satış Detayı</h1>
-      {sale.invoiceType === 'invoice' && sale.items && sale.items.length > 0 ? (
-        <QuotationPrintView quotation={{
-          id: sale.id,
-          quotationNumber: 'INV-'+sale.id,
-          date: sale.date,
-          customerName: '',
-          items: sale.items as any,
-          subTotal: sale.subtotal || 0,
-          taxRate: 0,
-          taxAmount: sale.taxAmount || 0,
-          grandTotal: sale.amount || 0,
-          currency: sale.currency as any,
-          status: 'Gönderildi',
-          notes: '',
-          createdAt: sale.createdAt,
-          updatedAt: sale.updatedAt,
-        }} customer={null} />
-      ) : (
-        <div className="grid gap-4">
-          <p><strong>Tutar:</strong> {sale.amount} {sale.currency}</p>
-          <p><strong>Tarih:</strong> {format(new Date(sale.date), 'dd.MM.yyyy', { locale: tr })}</p>
-          {sale.description && <p><strong>Açıklama:</strong> {sale.description}</p>}
-          <p><strong>Oluşturulma Tarihi:</strong> {format(new Date(sale.createdAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
-          <p><strong>Son Güncelleme:</strong> {format(new Date(sale.updatedAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>
-        </div>
-      )}
+      {/* Faturalı satış düzeni: items varsa onları, yoksa tek kalem çıkar */}
+      {(() => {
+        const hasItems = Array.isArray((sale as any).items) && (sale as any).items.length > 0;
+        const items: QuotationItem[] = hasItems
+          ? (sale as any).items
+          : [{
+              id: '1',
+              productName: sale.description || 'Satış',
+              description: sale.description || 'Satış',
+              quantity: typeof sale.quantity === 'number' ? sale.quantity : 1,
+              unitPrice: typeof sale.unitPrice === 'number' ? sale.unitPrice : (typeof sale.amount === 'number' ? sale.amount : 0),
+              total: typeof sale.subtotal === 'number' && sale.subtotal > 0 ? sale.subtotal : (typeof sale.amount === 'number' ? sale.amount : 0),
+              taxRate: typeof sale.taxRate === 'number' ? sale.taxRate : 0,
+              unit: 'adet',
+            }];
+        const subTotal = typeof sale.subtotal === 'number' && sale.subtotal > 0
+          ? sale.subtotal
+          : items.reduce((s, it) => s + (Number(it.quantity) * Number(it.unitPrice)), 0);
+        const taxAmount = typeof sale.taxAmount === 'number' ? sale.taxAmount : (subTotal * ((typeof sale.taxRate === 'number' ? sale.taxRate : 0) / 100));
+        const grandTotal = typeof sale.amount === 'number' && sale.amount > 0 ? sale.amount : (subTotal + taxAmount);
+
+        return (
+          <QuotationPrintView quotation={{
+            id: sale.id,
+            quotationNumber: 'INV-' + sale.id,
+            date: sale.date,
+            customerName: customer?.name || '',
+            customerAddress: customer?.address,
+            customerPhone: customer?.phone,
+            customerTaxOffice: customer?.taxOffice,
+            items: items as any,
+            subTotal,
+            taxRate: typeof sale.taxRate === 'number' ? sale.taxRate : 0,
+            taxAmount,
+            grandTotal,
+            currency: sale.currency as any,
+            status: 'Gönderildi',
+            notes: '',
+            createdAt: sale.createdAt,
+            updatedAt: sale.updatedAt,
+          }} customer={customer} />
+        );
+      })()}
     </div>
   );
 } 
