@@ -78,23 +78,35 @@ export default function PaymentDetailPage() {
         {payment.description && <p><strong>Açıklama:</strong> {payment.description}</p>}
         {payment.checkSerialNumber && <p><strong>Çek Seri No:</strong> {payment.checkSerialNumber}</p>}
         {payment.checkDate && <p><strong>Çek Tarihi:</strong> {format(new Date(payment.checkDate), 'dd.MM.yyyy', { locale: tr })}</p>}
-        {payment.checkImageUrl && (
+        {(payment as any).checkImageUrl && (
           <div>
             <strong>Çek Görseli:</strong>
             <div className="mt-2">
-              <a href={payment.checkImageUrl} target="_blank" className="text-blue-500 underline">Görseli yeni sekmede aç</a>
+              <a href={(payment as any).checkImageUrl as string} target="_blank" className="text-blue-500 underline">Görseli yeni sekmede aç</a>
               <div className="mt-3">
                 {/* Görsel ise küçük önizleme göster */}
-                {payment.checkImageUrl.match(/\.(png|jpe?g|gif|webp)$/i) ? (
-                  <img src={payment.checkImageUrl} alt="Çek Görseli" className="max-h-64 rounded border" />
+                {(payment as any).checkImageUrl.match(/\.(png|jpe?g|gif|webp)$/i) ? (
+                  <img src={(payment as any).checkImageUrl as string} alt="Çek Görseli" className="max-h-64 rounded border" />
                 ) : (
-                  <iframe src={payment.checkImageUrl} className="w-full h-64 border rounded" />
+                  <iframe src={(payment as any).checkImageUrl as string} className="w-full h-64 border rounded" />
                 )}
               </div>
             </div>
           </div>
         )}
-        {!payment.checkImageUrl && (
+        {!((payment as any).checkImageUrl) && (payment as any).checkImageData && (
+          <div>
+            <strong>Çek Görseli:</strong>
+            <div className="mt-3">
+              {String((payment as any).checkImageData).startsWith('data:application/pdf') ? (
+                <iframe src={(payment as any).checkImageData as string} className="w-full h-64 border rounded" />
+              ) : (
+                <img src={(payment as any).checkImageData as string} alt="Çek Görseli" className="max-h-64 rounded border" />
+              )}
+            </div>
+          </div>
+        )}
+        {!((payment as any).checkImageUrl) && !((payment as any).checkImageData) && (
           <div className="text-sm text-muted-foreground">Çek görseli eklenmemiş veya henüz yüklenmemiş.</div>
         )}
         <p><strong>Oluşturulma Tarihi:</strong> {format(new Date(payment.createdAt), 'dd.MM.yyyy HH:mm', { locale: tr })}</p>

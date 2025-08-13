@@ -199,6 +199,10 @@ export default function CustomerDetailPage() {
                     console.error('Çek görseli API yükleme hatası:', e);
                   }
                 }
+                // API dönüşünde URL gelmemişse fallback olarak base64'i dokümana da yaz (detayda geçici görünür)
+                if (!(maybeWithFile as any).checkImageUrl && (values as any).checkImageData) {
+                  (maybeWithFile as any).checkImageData = (values as any).checkImageData;
+                }
                 const newPayment = await storage.addPayment(user.uid, { ...maybeWithFile, createdAt: now, updatedAt: now } as any);
                 setPayments(prev => [newPayment, ...prev]);
                 toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
