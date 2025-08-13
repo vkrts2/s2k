@@ -194,6 +194,19 @@ export function PaymentModal({
                       reader.onload = () => {
                         const dataUrl = reader.result as string;
                         setFormValues({ ...formValues, checkImageFile: file as any, checkImageData: dataUrl as any, checkImageMimeType: file.type as any });
+                        // İsteğe bağlı: anında server yükleme (build uyumlu API route)
+                        const body = new FormData();
+                        body.append('uid', (window as any).currentUserId || 'public');
+                        body.append('dataUrl', dataUrl);
+                        body.append('mime', file.type);
+                        fetch('/api/upload-check-image', { method: 'POST', body })
+                          .then(res => res.json())
+                          .then(json => {
+                            if (json?.url) {
+                              setFormValues(prev => ({ ...prev, checkImageUrl: json.url as any }));
+                            }
+                          })
+                          .catch(() => {});
                       };
                       reader.readAsDataURL(file);
                     } catch (err) {

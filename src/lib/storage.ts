@@ -2,7 +2,8 @@
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, setDoc, getDoc, limit, DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { adminBucket } from '@/lib/firebaseAdmin';
+// Server build için firebase-admin sadece server dosyalarında import edilmeli.
+// Storage katmanı API route üzerinden çağrıldığı için burada ayrıca admin importuna gerek yok.
 import { formatISO, parseISO, format, addDays } from 'date-fns';
 import type { Customer, Sale, Payment, Currency, Supplier, Purchase, PaymentToSupplier, TodoItem, PortfolioItem, ArchivedFile, UsefulLink, StockItem, Price, Quotation, QuotationItem, ContactHistoryItem, SupplierTask, Cost, Order, OrderItem } from "./types";
 import type { BankCheck } from "./types";
