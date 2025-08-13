@@ -149,6 +149,8 @@ export type PaymentFormValues = {
   checkSerialNumber?: string | null;
   checkImageFile?: File | null;
   checkImageUrl?: string | null;
+  checkImageData?: string | null; // data URL (base64)
+  checkImageMimeType?: string | null;
 };
 
 export interface PaymentToSupplierFormValues {
@@ -215,6 +217,8 @@ export interface Payment {
   checkDate?: string | null;
   checkSerialNumber?: string | null;
   checkImageUrl?: string | null;
+  checkImageData?: string | null;
+  checkImageMimeType?: string | null;
   category: TransactionCategory;
   tags: TransactionTag[];
   createdAt: string; // ISO 8601 format

@@ -189,23 +189,16 @@ export function PaymentModal({
                     const file = e.target.files?.[0] || null;
                     if (!file) return;
                     try {
-                      // Sunucu tarafı upload: CORS problemi yaşamamak için
-                      const body = new FormData();
-                      // uid istemcide AuthContext'ten alınır; yoksa 'public' kullanır.
-                      const uid = (window as any).currentUserId || 'public';
-                      body.append('uid', uid);
-                      body.append('file', file);
-                      const res = await fetch('/api/upload-check-image', { method: 'POST', body });
-                      const json = await res.json();
-                      if (res.ok && json.url) {
-                        setFormValues({ ...formValues, checkImageFile: file as any, checkImageUrl: json.url as any });
-                      } else {
-                        console.error('Dosya yüklenemedi', json);
-                        alert('Çek görseli yüklenemedi. Lütfen tekrar deneyin.');
-                      }
+                      // Önce local preview için base64 kaydet, kaydet’e basınca server’a yükleriz
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const dataUrl = reader.result as string;
+                        setFormValues({ ...formValues, checkImageFile: file as any, checkImageData: dataUrl as any, checkImageMimeType: file.type as any });
+                      };
+                      reader.readAsDataURL(file);
                     } catch (err) {
-                      console.error('Upload error', err);
-                      alert('Çek görseli yüklenemedi.');
+                      console.error('Read file error', err);
+                      alert('Çek görseli okunamadı.');
                     }
                   }}
                   required={false}

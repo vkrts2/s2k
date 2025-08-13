@@ -2,6 +2,7 @@
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, setDoc, getDoc, limit, DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { adminBucket } from '@/lib/firebaseAdmin';
 import { formatISO, parseISO, format, addDays } from 'date-fns';
 import type { Customer, Sale, Payment, Currency, Supplier, Purchase, PaymentToSupplier, TodoItem, PortfolioItem, ArchivedFile, UsefulLink, StockItem, Price, Quotation, QuotationItem, ContactHistoryItem, SupplierTask, Cost, Order, OrderItem } from "./types";
 import type { BankCheck } from "./types";
@@ -388,6 +389,21 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
   // Eğer server upload ile gelen bir URL varsa doğrudan kullan
   if ((paymentData as any).checkImageUrl) {
     newPaymentData.checkImageUrl = (paymentData as any).checkImageUrl;
+  } else if ((paymentData as any).checkImageData) {
+    // Sunucuda yükle: base64 data URL ile geldiyse burada admin ile yükleyelim
+    try {
+      const dataUrl: string = (paymentData as any).checkImageData;
+      const mime: string = (paymentData as any).checkImageMimeType || 'application/octet-stream';
+      const base64 = dataUrl.split(',')[1];
+      const buffer = Buffer.from(base64, 'base64');
+      const filename = `${uid}/checks/${Date.now()}.upload`;
+      const file = adminBucket.file(filename);
+      await file.save(buffer, { contentType: mime, resumable: false, metadata: { cacheControl: 'public, max-age=31536000' } });
+      const [url] = await file.getSignedUrl({ action: 'read', expires: '2100-01-01' });
+      newPaymentData.checkImageUrl = url;
+    } catch (e) {
+      console.error('Base64 çek görseli yüklenirken hata:', e);
+    }
   }
   Object.keys(newPaymentData).forEach(key => {
     if (newPaymentData[key] === undefined) newPaymentData[key] = null;
