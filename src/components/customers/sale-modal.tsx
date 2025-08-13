@@ -147,6 +147,7 @@ interface SaleModalProps {
   setFormValues: Dispatch<SetStateAction<SaleFormValues>>;
   availableStockItems: StockItem[];
   customer?: Customer;
+  editingSale?: any;
 }
 
 enum SaleType {
@@ -167,11 +168,12 @@ export function SaleModal({
   setFormValues,
   availableStockItems,
   customer,
+  editingSale,
 }: SaleModalProps) {
   const [openCombobox, setOpenCombobox] = React.useState(false)
   const [saleType, setSaleType] = React.useState<SaleType>(SaleType.STOCK);
   const [invoiceType, setInvoiceType] = React.useState<InvoiceType>(InvoiceType.NORMAL);
-  const [showTypeSelection, setShowTypeSelection] = React.useState(true);
+  const [showTypeSelection, setShowTypeSelection] = React.useState(!editingSale);
   const [invoiceFile, setInvoiceFile] = React.useState<File | null>(null);
 
   // Otomatik tutar hesaplama
@@ -291,7 +293,7 @@ export function SaleModal({
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[860px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Faturalı Satış</DialogTitle>
+            <DialogTitle>{editingSale ? 'Faturalı Satış Düzenle' : 'Faturalı Satış'}</DialogTitle>
             <DialogDescription>
               Kalemleri ekleyin; toplamlar otomatik hesaplanır. Kaydedince satış oluşturulur.
             </DialogDescription>
