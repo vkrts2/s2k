@@ -83,20 +83,23 @@ export default function CustomerDetailPage() {
 
     // Olay Yöneticileri (Event Handlers) with OPTIMISTIC UPDATES
     const handleSaleSubmit = async (values: SaleFormValues, editingSale: Sale | null) => {
-        if (!user || !customer) return;
+        if (!user || !customer) {
+            toast({ title: "Hata", description: "Oturum doğrulanamadı. Lütfen tekrar deneyin.", variant: "destructive" });
+            throw new Error('Missing user or customer');
+        }
         if (!values.date || !(values.date instanceof Date) || isNaN(values.date.getTime())) {
             toast({ title: "Hata", description: "Lütfen geçerli bir tarih girin.", variant: "destructive" });
-            return;
+            throw new Error('Invalid date');
         }
-        const parsedAmount = parseFloat(values.amount.toString());
+        const parsedAmount = parseFloat(values.amount.toString().replace(',', '.'));
         if (isNaN(parsedAmount)) {
             toast({ title: "Hata", description: "Lütfen geçerli bir tutar girin.", variant: "destructive" });
-            return;
+            throw new Error('Invalid amount');
         }
         try {
             if (editingSale) {
-                const qty = values.quantity ? parseFloat(values.quantity.toString()) : NaN;
-                const price = values.unitPrice ? parseFloat(values.unitPrice.toString()) : NaN;
+                const qty = values.quantity ? parseFloat(values.quantity.toString().replace(',', '.')) : NaN;
+                const price = values.unitPrice ? parseFloat(values.unitPrice.toString().replace(',', '.')) : NaN;
 
                 const saleData: Sale = {
                     ...editingSale,
@@ -107,17 +110,22 @@ export default function CustomerDetailPage() {
                     stockItemId: values.stockItemId || null,
                     quantity: !isNaN(qty) ? qty : null,
                     unitPrice: !isNaN(price) ? price : null,
-                    taxRate: parseFloat((values as any).taxRate || '0'),
-                    taxAmount: parseFloat((values as any).taxAmount || '0'),
-                    subtotal: parseFloat((values as any).subtotal || '0'),
+                    taxRate: (values as any).taxRate !== undefined ? parseFloat((values as any).taxRate || '0') : editingSale.taxRate,
+                    taxAmount: (values as any).taxAmount !== undefined ? parseFloat((values as any).taxAmount || '0') : editingSale.taxAmount,
+                    subtotal: (values as any).subtotal !== undefined ? parseFloat((values as any).subtotal || '0') : editingSale.subtotal,
+                    invoiceType: (values as any).invoiceType ?? editingSale.invoiceType,
+                    items: (values as any).items ?? editingSale.items,
                     updatedAt: new Date().toISOString()
                 };
                 const updatedSale = await storage.updateSale(user.uid, saleData);
+                // Önce iyimser güncelle
                 setSales(prev => prev.map(s => s.id === updatedSale.id ? updatedSale : s));
+                // Arka planda tazele, hatayı yok say
+                storage.getSales(user.uid, customer.id).then(setSales).catch(() => {});
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla güncellendi.' });
             } else {
-                const qty = values.quantity ? parseFloat(values.quantity.toString()) : NaN;
-                const price = values.unitPrice ? parseFloat(values.unitPrice.toString()) : NaN;
+                const qty = values.quantity ? parseFloat(values.quantity.toString().replace(',', '.')) : NaN;
+                const price = values.unitPrice ? parseFloat(values.unitPrice.toString().replace(',', '.')) : NaN;
 
                 const newSaleData: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'transactionType'> = {
                   customerId: customer.id,
@@ -137,12 +145,16 @@ export default function CustomerDetailPage() {
                   tags: [],
                 };
                 const newSale = await storage.addSale(user.uid, newSaleData);
+                // Önce iyimser ekle
                 setSales(prev => [newSale, ...prev]);
+                // Arka planda tazele, olası index hatasını yut
+                storage.getSales(user.uid, customer.id).then(setSales).catch(() => {});
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla eklendi.' });
             }
         } catch (error) {
             console.error("Satış kaydedilirken hata:", error);
             toast({ title: "Hata", description: "Satış kaydedilemedi.", variant: "destructive" });
+            throw error;
         }
     };
 

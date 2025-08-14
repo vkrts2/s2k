@@ -279,7 +279,7 @@ export const addSale = async (uid: string, saleData: Omit<Sale, 'id' | 'transact
   }
 
   const now = formatISO(new Date());
-  const newSaleData = {
+  const newSaleData: any = {
     ...saleData,
     transactionType: 'sale',
     description: description,
@@ -287,15 +287,20 @@ export const addSale = async (uid: string, saleData: Omit<Sale, 'id' | 'transact
     updatedAt: now,
   };
 
-  const docRef = await addDoc(_getUserCollectionRef(uid, "sales"), newSaleData);
+  // Firestore 'undefined' değeri desteklemez; undefined olan alanları kaldır
+  const sanitized = Object.fromEntries(
+    Object.entries(newSaleData).filter(([, value]) => value !== undefined)
+  );
 
-  return { ...newSaleData, id: docRef.id } as Sale;
+  const docRef = await addDoc(_getUserCollectionRef(uid, "sales"), sanitized as any);
+
+  return { ...(sanitized as any), id: docRef.id } as Sale;
 };
 
 export const updateSale = async (uid: string, updatedSaleData: Sale): Promise<Sale> => {
   const saleDocRef = doc(_getUserCollectionRef(uid, "sales"), updatedSaleData.id);
 
-  const dataToUpdate: Partial<Sale> = {
+  let dataToUpdate: Partial<Sale> = {
     amount: updatedSaleData.amount,
     date: updatedSaleData.date,
     currency: updatedSaleData.currency,
@@ -303,8 +308,18 @@ export const updateSale = async (uid: string, updatedSaleData: Sale): Promise<Sa
     stockItemId: updatedSaleData.stockItemId,
     quantity: updatedSaleData.quantity,
     unitPrice: updatedSaleData.unitPrice,
+    invoiceType: updatedSaleData.invoiceType,
+    items: updatedSaleData.items,
+    taxRate: updatedSaleData.taxRate,
+    taxAmount: updatedSaleData.taxAmount,
+    subtotal: updatedSaleData.subtotal,
     updatedAt: new Date().toISOString(),
   };
+
+  // undefined alanları kaldır
+  dataToUpdate = Object.fromEntries(
+    Object.entries(dataToUpdate).filter(([, value]) => value !== undefined)
+  ) as Partial<Sale>;
 
   await updateDoc(saleDocRef, dataToUpdate);
   
@@ -391,17 +406,21 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
   if ((paymentData as any).checkImageUrl) {
     newPaymentData.checkImageUrl = (paymentData as any).checkImageUrl;
   } else if ((paymentData as any).checkImageData) {
-    // Sunucuda yükle: base64 data URL ile geldiyse burada admin ile yükleyelim
+    // İstemciden API route'a yüklet: firebase-admin'i client bundle'a sokmadan URL al
     try {
       const dataUrl: string = (paymentData as any).checkImageData;
       const mime: string = (paymentData as any).checkImageMimeType || 'application/octet-stream';
-      const base64 = dataUrl.split(',')[1];
-      const buffer = Buffer.from(base64, 'base64');
-      const filename = `${uid}/checks/${Date.now()}.upload`;
-      const file = adminBucket.file(filename);
-      await file.save(buffer, { contentType: mime, resumable: false, metadata: { cacheControl: 'public, max-age=31536000' } });
-      const [url] = await file.getSignedUrl({ action: 'read', expires: '2100-01-01' });
-      newPaymentData.checkImageUrl = url;
+      const body = new FormData();
+      body.append('uid', uid);
+      body.append('dataUrl', dataUrl);
+      body.append('mime', mime);
+      const res = await fetch('/api/upload-check-image', { method: 'POST', body } as any);
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.url) newPaymentData.checkImageUrl = json.url;
+      } else {
+        console.warn('upload-check-image API hatası:', res.status);
+      }
     } catch (e) {
       console.error('Base64 çek görseli yüklenirken hata:', e);
     }

@@ -167,6 +167,8 @@ export function CustomerDetailPageClient({
         currency: sale.currency,
         stockItemId: sale.stockItemId || undefined,
         description: sale.description || '',
+        // Manuel satışlar için ürün adını doldur
+        ...(sale.stockItemId ? {} : { manualProductName: sale.description || '' }),
         quantity: sale.quantity != null ? sale.quantity.toString() : undefined,
         unitPrice: sale.unitPrice != null ? sale.unitPrice.toString() : undefined,
         // faturalı satış düzenleme ipucu alanları

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminBucket } from '@/lib/firebaseAdmin';
+import { getAdminBucket } from '@/lib/firebaseAdmin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'file or dataUrl required' }, { status: 400 });
     }
 
-    const fileRef = adminBucket.file(filename);
+    const fileRef = getAdminBucket().file(filename);
     await fileRef.save(buffer, {
       contentType: mime || 'application/octet-stream',
       resumable: false,

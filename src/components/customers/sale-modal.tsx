@@ -30,12 +30,14 @@ function LightweightInvoiceForm({
   initialItems,
   initialDate,
   initialCurrency,
+  disableTax,
 }: {
   onSubmit: (data: any) => void;
   customerName: string;
   initialItems?: Array<{ id?: string; productName: string; description?: string; quantity: number; unitPrice: number; taxRate?: number; unit?: string }>;
   initialDate?: Date | string;
   initialCurrency?: 'TRY' | 'USD' | 'EUR';
+  disableTax?: boolean;
 }) {
   const [date, setDate] = React.useState<Date>(new Date());
   const [currency, setCurrency] = React.useState<'TRY' | 'USD' | 'EUR'>('TRY');
@@ -54,12 +56,12 @@ function LightweightInvoiceForm({
           productName: it.productName,
           quantity: String(it.quantity ?? ''),
           unitPrice: String(it.unitPrice ?? ''),
-          taxRate: String(it.taxRate ?? '20'),
+          taxRate: String(disableTax ? '0' : (it.taxRate ?? 20)),
           unit: it.unit || 'adet',
         }))
       );
     }
-  }, [initialDate, initialCurrency, initialItems]);
+  }, [initialDate, initialCurrency, initialItems, disableTax]);
 
 	const addItem = () => setItems(prev => [...prev, { id: `${Date.now()}`, productName: '', quantity: '', unitPrice: '', taxRate: '20', unit: 'adet' }]);
   const removeItem = (id: string) => setItems(prev => prev.filter(i => i.id !== id));
@@ -72,14 +74,14 @@ function LightweightInvoiceForm({
     for (const it of items) {
       const q = parseFloat(it.quantity || '0') || 0;
       const p = parseFloat(it.unitPrice || '0') || 0;
-      const t = parseFloat(it.taxRate || '0') || 0;
+      const t = disableTax ? 0 : (parseFloat(it.taxRate || '0') || 0);
       const line = q * p;
       subTotal += line;
       taxAmount += line * (t / 100);
     }
     const grandTotal = subTotal + taxAmount;
     return { subTotal, taxAmount, grandTotal };
-  }, [items]);
+  }, [items, disableTax]);
 
   return (
     <div className="space-y-3">
@@ -109,7 +111,7 @@ function LightweightInvoiceForm({
         </div>
         {items.length === 0 && <div className="text-sm text-muted-foreground">Henüz kalem eklenmedi.</div>}
 		{items.map(it => (
-			<div key={it.id} className="grid grid-cols-6 gap-2">
+			<div key={it.id} className={`grid ${disableTax ? 'grid-cols-5' : 'grid-cols-6'} gap-2`}>
 				<Input placeholder="Ürün/Hizmet" value={it.productName} onChange={e => updateItem(it.id, { productName: e.target.value })} />
 				<Input type="number" placeholder="Miktar" value={it.quantity} onChange={e => updateItem(it.id, { quantity: e.target.value })} />
 				<Select value={it.unit} onValueChange={v => updateItem(it.id, { unit: v })}>
@@ -122,20 +124,22 @@ function LightweightInvoiceForm({
 					</SelectContent>
 				</Select>
 				<Input type="number" placeholder="Birim Fiyat" value={it.unitPrice} onChange={e => updateItem(it.id, { unitPrice: e.target.value })} />
-				<Select value={it.taxRate} onValueChange={v => updateItem(it.id, { taxRate: v })}>
-					<SelectTrigger><SelectValue /></SelectTrigger>
-					<SelectContent>
-						<SelectItem value="10">%10</SelectItem>
-						<SelectItem value="20">%20</SelectItem>
-					</SelectContent>
-				</Select>
+				{!disableTax && (
+				  <Select value={it.taxRate} onValueChange={v => updateItem(it.id, { taxRate: v })}>
+					  <SelectTrigger><SelectValue /></SelectTrigger>
+					  <SelectContent>
+						  <SelectItem value="10">%10</SelectItem>
+						  <SelectItem value="20">%20</SelectItem>
+					  </SelectContent>
+				  </Select>
+				)}
 				<Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
 			</div>
 		))}
       </div>
       <div className="space-y-1 text-right">
         <div className="text-sm">Ara Toplam: {totals.subTotal.toFixed(2)}</div>
-        <div className="text-sm">KDV Tutarı: {totals.taxAmount.toFixed(2)}</div>
+        {!disableTax && (<div className="text-sm">KDV Tutarı: {totals.taxAmount.toFixed(2)}</div>)}
         <div className="font-semibold">Genel Toplam: {totals.grandTotal.toFixed(2)}</div>
       </div>
       <div className="flex justify-end gap-2">
@@ -208,14 +212,11 @@ export function SaleModal({
   // Düzenleme modunda mevcut satışın tipine göre doğru formu aç
   React.useEffect(() => {
     if (!editingSale) return;
-    const isInvoice = (editingSale as any).invoiceType === 'invoice' || (Array.isArray((editingSale as any).items) && (editingSale as any).items.length > 0);
-    if (isInvoice) {
-      setInvoiceType(InvoiceType.INVOICE);
-      setShowTypeSelection(false);
-    } else {
-      setInvoiceType(InvoiceType.NORMAL);
-      setShowTypeSelection(false);
-      // Manuel formda alt seçim: stok/manuel tahmini
+    const isInvoice = (editingSale as any).invoiceType === 'invoice';
+    setInvoiceType(isInvoice ? InvoiceType.INVOICE : InvoiceType.NORMAL);
+    setShowTypeSelection(false);
+    if (!isInvoice) {
+      // Manuel düzenleme: stok mu manuel mi belirle
       if ((editingSale as any).stockItemId) setSaleType(SaleType.STOCK);
       else setSaleType(SaleType.MANUAL);
     }
@@ -223,8 +224,8 @@ export function SaleModal({
 
   // Otomatik tutar hesaplama
   React.useEffect(() => {
-    const quantity = parseFloat(formValues.quantity as any);
-    const unitPrice = parseFloat(formValues.unitPrice as any);
+    const quantity = parseFloat(String(formValues.quantity ?? '').replace(',', '.'));
+    const unitPrice = parseFloat(String(formValues.unitPrice ?? '').replace(',', '.'));
     if (!isNaN(quantity) && !isNaN(unitPrice)) {
       const calculated = (quantity * unitPrice).toFixed(2);
       if (formValues.amount !== calculated) {
@@ -269,14 +270,20 @@ export function SaleModal({
       return;
     }
     try {
-      // amount ve unitPrice'ı hem string hem number olarak gönder
-      const submitValues = {
+      // Manuel modda LightweightInvoiceForm'dan gelen items/subtotal/toplam varsa bunları kullan
+      const submitValues: any = {
         ...formValues,
         amountNumber: parseFloat(String(formValues.amount).replace(',', '.')),
         unitPriceNumber: formValues.unitPrice !== undefined ? parseFloat(String(formValues.unitPrice).replace(',', '.')) : undefined,
         invoiceType: invoiceType,
         invoiceFile: invoiceFile,
       };
+      if (saleType === 'manual' as any && (formValues as any).items) {
+        submitValues.items = (formValues as any).items;
+        // tax kapalı olduğu için subtotal = grandTotal ve taxAmount = 0 gibi davranacağız; amount zaten grandTotal
+        submitValues.subtotal = undefined;
+        submitValues.taxAmount = undefined;
+      }
       await onSubmit(submitValues);
     } catch (error) {
       console.error("Error submitting sale form:", error);
@@ -285,6 +292,10 @@ export function SaleModal({
 
   const handleTypeSelection = (type: InvoiceType) => {
     setInvoiceType(type);
+    // Manuel satış istendiğinde doğrudan manuel (faturalı görünümlü) forma geç
+    if (type === InvoiceType.NORMAL) {
+      setSaleType(SaleType.MANUAL);
+    }
     setShowTypeSelection(false);
   };
 
@@ -376,7 +387,7 @@ export function SaleModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[860px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingSale ? 'Satışı Düzenle' : (invoiceType === InvoiceType.INVOICE ? 'Faturalı Satış Ekle' : 'Satış Ekle')}
@@ -452,54 +463,76 @@ export function SaleModal({
               </div>
             ) : (
               <div className="grid gap-2">
-                <Label htmlFor="manualProductName">Ürün Adı</Label>
-                <Input
-                  id="manualProductName"
-                  value={(formValues as any).manualProductName || ''}
-                  onChange={e => setFormValues(prev => ({ ...prev, manualProductName: e.target.value }))}
-                  placeholder="Ürün adını girin..."
-                  required
+                {/* Manuel satış için faturalı formun hafif versiyonu, KDV kapalı */}
+                <LightweightInvoiceForm
+                  customerName={customer?.name || ''}
+                  initialItems={Array.isArray((formValues as any).items) ? (formValues as any).items : undefined}
+                  initialDate={formValues.date}
+                  initialCurrency={formValues.currency}
+                  disableTax
+                  onSubmit={(data: any) => {
+                    const desc = Array.isArray(data.items) && data.items.length > 0
+                      ? `${data.items[0].productName}${data.items.length > 1 ? ` +${data.items.length - 1} kalem` : ''}`
+                      : (formValues.description || 'Satış');
+                    // Manuel satışta doğrudan kaydet
+                    onSubmit({
+                      amount: String(data.grandTotal ?? 0),
+                      date: data.date,
+                      currency: data.currency ?? 'TRY',
+                      description: desc,
+                      items: data.items || [],
+                      invoiceType: 'normal',
+                    } as any);
+                  }}
                 />
               </div>
             )}
+            {saleType === SaleType.STOCK && (
             <div className="grid gap-2">
               <Label htmlFor="quantity">Miktar</Label>
               <Input
                 id="quantity"
-                type="number"
-                step="1"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={formValues.quantity || ''}
-                onChange={(e) => setFormValues({ ...formValues, quantity: e.target.value })}
+                onChange={(e) => setFormValues({ ...formValues, quantity: e.target.value.replace(/[^0-9]/g, '') })}
                 required
               />
             </div>
+            )}
+            {saleType === SaleType.STOCK && (
             <div className="grid gap-2">
               <Label htmlFor="unitPrice">Birim Fiyat</Label>
               <Input
                 id="unitPrice"
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={formValues.unitPrice || ''}
-                onChange={(e) => setFormValues({ ...formValues, unitPrice: e.target.value })}
+                onChange={(e) => setFormValues({ ...formValues, unitPrice: e.target.value.replace(/,/g, '.') })}
                 required
               />
               <span className="text-xs text-muted-foreground">Negatif değer girebilirsiniz (devreden bakiye için).</span>
             </div>
+            )}
             {/* Faturalı modda artık QuotationForm kullanılıyor, bu yüzden KDV ve dosya alanları burada gösterilmiyor */}
+            {saleType === SaleType.STOCK && (
             <div className="grid gap-2">
               <Label htmlFor="amount">
                 {invoiceType === InvoiceType.INVOICE ? 'Toplam Tutar (KDV Dahil)' : 'Tutar'}
               </Label>
               <Input
                 id="amount"
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={formValues.amount}
-                onChange={(e) => setFormValues({ ...formValues, amount: e.target.value })}
+                onChange={(e) => setFormValues({ ...formValues, amount: e.target.value.replace(/,/g, '.') })}
                 required
               />
               <span className="text-xs text-muted-foreground">Negatif değer girebilirsiniz (devreden bakiye için).</span>
             </div>
+            )}
+            {saleType === SaleType.STOCK && (
             <div className="grid gap-2">
               <Label htmlFor="date">Tarih</Label>
                 <Input
@@ -526,6 +559,8 @@ export function SaleModal({
                   maxLength={10}
                 />
             </div>
+            )}
+            {saleType === SaleType.STOCK && (
             <div className="grid gap-2">
               <Label htmlFor="description">Açıklama</Label>
               <Textarea
@@ -535,13 +570,16 @@ export function SaleModal({
                 placeholder="Opsiyonel"
               />
             </div>
+            )}
           </div>
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              İptal
-            </Button>
-            <Button type="submit">Kaydet</Button>
-          </div>
+          {saleType !== SaleType.MANUAL && (
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                İptal
+              </Button>
+              <Button type="submit">Kaydet</Button>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>
