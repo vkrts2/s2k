@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { QuotationPrintView } from '@/components/quotations/quotation-print-view';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import BackToHomeButton from '@/components/common/back-to-home-button';
 
 export default function SaleDetailPage() {
   const { id: customerId, saleId } = useParams() as { id: string, saleId: string };
@@ -101,6 +102,7 @@ export default function SaleDetailPage() {
 
     return (
       <div className="container mx-auto p-6">
+        <BackToHomeButton />
         <h1 className="text-3xl font-bold mb-6">Satış Detayı</h1>
         <QuotationPrintView quotation={{
           id: sale.id,
@@ -143,6 +145,7 @@ export default function SaleDetailPage() {
 
   return (
     <div className="container mx-auto p-6">
+      <BackToHomeButton />
       <h1 className="text-3xl font-bold mb-6">Satış Detayı</h1>
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
