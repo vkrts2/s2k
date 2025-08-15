@@ -51,10 +51,6 @@ export function PaymentModal({
       alert('Lütfen geçerli bir tarih giriniz!');
       return;
     }
-    if (formValues.method === 'cek' && (!formValues.checkSerialNumber || formValues.checkSerialNumber.trim() === '')) {
-      alert('Çek ödemesi için çek seri numarası gereklidir!');
-      return;
-    }
     try {
       setIsSubmitting(true); // Gönderim başladığında durumu güncelle
       await onSubmit(formValues);
