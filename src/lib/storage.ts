@@ -429,6 +429,44 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
     if (newPaymentData[key] === undefined) newPaymentData[key] = null;
   });
   const docRef = await addDoc(_getUserCollectionRef(uid, "payments"), newPaymentData);
+  
+  // Eğer ödeme yöntemi çek ise, çek yönetimine de kaydet
+  if (paymentData.method === 'cek' && paymentData.checkSerialNumber) {
+    try {
+      // Çek verilerini hazırla
+      const checkData: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'> = {
+        checkNumber: paymentData.checkSerialNumber,
+        bankName: paymentData.description?.split(' ')?.[0] || 'Belirtilmemiş',
+        branchName: '',
+        accountNumber: '',
+        amount: parseFloat(paymentData.amount.toString()),
+        issueDate: now,
+        dueDate: paymentData.checkDate || now,
+        status: 'pending',
+        partyName: paymentData.customerId || '',
+        partyType: 'customer',
+        description: paymentData.description || '',
+        images: []
+      };
+      
+      // Çek görseli varsa ekle
+      if ((paymentData as any).checkImageUrl) {
+        // URL'den dosya adını çıkar
+        const url = (paymentData as any).checkImageUrl;
+        const urlParts = url.split('/');
+        const imageName = urlParts[urlParts.length - 1];
+        // Çek görselini kaydet
+        checkData.images = [imageName];
+      }
+      
+      // Çeki kaydet
+      await addCheck(uid, checkData);
+    } catch (error) {
+      console.error('Çek yönetimine kaydetme hatası:', error);
+      // Ana işlemi etkilememesi için hata fırlatmıyoruz
+    }
+  }
+  
   return { ...newPaymentData, id: docRef.id } as Payment;
 };
 
@@ -1001,7 +1039,9 @@ export const getCheckById = async (uid: string, checkId: string): Promise<BankCh
 export const addCheck = async (uid: string, data: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'>): Promise<BankCheck> => {
   try {
     const now = new Date().toISOString();
-    const payload: Omit<BankCheck, 'id'> = { ...data, createdAt: now, updatedAt: now };
+    // uid alanını ekleyerek çek belgesinin hangi kullanıcıya ait olduğunu belirtiyoruz
+    // Bu, çek görsellerini görüntülerken doğru kullanıcı ID'sini bulmak için kullanılacak
+    const payload: Omit<BankCheck, 'id'> = { ...data, createdAt: now, updatedAt: now, uid };
     console.log('Adding check to Firestore:', payload);
     const refDoc = await addDoc(_getUserCollectionRef(uid, "checks"), payload as any);
     console.log('Check added successfully with ID:', refDoc.id);

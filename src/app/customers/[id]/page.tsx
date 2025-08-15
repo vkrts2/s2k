@@ -160,6 +160,7 @@ export default function CustomerDetailPage() {
 
     const handlePaymentSubmit = async (values: PaymentFormValues, editingPayment: Payment | null) => {
         if (!user || !customer) return;
+        
         try {
             if (editingPayment) {
                  const paymentData: Payment = {
@@ -220,10 +221,20 @@ export default function CustomerDetailPage() {
                 const newPayment = await storage.addPayment(user.uid, { ...maybeWithFile, createdAt: now, updatedAt: now } as any);
                 setPayments(prev => [newPayment, ...prev]);
                 toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
+                
+                // Çek ödemesi ise, kullanıcıya çek yönetimine de kaydedildiğini bildir
+                if (values.method === 'cek') {
+                  toast({ 
+                    title: 'Bilgi', 
+                    description: 'Çek ödemesi aynı zamanda çek yönetimine de kaydedildi.'
+                  });
+                }
             }
+            return Promise.resolve(); // Başarılı işlem sonrası Promise döndür
         } catch (error) {
             console.error("Ödeme kaydedilirken hata:", error);
             toast({ title: "Hata", description: "Ödeme kaydedilemedi.", variant: "destructive" });
+            return Promise.reject(error); // Hata durumunda Promise.reject döndür
         }
     };
     

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminBucket } from '@/lib/firebaseAdmin';
+import { getServerSession } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -7,11 +8,17 @@ export const maxDuration = 20;
 
 export async function POST(req: NextRequest) {
   try {
+    // Kullanıcı oturumunu al
+    const session = await getServerSession();
+    if (!session || !session.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const uid = session.user.id;
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const dataUrl = formData.get('dataUrl') as string | null;
     const mime = (formData.get('mime') as string | null) || (file ? file.type : 'application/octet-stream');
-    const uid = (formData.get('uid') as string | null) || 'public';
     let buffer: Buffer;
     let filename: string;
 

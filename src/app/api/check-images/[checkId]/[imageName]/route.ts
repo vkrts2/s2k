@@ -12,10 +12,42 @@ export async function GET(req: NextRequest, { params }: { params: { checkId: str
     // URL'den gelen imageName'i decode et
     const decodedImageName = decodeURIComponent(imageName);
     
-    // Kullanıcı ID'sini almak için URL'den checkId'yi kullan
-    // Bu örnekte, checkId'nin kullanıcı ID'sini içerdiğini varsayıyoruz
-    // Gerçek uygulamada, checkId'den kullanıcı ID'sini almak için Firestore sorgusu yapabilirsiniz
-    const uid = 'public'; // Örnek olarak 'public' kullanıyoruz, gerçek uygulamada değiştirin
+    // Çek ID'sinden kullanıcı ID'sini almak için Firestore'dan çek bilgilerini sorgulayalım
+    const { getCheckById } = await import('@/lib/storage');
+    const { getFirestore, doc, getDoc } = await import('firebase/firestore');
+    const { app } = await import('@/lib/firebase');
+    
+    // Firestore'dan çek belgesini al
+    const db = getFirestore(app);
+    // Tüm kullanıcıların koleksiyonlarını kontrol etmemiz gerekiyor
+    // Önce kullanıcı koleksiyonlarını alalım
+    const { collection, getDocs } = await import('firebase/firestore');
+    const usersCollection = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersCollection);
+    
+    let checkSnap = null;
+    let foundUid = null;
+    
+    // Her kullanıcının çek koleksiyonunu kontrol et
+    for (const userDoc of usersSnapshot.docs) {
+      const uid = userDoc.id;
+      const checkRef = doc(db, `users/${uid}/checks`, checkId);
+      const tempCheckSnap = await getDoc(checkRef);
+      
+      if (tempCheckSnap.exists()) {
+        checkSnap = tempCheckSnap;
+        foundUid = uid;
+        break;
+      }
+    }
+    
+    // Çek bulunamadıysa hata döndür
+    if (!checkSnap || !foundUid) {
+      return NextResponse.json({ error: 'Çek bulunamadı' }, { status: 404 });
+    }
+    
+    // Bulunan kullanıcı ID'sini kullan
+    const uid = foundUid;
     
     // Dosya yolunu oluştur
     const filePath = `${uid}/checks/${decodedImageName}`;
