@@ -198,8 +198,9 @@ export default function CheckDetailPage() {
                       size="sm" 
                       className="mt-2 w-full"
                       onClick={() => {
-                        // TODO: Implement image download/view functionality
-                        console.log('Viewing image:', imageName);
+                        // Görsel URL'sini oluştur ve yeni sekmede aç
+                        const imageUrl = `/api/check-images/${checkId}/${encodeURIComponent(imageName)}`;
+                        window.open(imageUrl, '_blank');
                       }}
                     >
                       <Download className="mr-2 h-4 w-4" />

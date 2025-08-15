@@ -60,183 +60,284 @@ export function PaymentModal({
     }
   }, [formValues.date]);
 
+  const isCheckMethod = formValues.method === 'cek';
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className={cn(
+        "sm:max-w-[425px]",
+        isCheckMethod && "sm:max-w-[700px] max-h-[500px]"
+      )}>
         <DialogHeader>
           <DialogTitle>Ödeme Ekle</DialogTitle>
           <DialogDescription>Yeni bir ödeme işlemi ekleyin veya mevcut bir ödemeyi düzenleyin.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="amount">Tutar</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                value={formValues.amount}
-                onChange={(e) => setFormValues({ ...formValues, amount: e.target.value })}
-                required
-              />
+          {isCheckMethod ? (
+            // Çek için kare tasarım
+            <div className="grid grid-cols-2 gap-6">
+              {/* Sol kolon */}
+              <div className="space-y-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="amount">Tutar</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    value={formValues.amount}
+                    onChange={(e) => setFormValues({ ...formValues, amount: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="date">Tarih</Label>
+                  <Input
+                    type="text"
+                    placeholder="gg.aa.yyyy"
+                    value={formValues.dateInput ?? (formValues.date ? format(formValues.date, 'dd.MM.yyyy') : '')}
+                    onChange={e => {
+                      let val = e.target.value.replace(/[^0-9]/g, ''); // Sadece rakamları al
+                      if (val.length > 8) val = val.slice(0, 8);
+                      // Noktalama: 2. ve 4. karakterden sonra otomatik ekle
+                      if (val.length > 4) val = val.slice(0,2) + '.' + val.slice(2,4) + '.' + val.slice(4);
+                      else if (val.length > 2) val = val.slice(0,2) + '.' + val.slice(2);
+                      setFormValues(prev => ({ ...prev, dateInput: val }));
+                      if (val.length === 10) {
+                        const parsed = parse(val, 'dd.MM.yyyy', new Date());
+                        if (isValid(parsed)) {
+                          setFormValues(prev => ({ ...prev, date: parsed, dateInput: val }));
+                        }
+                      } else {
+                        setFormValues(prev => ({ ...prev, date: undefined }));
+                      }
+                    }}
+                    className="w-32"
+                    maxLength={10}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="currency">Para Birimi</Label>
+                  <Select
+                    value={formValues.currency}
+                    onValueChange={(value: Currency) => setFormValues({ ...formValues, currency: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Para birimi seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TRY">TRY</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="method">Ödeme Yöntemi</Label>
+                  <Select
+                    value={formValues.method}
+                    onValueChange={(value: 'nakit' | 'krediKarti' | 'havale' | 'diger' | 'cek') => setFormValues({ ...formValues, method: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ödeme yöntemi seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nakit">Nakit</SelectItem>
+                      <SelectItem value="krediKarti">Kredi Kartı</SelectItem>
+                      <SelectItem value="havale">Havale/EFT</SelectItem>
+                      <SelectItem value="diger">Diğer</SelectItem>
+                      <SelectItem value="cek">Çek</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="checkDate">Çek Tarihi</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !formValues.checkDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formValues.checkDate ? format(formValues.checkDate, "PPP", { locale: tr }) : "Çek Tarihi seçin"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={formValues.checkDate || undefined}
+                        onSelect={(date) => setFormValues({ ...formValues, checkDate: date || null })}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Sağ kolon */}
+              <div className="space-y-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="checkSerialNumber">Çek Seri Numarası</Label>
+                  <Input
+                    id="checkSerialNumber"
+                    value={formValues.checkSerialNumber || ''}
+                    onChange={(e) => setFormValues({ ...formValues, checkSerialNumber: e.target.value || null })}
+                    placeholder="Çek seri numarasını girin"
+                    required={formValues.method === 'cek'}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="checkImage">Çek Görseli (JPG/PNG/PDF)</Label>
+                  <Input
+                    id="checkImage"
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0] || null;
+                      if (!file) return;
+                      try {
+                        // Önce local preview için base64 kaydet, kaydet'e basınca server'a yükleriz
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const dataUrl = reader.result as string;
+                          setFormValues({ ...formValues, checkImageFile: file as any, checkImageData: dataUrl as any, checkImageMimeType: file.type as any });
+                          // İsteğe bağlı: anında server yükleme (build uyumlu API route)
+                          const body = new FormData();
+                          body.append('uid', (window as any).currentUserId || 'public');
+                          body.append('dataUrl', dataUrl);
+                          body.append('mime', file.type);
+                          fetch('/api/upload-check-image', { method: 'POST', body })
+                            .then(res => res.json())
+                            .then(json => {
+                              if (json?.url) {
+                                setFormValues(prev => ({ ...prev, checkImageUrl: json.url as any }));
+                              }
+                            })
+                            .catch(() => {});
+                        };
+                        reader.readAsDataURL(file);
+                      } catch (err) {
+                        console.error('Read file error', err);
+                        alert('Çek görseli okunamadı.');
+                      }
+                    }}
+                    required={false}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="referenceNumber">Referans No</Label>
+                  <Input
+                    id="referenceNumber"
+                    value={formValues.referenceNumber || ''}
+                    onChange={(e) => setFormValues({ ...formValues, referenceNumber: e.target.value || null })}
+                    placeholder="Opsiyonel"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="description">Açıklama</Label>
+                  <Input
+                    id="description"
+                    value={formValues.description || ''}
+                    onChange={(e) => setFormValues({ ...formValues, description: e.target.value })}
+                    placeholder="Opsiyonel"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="date">Tarih</Label>
+          ) : (
+            // Diğer ödeme yöntemleri için mevcut tasarım
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="amount">Tutar</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  value={formValues.amount}
+                  onChange={(e) => setFormValues({ ...formValues, amount: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="date">Tarih</Label>
                 <Input
                   type="text"
                   placeholder="gg.aa.yyyy"
-                value={formValues.dateInput ?? (formValues.date ? format(formValues.date, 'dd.MM.yyyy') : '')}
+                  value={formValues.dateInput ?? (formValues.date ? format(formValues.date, 'dd.MM.yyyy') : '')}
                   onChange={e => {
-                  let val = e.target.value.replace(/[^0-9]/g, ''); // Sadece rakamları al
-                  if (val.length > 8) val = val.slice(0, 8);
-                  // Noktalama: 2. ve 4. karakterden sonra otomatik ekle
-                  if (val.length > 4) val = val.slice(0,2) + '.' + val.slice(2,4) + '.' + val.slice(4);
-                  else if (val.length > 2) val = val.slice(0,2) + '.' + val.slice(2);
-                  setFormValues(prev => ({ ...prev, dateInput: val }));
-                  if (val.length === 10) {
-                    const parsed = parse(val, 'dd.MM.yyyy', new Date());
-                    if (isValid(parsed)) {
-                      setFormValues(prev => ({ ...prev, date: parsed, dateInput: val }));
-                    }
+                    let val = e.target.value.replace(/[^0-9]/g, ''); // Sadece rakamları al
+                    if (val.length > 8) val = val.slice(0, 8);
+                    // Noktalama: 2. ve 4. karakterden sonra otomatik ekle
+                    if (val.length > 4) val = val.slice(0,2) + '.' + val.slice(2,4) + '.' + val.slice(4);
+                    else if (val.length > 2) val = val.slice(0,2) + '.' + val.slice(2);
+                    setFormValues(prev => ({ ...prev, dateInput: val }));
+                    if (val.length === 10) {
+                      const parsed = parse(val, 'dd.MM.yyyy', new Date());
+                      if (isValid(parsed)) {
+                        setFormValues(prev => ({ ...prev, date: parsed, dateInput: val }));
+                      }
                     } else {
-                    setFormValues(prev => ({ ...prev, date: undefined }));
+                      setFormValues(prev => ({ ...prev, date: undefined }));
                     }
                   }}
                   className="w-32"
                   maxLength={10}
                 />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="currency">Para Birimi</Label>
-              <Select
-                value={formValues.currency}
-                onValueChange={(value: Currency) => setFormValues({ ...formValues, currency: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Para birimi seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TRY">TRY</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="method">Ödeme Yöntemi</Label>
-              <Select
-                value={formValues.method}
-                onValueChange={(value: 'nakit' | 'krediKarti' | 'havale' | 'diger') => setFormValues({ ...formValues, method: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Ödeme yöntemi seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nakit">Nakit</SelectItem>
-                  <SelectItem value="krediKarti">Kredi Kartı</SelectItem>
-                  <SelectItem value="havale">Havale/EFT</SelectItem>
-                  <SelectItem value="diger">Diğer</SelectItem>
-                  <SelectItem value="cek">Çek</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {formValues.method === 'cek' && (
-              <div className="grid gap-2">
-                <Label htmlFor="checkDate">Çek Tarihi</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !formValues.checkDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formValues.checkDate ? format(formValues.checkDate, "PPP", { locale: tr }) : "Çek Tarihi seçin"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formValues.checkDate || undefined}
-                      onSelect={(date) => setFormValues({ ...formValues, checkDate: date || null })}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
               </div>
-            )}
-            {formValues.method === 'cek' && (
               <div className="grid gap-2">
-                <Label htmlFor="checkSerialNumber">Çek Seri Numarası</Label>
+                <Label htmlFor="currency">Para Birimi</Label>
+                <Select
+                  value={formValues.currency}
+                  onValueChange={(value: Currency) => setFormValues({ ...formValues, currency: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Para birimi seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TRY">TRY</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="method">Ödeme Yöntemi</Label>
+                <Select
+                  value={formValues.method}
+                  onValueChange={(value: 'nakit' | 'krediKarti' | 'havale' | 'diger' | 'cek') => setFormValues({ ...formValues, method: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ödeme yöntemi seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nakit">Nakit</SelectItem>
+                    <SelectItem value="krediKarti">Kredi Kartı</SelectItem>
+                    <SelectItem value="havale">Havale/EFT</SelectItem>
+                    <SelectItem value="diger">Diğer</SelectItem>
+                    <SelectItem value="cek">Çek</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="referenceNumber">Referans No</Label>
                 <Input
-                  id="checkSerialNumber"
-                  value={formValues.checkSerialNumber || ''}
-                  onChange={(e) => setFormValues({ ...formValues, checkSerialNumber: e.target.value || null })}
-                  placeholder="Çek seri numarasını girin"
-                  required={formValues.method === 'cek'}
+                  id="referenceNumber"
+                  value={formValues.referenceNumber || ''}
+                  onChange={(e) => setFormValues({ ...formValues, referenceNumber: e.target.value || null })}
+                  placeholder="Opsiyonel"
                 />
               </div>
-            )}
-            {formValues.method === 'cek' && (
               <div className="grid gap-2">
-                <Label htmlFor="checkImage">Çek Görseli (JPG/PNG/PDF)</Label>
+                <Label htmlFor="description">Açıklama</Label>
                 <Input
-                  id="checkImage"
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0] || null;
-                    if (!file) return;
-                    try {
-                      // Önce local preview için base64 kaydet, kaydet’e basınca server’a yükleriz
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        const dataUrl = reader.result as string;
-                        setFormValues({ ...formValues, checkImageFile: file as any, checkImageData: dataUrl as any, checkImageMimeType: file.type as any });
-                        // İsteğe bağlı: anında server yükleme (build uyumlu API route)
-                        const body = new FormData();
-                        body.append('uid', (window as any).currentUserId || 'public');
-                        body.append('dataUrl', dataUrl);
-                        body.append('mime', file.type);
-                        fetch('/api/upload-check-image', { method: 'POST', body })
-                          .then(res => res.json())
-                          .then(json => {
-                            if (json?.url) {
-                              setFormValues(prev => ({ ...prev, checkImageUrl: json.url as any }));
-                            }
-                          })
-                          .catch(() => {});
-                      };
-                      reader.readAsDataURL(file);
-                    } catch (err) {
-                      console.error('Read file error', err);
-                      alert('Çek görseli okunamadı.');
-                    }
-                  }}
-                  required={false}
+                  id="description"
+                  value={formValues.description || ''}
+                  onChange={(e) => setFormValues({ ...formValues, description: e.target.value })}
+                  placeholder="Opsiyonel"
                 />
               </div>
-            )}
-            <div className="grid gap-2">
-              <Label htmlFor="referenceNumber">Referans No</Label>
-              <Input
-                id="referenceNumber"
-                value={formValues.referenceNumber || ''}
-                onChange={(e) => setFormValues({ ...formValues, referenceNumber: e.target.value || null })}
-                placeholder="Opsiyonel"
-              />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">Açıklama</Label>
-              <Input
-                id="description"
-                value={formValues.description || ''}
-                onChange={(e) => setFormValues({ ...formValues, description: e.target.value })}
-                placeholder="Opsiyonel"
-              />
-            </div>
-          </div>
+          )}
           <div className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
