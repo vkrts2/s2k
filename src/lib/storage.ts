@@ -401,6 +401,14 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
     checkDate: paymentData.checkDate ?? null,
     checkSerialNumber: paymentData.checkSerialNumber ?? null,
   };
+  // Debug: Gelen ödeme verilerini logla
+  console.log('addPayment çağrıldı:', {
+    method: paymentData.method,
+    checkSerialNumber: paymentData.checkSerialNumber,
+    customerId: paymentData.customerId,
+    amount: paymentData.amount
+  });
+
   // Opsiyonel çek görseli yüklemesi
   // Eğer server upload ile gelen bir URL varsa doğrudan kullan
   if ((paymentData as any).checkImageUrl) {
@@ -417,12 +425,16 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
       const res = await fetch('/api/upload-check-image', { method: 'POST', body } as any);
       if (res.ok) {
         const json = await res.json();
-        if (json?.url) newPaymentData.checkImageUrl = json.url;
+        if (json?.url) {
+          newPaymentData.checkImageUrl = json.url;
+        }
       } else {
-        console.warn('upload-check-image API hatası:', res.status);
+        console.warn('upload-check-image API hatası:', res.status, await res.text());
+        // Görsel yüklenemese de ödeme kaydını devam ettir
       }
     } catch (e) {
       console.error('Base64 çek görseli yüklenirken hata:', e);
+      // Görsel yüklenemese de ödeme kaydını devam ettir
     }
   }
   Object.keys(newPaymentData).forEach(key => {
@@ -431,21 +443,47 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
   const docRef = await addDoc(_getUserCollectionRef(uid, "payments"), newPaymentData);
   
   // Eğer ödeme yöntemi çek ise, çek yönetimine de kaydet
-  if (paymentData.method === 'cek' && paymentData.checkSerialNumber) {
+  if (paymentData.method === 'cek') {
+    console.log('Çek ödemesi tespit edildi, checkSerialNumber:', paymentData.checkSerialNumber);
+    
+    if (!paymentData.checkSerialNumber || paymentData.checkSerialNumber.trim() === '') {
+      console.warn('Çek seri numarası boş, çek yönetimine kaydedilmiyor');
+    } else {
     try {
+      console.log('Çek ödemesi tespit edildi, çek yönetimine kaydediliyor...', {
+        method: paymentData.method,
+        checkSerialNumber: paymentData.checkSerialNumber,
+        customerId: paymentData.customerId
+      });
+
+      // Müşteri adını almak için müşteri bilgisini çek
+      let customerName = 'Belirtilmemiş Müşteri';
+      if (paymentData.customerId) {
+        try {
+          const customer = await getCustomerById(uid, paymentData.customerId);
+          if (customer) {
+            customerName = customer.name || customer.companyName || 'Belirtilmemiş Müşteri';
+            console.log('Müşteri adı bulundu:', customerName);
+          }
+        } catch (e) {
+          console.warn('Müşteri bilgisi alınamadı:', e);
+        }
+      }
+
       // Çek verilerini hazırla
       const checkData: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'> = {
         checkNumber: paymentData.checkSerialNumber,
-        bankName: paymentData.description?.split(' ')?.[0] || 'Belirtilmemiş',
-        branchName: '',
-        accountNumber: '',
+        bankName: paymentData.description?.includes('Banka') ? 
+          paymentData.description.split(' ')[0] : 'Belirtilmemiş Banka',
+        branchName: undefined,
+        accountNumber: undefined,
         amount: parseFloat(paymentData.amount.toString()),
-        issueDate: now,
-        dueDate: paymentData.checkDate || now,
-        status: 'pending',
-        partyName: paymentData.customerId || '',
+        issueDate: paymentData.date || now,
+        dueDate: paymentData.checkDate || paymentData.date || now,
+        status: 'cleared', // Müşteriden alınan çek tahsil edilmiş sayılır
+        partyName: customerName,
         partyType: 'customer',
-        description: paymentData.description || '',
+        description: `Müşteri ödemesi: ${paymentData.description || 'Açıklama yok'}`,
         images: []
       };
       
@@ -455,15 +493,16 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
         const url = (paymentData as any).checkImageUrl;
         const urlParts = url.split('/');
         const imageName = urlParts[urlParts.length - 1];
-        // Çek görselini kaydet
         checkData.images = [imageName];
       }
       
       // Çeki kaydet
       await addCheck(uid, checkData);
+      console.log('Çek yönetimine başarıyla kaydedildi:', checkData.checkNumber);
     } catch (error) {
       console.error('Çek yönetimine kaydetme hatası:', error);
       // Ana işlemi etkilememesi için hata fırlatmıyoruz
+    }
     }
   }
   

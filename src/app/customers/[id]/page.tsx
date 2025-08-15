@@ -218,16 +218,18 @@ export default function CustomerDetailPage() {
                 if (!(maybeWithFile as any).checkImageUrl && (values as any).checkImageData) {
                   (maybeWithFile as any).checkImageData = (values as any).checkImageData;
                 }
+                console.log('Ödeme verisi gönderiliyor:', { ...maybeWithFile, createdAt: now, updatedAt: now });
                 const newPayment = await storage.addPayment(user.uid, { ...maybeWithFile, createdAt: now, updatedAt: now } as any);
                 setPayments(prev => [newPayment, ...prev]);
-                toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
                 
                 // Çek ödemesi ise, kullanıcıya çek yönetimine de kaydedildiğini bildir
                 if (values.method === 'cek') {
                   toast({ 
-                    title: 'Bilgi', 
-                    description: 'Çek ödemesi aynı zamanda çek yönetimine de kaydedildi.'
+                    title: 'Başarılı!', 
+                    description: 'Ödeme eklendi ve çek yönetimine de kaydedildi.'
                   });
+                } else {
+                  toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
                 }
             }
             return Promise.resolve(); // Başarılı işlem sonrası Promise döndür
