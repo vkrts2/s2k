@@ -220,14 +220,15 @@ export default function CustomerDetailPage() {
                 }
                 const newPayment = await storage.addPayment(user.uid, { ...maybeWithFile, createdAt: now, updatedAt: now } as any);
                 setPayments(prev => [newPayment, ...prev]);
-                toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
                 
                 // Çek ödemesi ise, kullanıcıya çek yönetimine de kaydedildiğini bildir
                 if (values.method === 'cek') {
                   toast({ 
-                    title: 'Bilgi', 
-                    description: 'Çek ödemesi aynı zamanda çek yönetimine de kaydedildi.'
+                    title: 'Başarılı!', 
+                    description: 'Ödeme eklendi ve çek yönetimine de kaydedildi.'
                   });
+                } else {
+                  toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
                 }
             }
             return Promise.resolve(); // Başarılı işlem sonrası Promise döndür

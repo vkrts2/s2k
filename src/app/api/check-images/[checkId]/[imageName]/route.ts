@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminBucket } from '@/lib/firebaseAdmin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 20;
 
 export async function GET(req: NextRequest, { params }: { params: { checkId: string, imageName: string } }) {
+  // Build zamanında bu route çalışmamalı
+  if (!process.env.VERCEL_ENV && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not available during build' }, { status: 503 });
+  }
+
   try {
     const { checkId, imageName } = params;
     
@@ -13,15 +17,13 @@ export async function GET(req: NextRequest, { params }: { params: { checkId: str
     const decodedImageName = decodeURIComponent(imageName);
     
     // Çek ID'sinden kullanıcı ID'sini almak için Firestore'dan çek bilgilerini sorgulayalım
-    const { getCheckById } = await import('@/lib/storage');
-    const { getFirestore, doc, getDoc } = await import('firebase/firestore');
+    const { getFirestore, doc, getDoc, collection, getDocs } = await import('firebase/firestore');
     const { app } = await import('@/lib/firebase');
     
     // Firestore'dan çek belgesini al
     const db = getFirestore(app);
     // Tüm kullanıcıların koleksiyonlarını kontrol etmemiz gerekiyor
     // Önce kullanıcı koleksiyonlarını alalım
-    const { collection, getDocs } = await import('firebase/firestore');
     const usersCollection = collection(db, 'users');
     const usersSnapshot = await getDocs(usersCollection);
     
@@ -53,7 +55,9 @@ export async function GET(req: NextRequest, { params }: { params: { checkId: str
     const filePath = `${uid}/checks/${decodedImageName}`;
     
     // Firebase Storage'dan dosyayı al
-    const fileRef = getAdminBucket().file(filePath);
+    const { getAdminBucket } = await import('@/lib/firebaseAdmin');
+    const bucket = getAdminBucket();
+    const fileRef = bucket.file(filePath);
     
     // Dosyanın var olup olmadığını kontrol et
     const [exists] = await fileRef.exists();

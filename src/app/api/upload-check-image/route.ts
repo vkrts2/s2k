@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminBucket } from '@/lib/firebaseAdmin';
-import { getServerSession } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 20;
 
 export async function POST(req: NextRequest) {
+  // Build zamanında bu route çalışmamalı
+  if (!process.env.VERCEL_ENV && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not available during build' }, { status: 503 });
+  }
+
   try {
-    // Kullanıcı oturumunu al
+    // Environment variable'ları kontrol et
+    const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+
+    if (!projectId || !clientEmail || !privateKey) {
+      console.error('Firebase Admin credentials missing during runtime');
+      return NextResponse.json({ 
+        error: 'Firebase Admin not configured properly' 
+      }, { status: 500 });
+    }
+
+    // Auth'u dinamik olarak import et
+    const { getServerSession } = await import('@/lib/auth');
     const session = await getServerSession();
     if (!session || !session.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -35,7 +51,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'file or dataUrl required' }, { status: 400 });
     }
 
-    const fileRef = getAdminBucket().file(filename);
+    // Firebase Admin'i dinamik olarak import et
+    const { getAdminBucket } = await import('@/lib/firebaseAdmin');
+    const bucket = getAdminBucket();
+    const fileRef = bucket.file(filename);
     await fileRef.save(buffer, {
       contentType: mime || 'application/octet-stream',
       resumable: false,
@@ -53,5 +72,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'upload failed' }, { status: 500 });
   }
 }
-
-

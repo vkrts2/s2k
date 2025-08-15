@@ -433,19 +433,33 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
   // Eğer ödeme yöntemi çek ise, çek yönetimine de kaydet
   if (paymentData.method === 'cek' && paymentData.checkSerialNumber) {
     try {
+      // Müşteri adını almak için müşteri bilgisini çek
+      let customerName = 'Belirtilmemiş Müşteri';
+      if (paymentData.customerId) {
+        try {
+          const customer = await getCustomerById(uid, paymentData.customerId);
+          if (customer) {
+            customerName = customer.name || customer.companyName || 'Belirtilmemiş Müşteri';
+          }
+        } catch (e) {
+          console.warn('Müşteri bilgisi alınamadı:', e);
+        }
+      }
+
       // Çek verilerini hazırla
       const checkData: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'> = {
         checkNumber: paymentData.checkSerialNumber,
-        bankName: paymentData.description?.split(' ')?.[0] || 'Belirtilmemiş',
-        branchName: '',
-        accountNumber: '',
+        bankName: paymentData.description?.includes('Banka') ? 
+          paymentData.description.split(' ')[0] : 'Belirtilmemiş Banka',
+        branchName: undefined,
+        accountNumber: undefined,
         amount: parseFloat(paymentData.amount.toString()),
-        issueDate: now,
-        dueDate: paymentData.checkDate || now,
-        status: 'pending',
-        partyName: paymentData.customerId || '',
+        issueDate: paymentData.date || now,
+        dueDate: paymentData.checkDate || paymentData.date || now,
+        status: 'cleared', // Müşteriden alınan çek tahsil edilmiş sayılır
+        partyName: customerName,
         partyType: 'customer',
-        description: paymentData.description || '',
+        description: `Müşteri ödemesi: ${paymentData.description || 'Açıklama yok'}`,
         images: []
       };
       
@@ -455,12 +469,12 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
         const url = (paymentData as any).checkImageUrl;
         const urlParts = url.split('/');
         const imageName = urlParts[urlParts.length - 1];
-        // Çek görselini kaydet
         checkData.images = [imageName];
       }
       
       // Çeki kaydet
       await addCheck(uid, checkData);
+      console.log('Çek yönetimine başarıyla kaydedildi:', checkData.checkNumber);
     } catch (error) {
       console.error('Çek yönetimine kaydetme hatası:', error);
       // Ana işlemi etkilememesi için hata fırlatmıyoruz
@@ -669,6 +683,57 @@ export const addPaymentToSupplier = async (uid: string, paymentData: Omit<Paymen
     updatedAt: now,
   };
   const docRef = await addDoc(_getUserCollectionRef(uid, "paymentsToSuppliers"), newPaymentData);
+  
+  // Eğer ödeme yöntemi çek ise, çek yönetimine de kaydet
+  if (paymentData.method === 'cek' && (paymentData as any).checkSerialNumber) {
+    try {
+      // Tedarikçi adını almak için tedarikçi bilgisini çek
+      let supplierName = 'Belirtilmemiş Tedarikçi';
+      if (paymentData.supplierId) {
+        try {
+          const supplier = await getSupplierById(uid, paymentData.supplierId);
+          if (supplier) {
+            supplierName = supplier.name || supplier.companyName || 'Belirtilmemiş Tedarikçi';
+          }
+        } catch (e) {
+          console.warn('Tedarikçi bilgisi alınamadı:', e);
+        }
+      }
+
+      // Çek verilerini hazırla
+      const checkData: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'> = {
+        checkNumber: (paymentData as any).checkSerialNumber,
+        bankName: paymentData.description?.includes('Banka') ? 
+          paymentData.description.split(' ')[0] : 'Belirtilmemiş Banka',
+        branchName: undefined,
+        accountNumber: undefined,
+        amount: parseFloat(paymentData.amount.toString()),
+        issueDate: paymentData.date || now,
+        dueDate: (paymentData as any).checkDate || paymentData.date || now,
+        status: 'pending', // Tedarikçiye verilen çek beklemede
+        partyName: supplierName,
+        partyType: 'supplier',
+        description: `Tedarikçi ödemesi: ${paymentData.description || 'Açıklama yok'}`,
+        images: []
+      };
+      
+      // Çek görseli varsa ekle
+      if ((paymentData as any).checkImageUrl) {
+        const url = (paymentData as any).checkImageUrl;
+        const urlParts = url.split('/');
+        const imageName = urlParts[urlParts.length - 1];
+        checkData.images = [imageName];
+      }
+      
+      // Çeki kaydet
+      await addCheck(uid, checkData);
+      console.log('Tedarikçi ödemesi çek yönetimine başarıyla kaydedildi:', checkData.checkNumber);
+    } catch (error) {
+      console.error('Tedarikçi ödemesi çek yönetimine kaydetme hatası:', error);
+      // Ana işlemi etkilememesi için hata fırlatmıyoruz
+    }
+  }
+  
   return { ...newPaymentData, id: docRef.id } as PaymentToSupplier;
 };
 
