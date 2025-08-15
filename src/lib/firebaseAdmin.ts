@@ -1,15 +1,5 @@
 // src/lib/firebaseAdmin.ts
-// Bu dosya sadece tip tanımları için kullanılıyor
-// Gerçek Firebase Admin işlemleri API route'larda dinamik olarak yapılıyor
+// Bu dosya artık kullanılmıyor - API route'larda dinamik import kullanılıyor
+// Sadece tip uyumluluğu için boş export
 
-export function getAdminApp(): never {
-  throw new Error('Use dynamic imports in API routes instead');
-}
-
-export function getAdminStorage(): never {
-  throw new Error('Use dynamic imports in API routes instead');
-}
-
-export function getAdminBucket(): never {
-  throw new Error('Use dynamic imports in API routes instead');
-}
+export {};

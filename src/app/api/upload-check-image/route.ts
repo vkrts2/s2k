@@ -26,11 +26,13 @@ export async function POST(req: NextRequest) {
     // Auth'u dinamik olarak import et
     const { getServerSession } = await import('@/lib/auth');
     const session = await getServerSession();
-    if (!session || !session.user?.id) {
+    if (!session || !session.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const uid = session.user.id;
+    // Email'i uid olarak kullan (Firebase Auth'da email unique'dir)
+    const uid = session.user.email.replace(/[^a-zA-Z0-9]/g, '_');
+    
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const dataUrl = formData.get('dataUrl') as string | null;
