@@ -464,5 +464,4 @@ export interface BankCheck extends BaseEntity {
   partyType: 'customer' | 'supplier';
   description?: string;
   images?: string[]; // Array of image file names or URLs
-  uid?: string; // Çekin hangi kullanıcıya ait olduğunu belirtir
 }

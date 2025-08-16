@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PaymentFormValues, Currency } from "@/lib/types";
 import { format, parse, isValid } from "date-fns";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -37,12 +37,8 @@ export function PaymentModal({
   formValues,
   setFormValues,
 }: PaymentModalProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return; // Eğer zaten gönderiliyorsa, işlemi engelle
-    
     if (!formValues.dateInput || formValues.dateInput.length !== 10) {
       alert('Lütfen tarihi gg.aa.yyyy formatında ve eksiksiz giriniz!');
       return;
@@ -52,22 +48,17 @@ export function PaymentModal({
       return;
     }
     try {
-      setIsSubmitting(true); // Gönderim başladığında durumu güncelle
       await onSubmit(formValues);
-      // Başarılı gönderim sonrası formu kapat
-      onClose();
     } catch (error) {
       console.error("Error submitting payment form:", error);
-    } finally {
-      setIsSubmitting(false); // İşlem tamamlandığında durumu sıfırla
     }
   };
 
   React.useEffect(() => {
     if (formValues.date && !formValues.dateInput) {
-      setFormValues(prev => ({ ...prev, dateInput: format(formValues.date as Date, 'dd.MM.yyyy') }));
+      setFormValues(prev => ({ ...prev, dateInput: format(formValues.date, 'dd.MM.yyyy') }));
     }
-  }, [formValues.date, setFormValues]);
+  }, [formValues.date]);
 
   const isCheckMethod = formValues.method === 'cek';
 
@@ -348,22 +339,13 @@ export function PaymentModal({
             </div>
           )}
           <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Kaydediliyor...
-                </>
-              ) : (
-                'Kaydet'
-              )}
-            </Button>
+            <Button type="submit">Kaydet</Button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
   );
-}
+} 

@@ -1,42 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAdminBucket } from '@/lib/firebaseAdmin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 20;
 
 export async function POST(req: NextRequest) {
-  // Sadece runtime'da çalış, build zamanında değil
-  if (!process.env.VERCEL_URL && !process.env.VERCEL_ENV) {
-    return NextResponse.json({ error: 'Service not available' }, { status: 503 });
-  }
-
   try {
-    // Environment variable'ları kontrol et
-    const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
-
-    if (!projectId || !clientEmail || !privateKey) {
-      console.error('Firebase Admin credentials missing');
-      return NextResponse.json({ 
-        error: 'Firebase Admin not configured' 
-      }, { status: 500 });
-    }
-
-    // Auth'u dinamik olarak import et
-    const { getServerSession } = await import('@/lib/auth');
-    const session = await getServerSession();
-    if (!session || !session.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    // Email'i uid olarak kullan (Firebase Auth'da email unique'dir)
-    const uid = session.user.email.replace(/[^a-zA-Z0-9]/g, '_');
-    
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const dataUrl = formData.get('dataUrl') as string | null;
     const mime = (formData.get('mime') as string | null) || (file ? file.type : 'application/octet-stream');
+    const uid = (formData.get('uid') as string | null) || 'public';
     let buffer: Buffer;
     let filename: string;
 
@@ -53,33 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'file or dataUrl required' }, { status: 400 });
     }
 
-    // Firebase Admin'i dinamik olarak import et
-    const { initializeApp, getApps, cert } = await import('firebase-admin/app');
-    const { getStorage } = await import('firebase-admin/storage');
-    
-    let app;
-    const existingApps = getApps();
-    if (existingApps.length > 0) {
-      app = existingApps[0];
-    } else {
-      let cleanPrivateKey = privateKey.replace(/\\n/g, '\n');
-      if (cleanPrivateKey.startsWith('"') && cleanPrivateKey.endsWith('"')) {
-        cleanPrivateKey = cleanPrivateKey.slice(1, -1);
-      }
-      
-      app = initializeApp({
-        credential: cert({ 
-          projectId, 
-          clientEmail, 
-          privateKey: cleanPrivateKey 
-        }),
-        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      });
-    }
-
-    const bucket = getStorage(app).bucket();
-    const fileRef = bucket.file(filename);
-    
+    const fileRef = getAdminBucket().file(filename);
     await fileRef.save(buffer, {
       contentType: mime || 'application/octet-stream',
       resumable: false,
@@ -97,3 +46,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'upload failed' }, { status: 500 });
   }
 }
+
+
