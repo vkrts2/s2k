@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 20;
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest, { params }: { params: { checkId: string, imageName: string } }) {
   // Sadece runtime'da çalış, build zamanında değil
