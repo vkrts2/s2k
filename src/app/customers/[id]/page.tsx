@@ -223,10 +223,11 @@ export default function CustomerDetailPage() {
                 toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
                 
                 // Çek ödemesi ise, kullanıcıya çek yönetimine de kaydedildiğini bildir
-                if (values.method === 'cek') {
+                if (values.method === 'cek' && values.checkSerialNumber) {
                   toast({ 
-                    title: 'Bilgi', 
-                    description: 'Çek ödemesi aynı zamanda çek yönetimine de kaydedildi.'
+                    title: '✅ Çek Kaydedildi', 
+                    description: `Çek (${values.checkSerialNumber}) hem ödeme hem de çek yönetimine kaydedildi.`,
+                    duration: 4000
                   });
                 }
             }

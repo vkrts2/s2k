@@ -433,19 +433,32 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
   // Eğer ödeme yöntemi çek ise, çek yönetimine de kaydet
   if (paymentData.method === 'cek' && paymentData.checkSerialNumber) {
     try {
+      // Müşteri adını al
+      let customerName = 'Bilinmeyen Müşteri';
+      try {
+        const customer = await getCustomerById(uid, paymentData.customerId);
+        if (customer) {
+          customerName = customer.name;
+        }
+      } catch (e) {
+        console.warn('Müşteri adı alınamadı:', e);
+      }
+
       // Çek verilerini hazırla
       const checkData: Omit<BankCheck, 'id' | 'createdAt' | 'updatedAt'> = {
         checkNumber: paymentData.checkSerialNumber,
-        bankName: paymentData.description?.split(' ')?.[0] || 'Belirtilmemiş',
+        bankName: paymentData.description?.includes('Banka') ? 
+                  paymentData.description.split(' ')[0] : 
+                  (paymentData.referenceNumber ? `${paymentData.referenceNumber} Bankası` : 'Belirtilmemiş Banka'),
         branchName: '',
         accountNumber: '',
         amount: parseFloat(paymentData.amount.toString()),
         issueDate: now,
         dueDate: paymentData.checkDate || now,
-        status: 'pending',
-        partyName: paymentData.customerId || '',
+        status: 'cleared', // Müşteriden gelen çek tahsil edilmiş sayılır
+        partyName: customerName,
         partyType: 'customer',
-        description: paymentData.description || '',
+        description: paymentData.description || `${customerName} - Çek Ödemesi`,
         images: []
       };
       
@@ -455,12 +468,12 @@ export const addPayment = async (uid: string, paymentData: Omit<Payment, 'id' | 
         const url = (paymentData as any).checkImageUrl;
         const urlParts = url.split('/');
         const imageName = urlParts[urlParts.length - 1];
-        // Çek görselini kaydet
         checkData.images = [imageName];
       }
       
       // Çeki kaydet
       await addCheck(uid, checkData);
+      console.log('Çek yönetimine başarıyla kaydedildi:', checkData.checkNumber);
     } catch (error) {
       console.error('Çek yönetimine kaydetme hatası:', error);
       // Ana işlemi etkilememesi için hata fırlatmıyoruz

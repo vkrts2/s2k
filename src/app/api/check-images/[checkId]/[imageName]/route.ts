@@ -18,10 +18,10 @@ export async function GET(req: NextRequest, { params }: { params: { checkId: str
     
     // Çek ID'sinden kullanıcı ID'sini almak için Firestore'dan çek bilgilerini sorgulayalım
     const { getFirestore, doc, getDoc, collection, getDocs } = await import('firebase/firestore');
-    const { app } = await import('@/lib/firebase');
+    const { app: clientApp } = await import('@/lib/firebase');
     
     // Firestore'dan çek belgesini al
-    const db = getFirestore(app);
+    const db = getFirestore(clientApp);
     const usersCollection = collection(db, 'users');
     const usersSnapshot = await getDocs(usersCollection);
     

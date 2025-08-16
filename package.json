@@ -1,18 +1,41 @@
 {
-  "name": "nextn",
+  "name": "69b77f77336f3787c2478c12857c771b944a595a0b03913735e0f82b828f1738",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack -p 9002",
-    "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "preview": "next start"
   },
   "dependencies": {
+    "@kombai/react-error-boundary": "^1.1.0",
+    "@tanstack/react-query": "^5.85.3",
+    "date-fns": "^3.6.0",
+    "lucide-react": "^0.475.0",
+    "next": "15.4.5",
+    "postcss": "^8.5.6",
+    "postcss-import": "^16.1.1",
+    "postcss-preset-env": "^10.2.4",
+    "radix-ui": "^1.4.3",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "tailwindcss": "^3.4.17",
+    "firebase": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.11",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "comment-json": "^4.2.5",
+    "env-cmd": "^10.1.0",
+    "ts-morph": "^26.0.0",
+    "typescript": "^5",
+    "webpack": "^5.101.2"
+  },
+  "type": "module",
+  "strictDependencies": {
     "@auth/firebase-adapter": "^1.0.0",
     "@genkit-ai/googleai": "^1.8.0",
     "@genkit-ai/next": "^1.8.0",
@@ -43,7 +66,9 @@
     "@tiptap/react": "^2.14.0",
     "@tiptap/starter-kit": "^2.14.0",
     "axios": "^1.11.0",
-    "chart.js": "^4.5.0",
+    "chart/": {
+      "js": "^4.5.0"
+    },
     "cheerio": "^1.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -55,7 +80,9 @@
     "firebase-admin": "^11.11.1",
     "genkit": "^1.8.0",
     "html2canvas": "^1.4.1",
-    "html2pdf.js": "^0.10.3",
+    "html2pdf/": {
+      "js": "^0.10.3"
+    },
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.475.0",
@@ -73,9 +100,7 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "xlsx": "^0.18.5",
-    "zod": "^3.25.76"
-  },
-  "devDependencies": {
+    "zod": "^3.25.76",
     "@babel/preset-env": "^7.27.2",
     "@babel/preset-react": "^7.27.1",
     "@babel/preset-typescript": "^7.27.1",
@@ -86,7 +111,9 @@
     "@types/babel__generator": "^7.27.0",
     "@types/babel__template": "^7.4.4",
     "@types/babel__traverse": "^7.20.7",
-    "@types/chart.js": "^2.9.41",
+    "@types/chart/": {
+      "js": "^2.9.41"
+    },
     "@types/date-fns": "^2.6.3",
     "@types/exceljs": "^0.5.3",
     "@types/jest": "^30.0.0",
