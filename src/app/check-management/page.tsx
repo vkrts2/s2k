@@ -29,6 +29,7 @@ export default function CheckManagementPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [checks, setChecks] = useState<Check[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [editingCheck, setEditingCheck] = useState<Check | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -146,6 +147,21 @@ export default function CheckManagementPage() {
       setChecks(items as any);
     }, (err) => {
       console.error('onSnapshot checks error:', err);
+    });
+    return () => unsub();
+  }, [user]);
+
+  // Real-time listener: payments collection -> update payments list automatically
+  useEffect(() => {
+    if (!user) return;
+    const ref = collection(db, 'users', user.uid, 'payments');
+    const unsub = onSnapshot(ref, (snap) => {
+      const items = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+      const parseTime = (v: any) => { try { return new Date(v as any).getTime() || 0; } catch { return 0; } };
+      items.sort((a: any, b: any) => (parseTime(b.date) - parseTime(a.date)) || (parseTime(b.createdAt) - parseTime(a.createdAt)));
+      setPayments(items as any[]);
+    }, (err) => {
+      console.error('onSnapshot payments error:', err);
     });
     return () => unsub();
   }, [user]);
@@ -392,7 +408,7 @@ export default function CheckManagementPage() {
     <div className="container mx-auto py-6 space-y-6">
       <BackToHomeButton />
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Çek Yönetimi</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Ödeme Takibi</h2>
         <div className="flex space-x-2">
           <Dialog open={showCheckModal} onOpenChange={setShowCheckModal}>
             <DialogTrigger asChild>
@@ -662,6 +678,54 @@ export default function CheckManagementPage() {
                         </Button>
                       </div>
                     </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Müşteri Ödemeleri ({payments.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <Input
+              placeholder="Ödeme ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tarih</TableHead>
+                  <TableHead>Yöntem</TableHead>
+                  <TableHead>Tutar</TableHead>
+                  <TableHead>Açıklama</TableHead>
+                  <TableHead>Ref No</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payments
+                  .filter(p => {
+                    const q = searchQuery.toLowerCase();
+                    return (
+                      (p.description || '').toLowerCase().includes(q) ||
+                      (p.referenceNumber || '').toLowerCase().includes(q) ||
+                      (p.method || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell>{p.date ? format(new Date(p.date), 'dd.MM.yyyy', { locale: tr }) : '-'}</TableCell>
+                    <TableCell>{p.method === 'nakit' ? 'Nakit' : p.method === 'krediKarti' ? 'Kredi Kartı' : p.method === 'havale' ? 'Havale/EFT' : p.method === 'cek' ? 'Çek' : p.method === 'diger' ? 'Diğer' : (p.method || '-')}</TableCell>
+                    <TableCell>{Number(p.amount || 0).toLocaleString('tr-TR', { style: 'currency', currency: p.currency || 'TRY' })}</TableCell>
+                    <TableCell>{p.description || '-'}</TableCell>
+                    <TableCell>{p.referenceNumber || '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -132,7 +132,7 @@ export function SidebarNav() {
         )}
       >
         <ClipboardList className="h-4 w-4" />
-        Çek Yönetimi
+        Ödeme Takibi
       </Link>
       <Link
         href="/archive"

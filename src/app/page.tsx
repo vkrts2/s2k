@@ -39,8 +39,8 @@ const navItems = [
   },
   {
     href: '/check-management',
-    label: 'Çek Yönetimi',
-    description: 'Çeklerinizi yönetin ve takip edin.',
+    label: 'Ödeme Takibi',
+    description: 'Ödemelerinizi ve çeklerinizi takip edin.',
     icon: <ReceiptText className="h-8 w-8 mb-2 text-primary" />,
   },
   {
