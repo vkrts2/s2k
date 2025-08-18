@@ -48,6 +48,18 @@ export default function CheckManagementPage() {
   const [amountMin, setAmountMin] = useState<string>('');
   const [amountMax, setAmountMax] = useState<string>('');
 
+  // Safe date formatter to avoid runtime errors from invalid dates
+  const safeFormatDate = (value: any) => {
+    try {
+      if (!value) return '-';
+      const d = new Date(value as any);
+      if (isNaN(d.getTime())) return '-';
+      return format(d, 'dd.MM.yyyy', { locale: tr });
+    } catch {
+      return '-';
+    }
+  };
+
   // Form state
   const [checkNumber, setCheckNumber] = useState("");
   const [bankName, setBankName] = useState("");
@@ -661,7 +673,7 @@ export default function CheckManagementPage() {
                     <TableCell>{check.checkNumber}</TableCell>
                     <TableCell>{check.bankName}</TableCell>
                     <TableCell>{Number(check.amount).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</TableCell>
-                    <TableCell>{format(new Date(check.dueDate), "dd.MM.yyyy", { locale: tr })}</TableCell>
+                    <TableCell>{safeFormatDate(check.dueDate)}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs ${
                         check.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -797,7 +809,7 @@ export default function CheckManagementPage() {
                       >
                         <TableCell>
                           <div className="flex flex-col">
-                            <span>{p.date ? format(new Date(p.date), 'dd.MM.yyyy', { locale: tr }) : '-'}</span>
+                            <span>{safeFormatDate(p.date)}</span>
                             <span className="text-xs text-muted-foreground">{nameById[p.customerId] || '-'}</span>
                           </div>
                         </TableCell>
