@@ -85,7 +85,6 @@
     "@types/babel__template": "^7.4.4",
     "@types/babel__traverse": "^7.20.7",
     "@types/chart.js": "^2.9.41",
-    "@types/date-fns": "^2.6.3",
     "@types/exceljs": "^0.5.3",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.19.9",
