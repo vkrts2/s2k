@@ -41,8 +41,8 @@ export default function CheckManagementPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Filters for payments
-  const [methodFilter, setMethodFilter] = useState<string>('');
-  const [customerFilter, setCustomerFilter] = useState<string>('');
+  const [methodFilter, setMethodFilter] = useState<string>('all');
+  const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<string>(''); // yyyy-MM-dd
   const [dateTo, setDateTo] = useState<string>('');     // yyyy-MM-dd
   const [amountMin, setAmountMin] = useState<string>('');
@@ -738,7 +738,7 @@ export default function CheckManagementPage() {
                 <SelectValue placeholder="Yöntem (hepsi)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Hepsi</SelectItem>
+                <SelectItem value="all">Hepsi</SelectItem>
                 <SelectItem value="nakit">Nakit</SelectItem>
                 <SelectItem value="krediKarti">Kredi Kartı</SelectItem>
                 <SelectItem value="havale">Havale/EFT</SelectItem>
@@ -751,7 +751,7 @@ export default function CheckManagementPage() {
                 <SelectValue placeholder="Müşteri (hepsi)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Hepsi</SelectItem>
+                <SelectItem value="all">Hepsi</SelectItem>
                 {customers.map((c: any) => (
                   <SelectItem key={c.id} value={c.id}>{c.name || c.title || c.id}</SelectItem>
                 ))}
@@ -793,8 +793,8 @@ export default function CheckManagementPage() {
                         (p.referenceNumber || '').toLowerCase().includes(q) ||
                         (p.method || '').toLowerCase().includes(q)
                       );
-                      const matchesMethod = methodFilter ? p.method === methodFilter : true;
-                      const matchesCustomer = customerFilter ? p.customerId === customerFilter : true;
+                      const matchesMethod = methodFilter === 'all' ? true : p.method === methodFilter;
+                      const matchesCustomer = customerFilter === 'all' ? true : p.customerId === customerFilter;
                       const matchesDate = t >= fromTime && t <= toTime;
                       const matchesAmount = amt >= minAmt && amt <= maxAmt;
                       return matchesSearch && matchesMethod && matchesCustomer && matchesDate && matchesAmount;
