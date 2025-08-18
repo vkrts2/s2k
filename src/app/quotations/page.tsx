@@ -297,7 +297,10 @@ export default function QuotationsPage() {
                           variant="default"
                           size="icon"
                           title="Sipariş Oluştur"
-                          onClick={() => handleCreateOrderFromQuotation(quotation)}
+                          onClick={() => {
+                            const ok = window.confirm('Bu tekliften sipariş oluşturulsun mu?');
+                            if (ok) handleCreateOrderFromQuotation(quotation);
+                          }}
                         >
                           <PlusCircle className="h-4 w-4" />
                         </Button>
