@@ -110,8 +110,6 @@ export default function CheckManagementPage() {
   useEffect(() => {
     if (!user) return;
     const ref = collection(db, 'users', user.uid, 'checks');
-    // createdAt ile sıralama: farklı dueDate tipleri (Timestamp/string) varsa hata riskini azaltır
-    const q = fsQuery(ref, fsOrderBy('createdAt', 'desc'));
     const normalizeDate = (val: any): string | undefined => {
       if (!val) return undefined;
       if (typeof val === 'string') return val;
@@ -119,7 +117,7 @@ export default function CheckManagementPage() {
       if (val instanceof Date) return val.toISOString();
       return undefined;
     };
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(ref, (snap) => {
       const items = snap.docs.map((d) => {
         const raw: any = d.data();
         const issueDate = normalizeDate(raw.issueDate);
@@ -134,6 +132,16 @@ export default function CheckManagementPage() {
           ...(createdAt ? { createdAt } : {}),
           ...(updatedAt ? { updatedAt } : {}),
         } as any;
+      });
+      // Client-side sort: prefer createdAt desc, fallback to dueDate desc
+      const parseTime = (v: any) => {
+        if (!v) return 0;
+        try { return new Date(v).getTime() || 0; } catch { return 0; }
+      };
+      items.sort((a: any, b: any) => {
+        const at = parseTime(a.createdAt) || parseTime(a.dueDate);
+        const bt = parseTime(b.createdAt) || parseTime(b.dueDate);
+        return bt - at;
       });
       setChecks(items as any);
     }, (err) => {
