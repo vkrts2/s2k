@@ -974,9 +974,55 @@ export const deleteUsefulLink = async (uid: string, linkId: string): Promise<voi
 export const getChecks = async (uid: string): Promise<BankCheck[]> => {
   if (!uid) return [];
   try {
-    const q = query(_getUserCollectionRef(uid, "checks"), orderBy("dueDate", "desc"));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as BankCheck));
+    const ref = _getUserCollectionRef(uid, "checks");
+    let snapshot;
+    try {
+      // Primary ordering by dueDate (desc)
+      const q1 = query(ref, orderBy("dueDate", "desc"));
+      snapshot = await getDocs(q1);
+    } catch (err1) {
+      console.warn("getChecks: orderBy dueDate failed, falling back to createdAt", err1);
+      try {
+        // Fallback ordering by createdAt (desc)
+        const q2 = query(ref, orderBy("createdAt", "desc"));
+        snapshot = await getDocs(q2);
+      } catch (err2) {
+        console.warn("getChecks: orderBy createdAt failed, fetching without order", err2);
+        // Last resort: fetch without order
+        snapshot = await getDocs(ref as any);
+      }
+    }
+
+    const normalizeDate = (val: any): string | undefined => {
+      if (!val) return undefined;
+      if (typeof val === 'string') return val;
+      // Firestore Timestamp has a toDate() method
+      try {
+        if (typeof val.toDate === 'function') {
+          return (val.toDate() as Date).toISOString();
+        }
+      } catch {}
+      // If value is Date
+      if (val instanceof Date) return val.toISOString();
+      return undefined;
+    };
+
+    const docs = (snapshot.docs as unknown) as QueryDocumentSnapshot<DocumentData>[];
+    return docs.map((d) => {
+      const raw: any = d.data();
+      const issueDate = normalizeDate(raw.issueDate);
+      const dueDate = normalizeDate(raw.dueDate);
+      const createdAt = normalizeDate(raw.createdAt);
+      const updatedAt = normalizeDate(raw.updatedAt);
+      return {
+        id: d.id,
+        ...raw,
+        ...(issueDate ? { issueDate } : {}),
+        ...(dueDate ? { dueDate } : {}),
+        ...(createdAt ? { createdAt } : {}),
+        ...(updatedAt ? { updatedAt } : {}),
+      } as BankCheck;
+    });
   } catch (e) {
     console.error("Error fetching checks", e);
     return [];
