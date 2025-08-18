@@ -22,20 +22,31 @@ import type { BankCheck } from '@/lib/types';
 import { getChecks, addCheck as addCheckToDb, updateCheck as updateCheckInDb, deleteCheck as deleteCheckFromDb } from '@/lib/storage';
 import { db } from '@/lib/firebase';
 import { collection, query as fsQuery, orderBy as fsOrderBy, onSnapshot } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
 
 type Check = BankCheck;
 
 export default function CheckManagementPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const router = useRouter();
   const [checks, setChecks] = useState<Check[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [editingCheck, setEditingCheck] = useState<Check | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [checkIdToDelete, setCheckIdToDelete] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Filters for payments
+  const [methodFilter, setMethodFilter] = useState<string>('');
+  const [customerFilter, setCustomerFilter] = useState<string>('');
+  const [dateFrom, setDateFrom] = useState<string>(''); // yyyy-MM-dd
+  const [dateTo, setDateTo] = useState<string>('');     // yyyy-MM-dd
+  const [amountMin, setAmountMin] = useState<string>('');
+  const [amountMax, setAmountMax] = useState<string>('');
 
   // Form state
   const [checkNumber, setCheckNumber] = useState("");
@@ -162,6 +173,19 @@ export default function CheckManagementPage() {
       setPayments(items as any[]);
     }, (err) => {
       console.error('onSnapshot payments error:', err);
+    });
+    return () => unsub();
+  }, [user]);
+
+  // Real-time listener: customers -> to resolve customer names
+  useEffect(() => {
+    if (!user) return;
+    const ref = collection(db, 'users', user.uid, 'customers');
+    const unsub = onSnapshot(ref, (snap) => {
+      const items = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+      setCustomers(items as any[]);
+    }, (err) => {
+      console.error('onSnapshot customers error:', err);
     });
     return () => unsub();
   }, [user]);
@@ -691,18 +715,48 @@ export default function CheckManagementPage() {
           <CardTitle>Müşteri Ödemeleri ({payments.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 mb-4">
             <Input
-              placeholder="Ödeme ara..."
+              placeholder="Ara (açıklama, ref no, yöntem)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            <Select value={methodFilter} onValueChange={setMethodFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Yöntem (hepsi)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Hepsi</SelectItem>
+                <SelectItem value="nakit">Nakit</SelectItem>
+                <SelectItem value="krediKarti">Kredi Kartı</SelectItem>
+                <SelectItem value="havale">Havale/EFT</SelectItem>
+                <SelectItem value="cek">Çek</SelectItem>
+                <SelectItem value="diger">Diğer</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={customerFilter} onValueChange={setCustomerFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Müşteri (hepsi)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Hepsi</SelectItem>
+                {customers.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name || c.title || c.id}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} placeholder="Başlangıç" />
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} placeholder="Bitiş" />
+            <div className="flex gap-2">
+              <Input type="number" placeholder="Min Tutar" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} />
+              <Input type="number" placeholder="Max Tutar" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} />
+            </div>
           </div>
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tarih</TableHead>
+                  <TableHead>Tarih / Müşteri</TableHead>
                   <TableHead>Yöntem</TableHead>
                   <TableHead>Tutar</TableHead>
                   <TableHead>Açıklama</TableHead>
@@ -710,24 +764,50 @@ export default function CheckManagementPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments
-                  .filter(p => {
-                    const q = searchQuery.toLowerCase();
-                    return (
-                      (p.description || '').toLowerCase().includes(q) ||
-                      (p.referenceNumber || '').toLowerCase().includes(q) ||
-                      (p.method || '').toLowerCase().includes(q)
-                    );
-                  })
-                  .map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>{p.date ? format(new Date(p.date), 'dd.MM.yyyy', { locale: tr }) : '-'}</TableCell>
-                    <TableCell>{p.method === 'nakit' ? 'Nakit' : p.method === 'krediKarti' ? 'Kredi Kartı' : p.method === 'havale' ? 'Havale/EFT' : p.method === 'cek' ? 'Çek' : p.method === 'diger' ? 'Diğer' : (p.method || '-')}</TableCell>
-                    <TableCell>{Number(p.amount || 0).toLocaleString('tr-TR', { style: 'currency', currency: p.currency || 'TRY' })}</TableCell>
-                    <TableCell>{p.description || '-'}</TableCell>
-                    <TableCell>{p.referenceNumber || '-'}</TableCell>
-                  </TableRow>
-                ))}
+                {(() => {
+                  const q = searchQuery.toLowerCase();
+                  const nameById: Record<string, string> = {};
+                  customers.forEach((c: any) => { nameById[c.id] = c.name || c.title || c.companyName || c.id; });
+                  const fromTime = dateFrom ? new Date(dateFrom + 'T00:00:00').getTime() : Number.NEGATIVE_INFINITY;
+                  const toTime = dateTo ? new Date(dateTo + 'T23:59:59').getTime() : Number.POSITIVE_INFINITY;
+                  const minAmt = amountMin ? parseFloat(amountMin) : Number.NEGATIVE_INFINITY;
+                  const maxAmt = amountMax ? parseFloat(amountMax) : Number.POSITIVE_INFINITY;
+                  return payments
+                    .filter((p) => {
+                      const t = p.date ? new Date(p.date).getTime() : 0;
+                      const amt = typeof p.amount === 'number' ? p.amount : parseFloat(p.amount || '0');
+                      const matchesSearch = (
+                        (p.description || '').toLowerCase().includes(q) ||
+                        (p.referenceNumber || '').toLowerCase().includes(q) ||
+                        (p.method || '').toLowerCase().includes(q)
+                      );
+                      const matchesMethod = methodFilter ? p.method === methodFilter : true;
+                      const matchesCustomer = customerFilter ? p.customerId === customerFilter : true;
+                      const matchesDate = t >= fromTime && t <= toTime;
+                      const matchesAmount = amt >= minAmt && amt <= maxAmt;
+                      return matchesSearch && matchesMethod && matchesCustomer && matchesDate && matchesAmount;
+                    })
+                    .map((p) => (
+                      <TableRow
+                        key={p.id}
+                        className="cursor-pointer hover:bg-accent/30"
+                        onClick={() => {
+                          if (p.customerId) router.push(`/customers/${p.customerId}/payments/${p.id}`);
+                        }}
+                      >
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span>{p.date ? format(new Date(p.date), 'dd.MM.yyyy', { locale: tr }) : '-'}</span>
+                            <span className="text-xs text-muted-foreground">{nameById[p.customerId] || '-'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{p.method === 'nakit' ? 'Nakit' : p.method === 'krediKarti' ? 'Kredi Kartı' : p.method === 'havale' ? 'Havale/EFT' : p.method === 'cek' ? 'Çek' : p.method === 'diger' ? 'Diğer' : (p.method || '-')}</TableCell>
+                        <TableCell>{Number(p.amount || 0).toLocaleString('tr-TR', { style: 'currency', currency: p.currency || 'TRY' })}</TableCell>
+                        <TableCell>{p.description || '-'}</TableCell>
+                        <TableCell>{p.referenceNumber || '-'}</TableCell>
+                      </TableRow>
+                    ));
+                })()}
               </TableBody>
             </Table>
           </div>
