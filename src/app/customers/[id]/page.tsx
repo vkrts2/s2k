@@ -119,7 +119,7 @@ export default function CustomerDetailPage() {
                 };
                 const updatedSale = await storage.updateSale(user.uid, saleData);
                 // Önce iyimser güncelle
-                setSales(prev => prev.map(s => s.id === updatedSale.id ? updatedSale : s));
+                setSales((prev: Sale[]) => prev.map((s: Sale) => s.id === updatedSale.id ? updatedSale : s));
                 // Arka planda tazele, hatayı yok say
                 storage.getSales(user.uid, customer.id).then(setSales).catch(() => {});
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla güncellendi.' });
@@ -146,7 +146,7 @@ export default function CustomerDetailPage() {
                 };
                 const newSale = await storage.addSale(user.uid, newSaleData);
                 // Önce iyimser ekle
-                setSales(prev => [newSale, ...prev]);
+                setSales((prev: Sale[]) => [newSale, ...prev]);
                 // Arka planda tazele, olası index hatasını yut
                 storage.getSales(user.uid, customer.id).then(setSales).catch(() => {});
                 toast({ title: 'Başarılı!', description: 'Satış başarıyla eklendi.' });
@@ -175,7 +175,7 @@ export default function CustomerDetailPage() {
                     updatedAt: formatISO(new Date())
                 };
                 const updatedPayment = await storage.updatePayment(user.uid, paymentData);
-                setPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
+                setPayments((prev: Payment[]) => prev.map((p: Payment) => p.id === updatedPayment.id ? updatedPayment : p));
                 toast({ title: 'Başarılı!', description: 'Ödeme başarıyla güncellendi.' });
             } else {
                 const now = new Date().toISOString();
@@ -218,8 +218,34 @@ export default function CustomerDetailPage() {
                   (maybeWithFile as any).checkImageData = (values as any).checkImageData;
                 }
                 const newPayment = await storage.addPayment(user.uid, { ...maybeWithFile, createdAt: now, updatedAt: now } as any);
-                setPayments(prev => [newPayment, ...prev]);
+                setPayments((prev: Payment[]) => [newPayment, ...prev]);
                 toast({ title: 'Başarılı!', description: 'Ödeme başarıyla eklendi.' });
+
+                // Eğer ödeme yöntemi çek ise, Çek Yönetimi'ne de otomatik kayıt aç
+                if (values.method === 'cek') {
+                  try {
+                    const images: string[] | undefined = (maybeWithFile as any).checkImageUrl
+                      ? [(maybeWithFile as any).checkImageUrl]
+                      : undefined;
+                    await storage.addCheck(user.uid, {
+                      checkNumber: values.checkSerialNumber || newPayment.referenceNumber || '',
+                      bankName: '',
+                      branchName: undefined,
+                      accountNumber: undefined,
+                      amount: parseFloat(values.amount.toString()),
+                      issueDate: formatISO(values.date),
+                      dueDate: values.checkDate ? formatISO(values.checkDate) : formatISO(values.date),
+                      status: 'pending',
+                      partyName: customer.name,
+                      partyType: 'customer',
+                      description: values.description || undefined,
+                      images,
+                    });
+                  } catch (e) {
+                    console.error('Çek kaydı oluşturulurken hata:', e);
+                    toast({ title: 'Uyarı', description: 'Ödeme kaydedildi ancak çek kaydı eklenemedi.', variant: 'destructive' });
+                  }
+                }
             }
         } catch (error) {
             console.error("Ödeme kaydedilirken hata:", error);
@@ -231,7 +257,7 @@ export default function CustomerDetailPage() {
         if (!user) return;
         try {
             // Önce UI'ı güncelle
-            setSales(prev => prev.filter(s => s.id !== saleId));
+            setSales((prev: Sale[]) => prev.filter((s: Sale) => s.id !== saleId));
             
             // Silme işlemini gerçekleştir
             await storage.storageDeleteSale(user.uid, saleId);
@@ -264,7 +290,7 @@ export default function CustomerDetailPage() {
         if (!user) return;
         try {
             await storage.storageDeletePayment(user.uid, paymentId);
-            setPayments(prev => prev.filter(p => p.id !== paymentId));
+            setPayments((prev: Payment[]) => prev.filter((p: Payment) => p.id !== paymentId));
             toast({ title: "Başarılı", description: "Ödeme başarıyla silindi." });
         } catch (error) {
             console.error("Ödeme silinirken hata:", error);
@@ -340,7 +366,7 @@ export default function CustomerDetailPage() {
         if (!user || !customer) return;
         let updatedTasks: CustomerTask[];
         if (editingTask) {
-            updatedTasks = (customer.tasks || []).map(task =>
+            updatedTasks = (customer.tasks || []).map((task: CustomerTask) =>
                 task.id === editingTask.id ? { ...task, ...values, updatedAt: formatISO(new Date()), dueDate: values.dueDate ? formatISO(values.dueDate) : undefined } : task
             );
         } else {
@@ -358,13 +384,13 @@ export default function CustomerDetailPage() {
 
     const handleTaskDelete = async (taskId: string) => {
         if (!customer) return;
-        const updatedTasks = (customer.tasks || []).filter(task => task.id !== taskId);
+        const updatedTasks = (customer.tasks || []).filter((task: CustomerTask) => task.id !== taskId);
         await handleCustomerUpdate({ tasks: updatedTasks });
     };
 
     // Satış ve ödeme işlemlerinde amount alanı olmayan kayıtları filtrele
-    const filteredSales = sales.filter(sale => typeof sale.amount === 'number' && !isNaN(sale.amount));
-    const filteredPayments = payments.filter(payment => typeof payment.amount === 'number' && !isNaN(payment.amount));
+    const filteredSales = sales.filter((sale: Sale) => typeof sale.amount === 'number' && !isNaN(sale.amount));
+    const filteredPayments = payments.filter((payment: Payment) => typeof payment.amount === 'number' && !isNaN(payment.amount));
 
   if (isLoading || authLoading) {
     return (

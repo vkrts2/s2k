@@ -15,7 +15,7 @@ import { tr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { QuotationForm } from "@/components/quotations/quotation-form";
 import BackToHomeButton from '@/components/common/back-to-home-button';
-import { getCustomers, getQuotations, addQuotation as addQuotationToDb, updateQuotation as updateQuotationInDb, deleteQuotation as deleteQuotationFromDb } from '@/lib/storage';
+import { getCustomers, getQuotations, addQuotation as addQuotationToDb, updateQuotation as updateQuotationInDb, deleteQuotation as deleteQuotationFromDb, addOrder, getCustomerByName } from '@/lib/storage';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Quotation } from '@/lib/types';
 
@@ -147,6 +147,47 @@ export default function QuotationsPage() {
     window.open(`/quotations/${quotation.id}/print?data=${data}`, '_blank');
   };
 
+  const handleCreateOrderFromQuotation = async (quotation: Quotation) => {
+    if (!user) return;
+    try {
+      // Müşteri ID'sini isimden bul
+      const customer = await getCustomerByName(user.uid, quotation.customerName);
+      const customerId = customer?.id || '';
+
+      // Sipariş kalemlerini tekliften oluştur
+      const orderItems = (quotation.items || []).map((item: any) => ({
+        id: item.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        productName: item.productName,
+        quantity: typeof item.quantity === 'number' ? item.quantity : Number(item.quantity) || 0,
+        unit: typeof item.unit === 'string' && item.unit.length > 0 ? item.unit : 'adet',
+        specifications: item.description || undefined,
+      }));
+
+      // Tarihler
+      const orderDate = quotation.date ? new Date(quotation.date as any) : new Date();
+      const deliveryDate = quotation.validUntil ? new Date(quotation.validUntil as any) : orderDate;
+
+      const newOrderPayload = {
+        orderNumber: `SIP-${Date.now()}`,
+        customerName: quotation.customerName,
+        customerId,
+        orderDate,
+        deliveryDate,
+        status: 'pending' as const,
+        priority: 'medium' as const,
+        totalAmount: Number(quotation.grandTotal) || 0,
+        currency: quotation.currency,
+        items: orderItems,
+        notes: quotation.notes || '',
+      };
+
+      await addOrder(user.uid, newOrderPayload);
+      toast({ title: 'Başarılı', description: 'Tekliften sipariş oluşturuldu.' });
+    } catch (error) {
+      toast({ title: 'Hata', description: 'Sipariş oluşturulamadı.', variant: 'destructive' });
+    }
+  };
+
   const filteredQuotations = quotations.filter((quotation: Quotation) =>
     quotation.quotationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
     quotation.customerName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -251,6 +292,14 @@ export default function QuotationsPage() {
                       <div className="flex space-x-2">
                         <Button variant="outline" size="icon" className="h-8 w-8" title="Teklifi Yazdır/Görüntüle" onClick={() => handlePrintQuotation(quotation)}>
                           <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="icon"
+                          title="Sipariş Oluştur"
+                          onClick={() => handleCreateOrderFromQuotation(quotation)}
+                        >
+                          <PlusCircle className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
