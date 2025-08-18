@@ -20,6 +20,8 @@ import BackToHomeButton from '@/components/common/back-to-home-button';
 import { useAuth } from '@/contexts/AuthContext';
 import type { BankCheck } from '@/lib/types';
 import { getChecks, addCheck as addCheckToDb, updateCheck as updateCheckInDb, deleteCheck as deleteCheckFromDb } from '@/lib/storage';
+import { db } from '@/lib/firebase';
+import { collection, query as fsQuery, orderBy as fsOrderBy, onSnapshot } from 'firebase/firestore';
 
 type Check = BankCheck;
 
@@ -102,6 +104,42 @@ export default function CheckManagementPage() {
     } catch (e) {
       console.error('Check migration error', e);
     }
+  }, [user]);
+
+  // Real-time listener: checks collection -> update UI automatically
+  useEffect(() => {
+    if (!user) return;
+    const ref = collection(db, 'users', user.uid, 'checks');
+    // createdAt ile sıralama: farklı dueDate tipleri (Timestamp/string) varsa hata riskini azaltır
+    const q = fsQuery(ref, fsOrderBy('createdAt', 'desc'));
+    const normalizeDate = (val: any): string | undefined => {
+      if (!val) return undefined;
+      if (typeof val === 'string') return val;
+      try { if (typeof val.toDate === 'function') return val.toDate().toISOString(); } catch {}
+      if (val instanceof Date) return val.toISOString();
+      return undefined;
+    };
+    const unsub = onSnapshot(q, (snap) => {
+      const items = snap.docs.map((d) => {
+        const raw: any = d.data();
+        const issueDate = normalizeDate(raw.issueDate);
+        const dueDate = normalizeDate(raw.dueDate);
+        const createdAt = normalizeDate(raw.createdAt);
+        const updatedAt = normalizeDate(raw.updatedAt);
+        return {
+          id: d.id,
+          ...raw,
+          ...(issueDate ? { issueDate } : {}),
+          ...(dueDate ? { dueDate } : {}),
+          ...(createdAt ? { createdAt } : {}),
+          ...(updatedAt ? { updatedAt } : {}),
+        } as any;
+      });
+      setChecks(items as any);
+    }, (err) => {
+      console.error('onSnapshot checks error:', err);
+    });
+    return () => unsub();
   }, [user]);
 
   // LocalStorage ve JSON'dan içe aktarma
