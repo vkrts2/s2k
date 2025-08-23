@@ -349,6 +349,8 @@ export function PurchaseModal({
                                     type="button"
                                     className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
                                     onClick={async () => {
+                                      const ok = typeof window !== 'undefined' ? window.confirm(`“${it.productName}” stok kalemine eklensin mi?`) : true;
+                                      if (!ok) return;
                                       const created = await addCurrentAsStock(it.productName);
                                       if (created) {
                                         const next = [...(items ?? [])];
@@ -513,7 +515,10 @@ export function PurchaseModal({
                                     type="button"
                                     className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
                                     onClick={async () => {
-                                      const created = await addCurrentAsStock(field.value || '');
+                                      const name = field.value || '';
+                                      const ok = typeof window !== 'undefined' ? window.confirm(`“${name}” stok kalemine eklensin mi?`) : true;
+                                      if (!ok) return;
+                                      const created = await addCurrentAsStock(name);
                                       if (created) field.onChange(created.name);
                                     }}
                                   >
