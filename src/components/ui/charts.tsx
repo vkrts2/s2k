@@ -48,7 +48,13 @@ export function BarChart({ data, xKey = 'category', yKey = 'count', valueFormatt
             labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
             wrapperStyle={{ outline: 'none' }}
           />
-          <Bar dataKey={yKey} fill="#8884d8" />
+          <Bar dataKey={yKey}>
+            {data.map((entry: any, index: number) => {
+              const val = Number(entry?.[yKey] ?? 0);
+              const fill = val >= 0 ? '#22C55E' : '#EF4444'; // green for positive/zero, red for negative
+              return <Cell key={`cell-${index}`} fill={fill} />;
+            })}
+          </Bar>
         </RechartsBarChart>
       </ResponsiveContainer>
     </div>
