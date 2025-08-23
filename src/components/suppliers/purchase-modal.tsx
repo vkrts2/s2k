@@ -175,6 +175,18 @@ export function PurchaseModal({
     form.reset();
   };
 
+  // Basit öneri filtresi
+  const getSuggestions = React.useCallback(
+    (q: string) => {
+      const query = (q || '').toLowerCase().trim();
+      if (!query) return [] as StockItem[];
+      return availableStockItems
+        .filter((s) => s.name.toLowerCase().includes(query))
+        .slice(0, 8);
+    },
+    [availableStockItems]
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
@@ -287,15 +299,40 @@ export function PurchaseModal({
                 {(items ?? []).map((it: any, idx: number) => (
                   <div key={it.id} className="grid grid-cols-12 gap-2 items-center">
                     <div className="col-span-3">
-                      <Input
-                        placeholder="Ürün/Hizmet"
-                        value={it.productName}
-                        onChange={(e) => {
-                          const next = [...(items ?? [])];
-                          next[idx] = { ...next[idx], productName: e.target.value };
-                          form.setValue('items', next);
-                        }}
-                      />
+                      <div className="relative">
+                        <Input
+                          placeholder="Ürün/Hizmet"
+                          value={it.productName}
+                          onChange={(e) => {
+                            const next = [...(items ?? [])];
+                            next[idx] = { ...next[idx], productName: e.target.value };
+                            form.setValue('items', next);
+                          }}
+                        />
+                        {(() => {
+                          const list = getSuggestions(it.productName);
+                          const hide = !!list.find((s) => s.name === it.productName);
+                          if (list.length === 0 || hide) return null;
+                          return (
+                            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-auto rounded border bg-white shadow z-50">
+                              {list.map((s) => (
+                                <button
+                                  type="button"
+                                  key={s.id}
+                                  className="w-full text-left px-3 py-2 hover:bg-accent"
+                                  onClick={() => {
+                                    const next = [...(items ?? [])];
+                                    next[idx] = { ...next[idx], productName: s.name };
+                                    form.setValue('items', next);
+                                  }}
+                                >
+                                  {s.name}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
                     <div className="col-span-2">
                       <Input
@@ -420,7 +457,28 @@ export function PurchaseModal({
                   <FormItem>
                     <FormLabel>Ürün Adı</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ürün adını girin..." {...field} />
+                      <div className="relative">
+                        <Input placeholder="Ürün adını girin..." {...field} />
+                        {(() => {
+                          const list = getSuggestions(field.value ?? '');
+                          const hide = !!list.find((s) => s.name === (field.value ?? ''));
+                          if (list.length === 0 || hide) return null;
+                          return (
+                            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-auto rounded border bg-white shadow z-50">
+                              {list.map((s) => (
+                                <button
+                                  type="button"
+                                  key={s.id}
+                                  className="w-full text-left px-3 py-2 hover:bg-accent"
+                                  onClick={() => field.onChange(s.name)}
+                                >
+                                  {s.name}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
