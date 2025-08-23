@@ -19,6 +19,16 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '
 import type { Currency, StockItem } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { addStockItem } from '@/lib/storage';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog';
 
 enum PurchaseType {
   STOCK = 'stock',
@@ -86,6 +96,11 @@ export function PurchaseModal({
   invoiceMode,
 }: PurchaseModalProps) {
   const { user } = useAuth();
+  const [pendingAdd, setPendingAdd] = React.useState<{
+    open: boolean;
+    name: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: initialData || {
@@ -202,6 +217,7 @@ export function PurchaseModal({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
@@ -349,14 +365,18 @@ export function PurchaseModal({
                                     type="button"
                                     className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
                                     onClick={async () => {
-                                      const ok = typeof window !== 'undefined' ? window.confirm(`“${it.productName}” stok kalemine eklensin mi?`) : true;
-                                      if (!ok) return;
-                                      const created = await addCurrentAsStock(it.productName);
-                                      if (created) {
-                                        const next = [...(items ?? [])];
-                                        next[idx] = { ...next[idx], productName: created.name };
-                                        form.setValue('items', next);
-                                      }
+                                      setPendingAdd({
+                                        open: true,
+                                        name: it.productName,
+                                        onConfirm: async () => {
+                                          const created = await addCurrentAsStock(it.productName);
+                                          if (created) {
+                                            const next = [...(items ?? [])];
+                                            next[idx] = { ...next[idx], productName: created.name };
+                                            form.setValue('items', next);
+                                          }
+                                        }
+                                      });
                                     }}
                                   >
                                     Stok kalemlerine ekle
@@ -516,10 +536,14 @@ export function PurchaseModal({
                                     className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
                                     onClick={async () => {
                                       const name = field.value || '';
-                                      const ok = typeof window !== 'undefined' ? window.confirm(`“${name}” stok kalemine eklensin mi?`) : true;
-                                      if (!ok) return;
-                                      const created = await addCurrentAsStock(name);
-                                      if (created) field.onChange(created.name);
+                                      setPendingAdd({
+                                        open: true,
+                                        name,
+                                        onConfirm: async () => {
+                                          const created = await addCurrentAsStock(name);
+                                          if (created) field.onChange(created.name);
+                                        }
+                                      });
                                     }}
                                   >
                                     Stok kalemlerine ekle
@@ -637,5 +661,32 @@ export function PurchaseModal({
         </Form>
       </DialogContent>
     </Dialog>
+    {pendingAdd && (
+      <AlertDialog open={pendingAdd?.open ?? false} onOpenChange={(open) => setPendingAdd(prev => prev ? { ...prev, open } : prev)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stok Kalemine Ekle</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{pendingAdd?.name ?? ''}” stok kalemine eklemek istediğinize emin misiniz?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingAdd(null)}>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                try {
+                  await pendingAdd?.onConfirm?.();
+                } finally {
+                  setPendingAdd(null);
+                }
+              }}
+            >
+              Stok Kalemine Ekle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )}
+    </>
   );
-} 
+}
