@@ -126,25 +126,31 @@ function LightweightInvoiceForm({
 					<Input placeholder="Ürün/Hizmet" value={it.productName} onChange={e => updateItem(it.id, { productName: e.target.value })} />
 					{(() => {
 						const list = getSuggestions(it.productName);
-						const hide = !!list.find(s => s.name === it.productName);
+						const hasQuery = (it.productName || '').trim().length > 0;
+						const hideExact = !!list.find(s => s.name === it.productName);
+						const showList = list.length > 0 && !hideExact;
+						const showAdd = list.length === 0 && hasQuery;
+						if (!showList && !showAdd) return null;
 						return (
 							<div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
-								{list.length > 0 && !hide && list.map(s => (
+								{showList && list.map(s => (
 									<button
 										type="button"
 										key={s.id}
 										className="w-full text-left px-3 py-2 hover:bg-primary/80"
+										onMouseDown={(e) => e.preventDefault()}
 										onClick={() => updateItem(it.id, { productName: s.name })}
 									>
 										{s.name}
 									</button>
 								))}
-								{list.length === 0 && (it.productName || '').trim().length > 0 && (
+								{showAdd && (
 									<div className="px-3 py-2 flex items-center justify-between gap-2">
 										<span className="text-sm opacity-90">“{it.productName}” bulunamadı</span>
 										<button
 											type="button"
 											className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
+											onMouseDown={(e) => e.preventDefault()}
 											onClick={() => onRequestAddStock && onRequestAddStock(it.productName, (newName) => updateItem(it.id, { productName: newName }))}
 										>
 											Stok kalemlerine ekle
@@ -451,59 +457,83 @@ export function SaleModal({
   // Faturalı satış: Teklif formunu aç ve dönüşte satışa dönüştür
   if (invoiceType === InvoiceType.INVOICE) {
     return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[860px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingSale ? 'Faturalı Satış Düzenle' : 'Faturalı Satış'}</DialogTitle>
-            <DialogDescription>
-              Kalemleri ekleyin; toplamlar otomatik hesaplanır. Kaydedince satış oluşturulur.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <LightweightInvoiceForm
-              customerName={customer?.name || ''}
-              initialItems={editingSale?.items}
-              initialDate={editingSale ? new Date(editingSale.date) : undefined}
-              initialCurrency={editingSale?.currency}
-              availableStockItems={availableStockItems}
-              onRequestAddStock={(name, onAdded) => {
-                setPendingAdd({
-                  open: true,
-                  name,
-                  onConfirm: async () => {
-                    if (!user?.uid) return;
-                    const created = await addStockItem(user.uid, { name, currentStock: 0, unit: 'ad' });
-                    if (created) onAdded(created.name);
-                  }
-                });
-              }}
-              onSubmit={(data: any) => {
-                try {
-                  const desc = Array.isArray(data.items) && data.items.length > 0
-                    ? `${data.items[0].productName}${data.items.length > 1 ? ` +${data.items.length - 1} kalem` : ''}`
-                    : (formValues.description || 'Faturalı Satış');
-                  const submitValues: any = {
-                    amount: String(data.grandTotal ?? 0),
-                    date: data.date,
-                    currency: data.currency ?? 'TRY',
-                    description: desc,
-                    subtotal: data.subTotal ?? 0,
-                    taxAmount: data.taxAmount ?? 0,
-                    items: data.items || [],
-                    invoiceType: 'invoice',
-                  };
-                  onSubmit(submitValues);
-                } catch (e) { console.error(e); }
-              }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <>
+        <Dialog open={isOpen} onOpenChange={onClose}>
+          <DialogContent className="sm:max-w-[860px] max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingSale ? 'Faturalı Satış Düzenle' : 'Faturalı Satış'}</DialogTitle>
+              <DialogDescription>
+                Kalemleri ekleyin; toplamlar otomatik hesaplanır. Kaydedince satış oluşturulur.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-2">
+              <LightweightInvoiceForm
+                customerName={customer?.name || ''}
+                initialItems={editingSale?.items}
+                initialDate={editingSale ? new Date(editingSale.date) : undefined}
+                initialCurrency={editingSale?.currency}
+                availableStockItems={availableStockItems}
+                onRequestAddStock={(name, onAdded) => {
+                  setPendingAdd({
+                    open: true,
+                    name,
+                    onConfirm: async () => {
+                      if (!user?.uid) return;
+                      const created = await addStockItem(user.uid, { name, currentStock: 0, unit: 'ad' });
+                      if (created) onAdded(created.name);
+                    }
+                  });
+                }}
+                onSubmit={(data: any) => {
+                  try {
+                    const desc = Array.isArray(data.items) && data.items.length > 0
+                      ? `${data.items[0].productName}${data.items.length > 1 ? ` +${data.items.length - 1} kalem` : ''}`
+                      : (formValues.description || 'Faturalı Satış');
+                    const submitValues: any = {
+                      amount: String(data.grandTotal ?? 0),
+                      date: data.date,
+                      currency: data.currency ?? 'TRY',
+                      description: desc,
+                    };
+                    onSubmit({ ...formValues, ...submitValues });
+                    onClose();
+                  } catch (e) { console.error(e); }
+                }}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+        {pendingAdd && (
+          <AlertDialog open={pendingAdd?.open ?? false} onOpenChange={(open) => setPendingAdd(prev => prev ? { ...prev, open } : prev)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Stok Kalemine Ekle</AlertDialogTitle>
+                <AlertDialogDescription>
+                  “{pendingAdd?.name ?? ''}” stok kalemine eklemek istediğinize emin misiniz?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setPendingAdd(null)}>İptal</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    try {
+                      await pendingAdd?.onConfirm?.();
+                    } finally {
+                      setPendingAdd(null);
+                    }
+                  }}
+                >
+                  Stok Kalemine Ekle
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </>
     );
   }
 
   return (
-    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[860px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
