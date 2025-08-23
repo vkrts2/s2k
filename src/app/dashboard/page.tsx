@@ -547,7 +547,7 @@ export default function DashboardPage() {
                     <YAxis />
                     <Tooltip
                       formatter={(value: number) => value.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
-                      contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                      contentStyle={{ background: 'transparent', border: 'none', color: 'hsl(var(--popover-foreground))', borderRadius: 8, boxShadow: 'none' }}
                       itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
                       labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
                       wrapperStyle={{ outline: 'none' }}
@@ -574,7 +574,7 @@ export default function DashboardPage() {
                       <XAxis dataKey="name" />
                       <YAxis />
                       <Tooltip
-                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        contentStyle={{ background: 'transparent', border: 'none', color: 'hsl(var(--popover-foreground))', borderRadius: 8, boxShadow: 'none' }}
                         itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         wrapperStyle={{ outline: 'none' }}
@@ -610,7 +610,7 @@ export default function DashboardPage() {
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        contentStyle={{ background: 'transparent', border: 'none', color: 'hsl(var(--popover-foreground))', borderRadius: 8, boxShadow: 'none' }}
                         itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         wrapperStyle={{ outline: 'none' }}
@@ -634,7 +634,7 @@ export default function DashboardPage() {
                       <XAxis dataKey="name" />
                       <YAxis />
                       <Tooltip
-                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        contentStyle={{ background: 'transparent', border: 'none', color: 'hsl(var(--popover-foreground))', borderRadius: 8, boxShadow: 'none' }}
                         itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         wrapperStyle={{ outline: 'none' }}
@@ -664,7 +664,7 @@ export default function DashboardPage() {
                       <YAxis />
                       <Tooltip
                         formatter={(value) => `₺${value.toLocaleString()}`}
-                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        contentStyle={{ background: 'transparent', border: 'none', color: 'hsl(var(--popover-foreground))', borderRadius: 8, boxShadow: 'none' }}
                         itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         wrapperStyle={{ outline: 'none' }}
@@ -710,7 +710,7 @@ export default function DashboardPage() {
                       <YAxis />
                       <Tooltip
                         formatter={(value) => `₺${value.toLocaleString()}`}
-                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        contentStyle={{ background: 'transparent', border: 'none', color: 'hsl(var(--popover-foreground))', borderRadius: 8, boxShadow: 'none' }}
                         itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
                         wrapperStyle={{ outline: 'none' }}
