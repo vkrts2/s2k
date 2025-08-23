@@ -152,6 +152,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseFormValues, setPurchaseFormValues] = useState<PurchaseFormValues>(EMPTY_PURCHASE_FORM_VALUES);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
+  const [showPurchaseTypeDialog, setShowPurchaseTypeDialog] = useState(false);
 
   const [showPaymentToSupplierModal, setShowPaymentToSupplierModal] = useState(false);
   const [paymentToSupplierFormValues, setPaymentToSupplierFormValues] = useState<PaymentToSupplierFormValues>(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
@@ -376,6 +377,17 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const handleOpenAddPurchaseModal = useCallback(() => {
     setEditingPurchase(null);
     setPurchaseFormValues(EMPTY_PURCHASE_FORM_VALUES);
+    setShowPurchaseTypeDialog(true);
+  }, []);
+
+  const handleSelectPurchaseType = useCallback((type: PurchaseType | 'stock' | 'manual') => {
+    setEditingPurchase(null);
+    setPurchaseFormValues({
+      ...EMPTY_PURCHASE_FORM_VALUES,
+      purchaseType: type as PurchaseType,
+      date: new Date(),
+    });
+    setShowPurchaseTypeDialog(false);
     setShowPurchaseModal(true);
   }, []);
 
@@ -1459,6 +1471,28 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         </TabsContent>
 
       </Tabs>
+
+      <Dialog open={showPurchaseTypeDialog} onOpenChange={setShowPurchaseTypeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Satın Alma Türü Seçin</DialogTitle>
+            <DialogDescription>İşleme başlamadan önce satın alma türünü seçin.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
+            <Button variant="default" onClick={() => handleSelectPurchaseType('stock')}>
+              Faturalı Alış
+            </Button>
+            <Button variant="secondary" onClick={() => handleSelectPurchaseType('manual')}>
+              Manuel Alış
+            </Button>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="ghost">İptal</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <PurchaseModal
         isOpen={showPurchaseModal}

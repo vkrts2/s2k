@@ -748,6 +748,62 @@ export const deleteSupplierTask = async (uid: string, taskId: string): Promise<v
   const taskDocRef = doc(_getUserCollectionRef(uid, "supplierTasks"), taskId);
   await deleteDoc(taskDocRef);
 };
+// Stored under users/{uid}/settings/biSalesTargets with a document structure:
+// { targets: { 'YYYY-MM': number } }
+
+export const getBISalesTargets = async (uid: string): Promise<Record<string, number>> => {
+  if (!uid) return {};
+  try {
+    const docRef = doc(db as any, "users", uid, "settings", "biSalesTargets");
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data() as any;
+      return (data?.targets as Record<string, number>) || {};
+    }
+    return {};
+  } catch (e) {
+    console.error("getBISalesTargets error", e);
+    return {};
+  }
+};
+
+export const getBIMonthlyTarget = async (uid: string, monthKey: string): Promise<number | null> => {
+  const all = await getBISalesTargets(uid);
+  const v = all[monthKey];
+  return typeof v === 'number' ? v : null;
+};
+
+export const setBIMonthlyTarget = async (uid: string, monthKey: string, amount: number): Promise<void> => {
+  if (!uid) throw new Error('setBIMonthlyTarget: uid required');
+  if (!monthKey) throw new Error('setBIMonthlyTarget: monthKey required');
+  const docRef = doc(db as any, "users", uid, "settings", "biSalesTargets");
+  const snap = await getDoc(docRef);
+  const current = snap.exists() ? ((snap.data() as any)?.targets || {}) : {};
+  const targets = { ...current, [monthKey]: amount };
+  await setDoc(docRef, { targets }, { merge: true });
+};
+
+// Margin targets (separate document to avoid breaking existing sales targets schema)
+export async function getBIMarginMonthlyTarget(uid: string, monthKey: string): Promise<number | null> {
+  try {
+    const docRef = doc(db as any, "users", uid, "settings", "biMarginTargets");
+    const snap = await getDoc(docRef);
+    const data = snap.exists() ? snap.data() as any : {};
+    const targets = (data.targets || {}) as Record<string, number>;
+    return typeof targets[monthKey] === 'number' ? targets[monthKey] : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function setBIMarginMonthlyTarget(uid: string, monthKey: string, amount: number): Promise<void> {
+  const docRef = doc(db as any, "users", uid, "settings", "biMarginTargets");
+  const snap = await getDoc(docRef);
+  const data = snap.exists() ? snap.data() as any : {};
+  const targets = (data.targets || {}) as Record<string, number>;
+  targets[monthKey] = amount;
+  await setDoc(docRef, { targets }, { merge: true });
+}
 
 // Portfolio Functions
 export const getPortfolioItems = async (uid: string): Promise<PortfolioItem[]> => {
@@ -800,35 +856,59 @@ export const addPortfolioItem = async (uid: string, itemData: Omit<PortfolioItem
     const customersRef = _getUserCollectionRef(uid, "customers");
     const q = query(customersRef, where("name", "==", itemData.companyName));
     const querySnapshot = await getDocs(q);
-    for (const docSnap of querySnapshot.docs) {
-      const customerId = docSnap.id;
-      const customerData = docSnap.data();
-      
-      // undefined değerleri temizle
-      const updatedCustomer: any = {
-        ...customerData,
+    if (!querySnapshot.empty) {
+      // Eşleşen tüm müşterileri güncelle
+      for (const docSnap of querySnapshot.docs) {
+        const customerId = docSnap.id;
+        const customerData = docSnap.data();
+        // undefined değerleri temizle
+        const updatedCustomer: any = {
+          ...customerData,
+          name: itemData.companyName,
+          phone: itemData.gsm || itemData.phone || customerData.phone || null,
+          email: itemData.email || customerData.email || null,
+          address: itemData.address || customerData.address || null,
+          taxNumber: itemData.taxId || customerData.taxNumber || null,
+          taxOffice: itemData.taxOffice || customerData.taxOffice || null,
+          notes: itemData.notes || customerData.notes || null,
+          city: itemData.city || customerData.city || null,
+          district: itemData.district || customerData.district || null,
+          website: itemData.website || customerData.website || null,
+          sector: itemData.sector || customerData.sector || null,
+          updatedAt: now,
+        };
+        // undefined değerleri null'a çevir
+        Object.keys(updatedCustomer).forEach(key => {
+          if (updatedCustomer[key] === undefined) {
+            updatedCustomer[key] = null;
+          }
+        });
+        await updateDoc(doc(customersRef, customerId), updatedCustomer);
+      }
+    } else {
+      // Hiç müşteri bulunamadıysa yeni müşteri oluştur
+      const newCustomer: any = {
         name: itemData.companyName,
-        phone: itemData.gsm || itemData.phone || customerData.phone || null,
-        email: itemData.email || customerData.email || null,
-        address: itemData.address || customerData.address || null,
-        taxNumber: itemData.taxId || customerData.taxNumber || null,
-        taxOffice: itemData.taxOffice || customerData.taxOffice || null,
-        notes: itemData.notes || customerData.notes || null,
-        city: itemData.city || customerData.city || null,
-        district: itemData.district || customerData.district || null,
-        website: itemData.website || customerData.website || null,
-        sector: itemData.sector || customerData.sector || null,
+        phone: itemData.gsm || itemData.phone || null,
+        email: itemData.email || null,
+        address: itemData.address || null,
+        taxNumber: itemData.taxId || null,
+        taxOffice: itemData.taxOffice || null,
+        notes: itemData.notes || null,
+        city: itemData.city || null,
+        district: itemData.district || null,
+        website: itemData.website || null,
+        sector: itemData.sector || null,
+        createdAt: now,
         updatedAt: now,
       };
-      
       // undefined değerleri null'a çevir
-      Object.keys(updatedCustomer).forEach(key => {
-        if (updatedCustomer[key] === undefined) {
-          updatedCustomer[key] = null;
+      Object.keys(newCustomer).forEach(key => {
+        if (newCustomer[key] === undefined) {
+          newCustomer[key] = null;
         }
       });
-      
-      await updateDoc(doc(customersRef, customerId), updatedCustomer);
+      await addDoc(customersRef, newCustomer);
     }
   }
 
@@ -860,35 +940,57 @@ export const updatePortfolioItem = async (uid: string, updatedItem: PortfolioIte
     const customersRef = _getUserCollectionRef(uid, "customers");
     const q = query(customersRef, where("name", "==", updatedItem.companyName));
     const querySnapshot = await getDocs(q);
-    for (const docSnap of querySnapshot.docs) {
-      const customerId = docSnap.id;
-      const customerData = docSnap.data();
-      
-      // undefined değerleri temizle
-      const updatedCustomer: any = {
-        ...customerData,
+    if (!querySnapshot.empty) {
+      for (const docSnap of querySnapshot.docs) {
+        const customerId = docSnap.id;
+        const customerData = docSnap.data();
+        // undefined değerleri temizle
+        const updatedCustomer: any = {
+          ...customerData,
+          name: updatedItem.companyName,
+          phone: updatedItem.gsm || updatedItem.phone || customerData.phone || null,
+          email: updatedItem.email || customerData.email || null,
+          address: updatedItem.address || customerData.address || null,
+          taxNumber: updatedItem.taxId || customerData.taxNumber || null,
+          taxOffice: updatedItem.taxOffice || customerData.taxOffice || null,
+          notes: updatedItem.notes || customerData.notes || null,
+          city: updatedItem.city || customerData.city || null,
+          district: updatedItem.district || customerData.district || null,
+          website: updatedItem.website || customerData.website || null,
+          sector: updatedItem.sector || customerData.sector || null,
+          updatedAt: now,
+        };
+        // undefined değerleri null'a çevir
+        Object.keys(updatedCustomer).forEach(key => {
+          if (updatedCustomer[key] === undefined) {
+            updatedCustomer[key] = null;
+          }
+        });
+        await updateDoc(doc(customersRef, customerId), updatedCustomer);
+      }
+    } else {
+      // Hiç müşteri bulunamadıysa yeni müşteri oluştur
+      const newCustomer: any = {
         name: updatedItem.companyName,
-        phone: updatedItem.gsm || updatedItem.phone || customerData.phone || null,
-        email: updatedItem.email || customerData.email || null,
-        address: updatedItem.address || customerData.address || null,
-        taxNumber: updatedItem.taxId || customerData.taxNumber || null,
-        taxOffice: updatedItem.taxOffice || customerData.taxOffice || null,
-        notes: updatedItem.notes || customerData.notes || null,
-        city: updatedItem.city || customerData.city || null,
-        district: updatedItem.district || customerData.district || null,
-        website: updatedItem.website || customerData.website || null,
-        sector: updatedItem.sector || customerData.sector || null,
+        phone: updatedItem.gsm || updatedItem.phone || null,
+        email: updatedItem.email || null,
+        address: updatedItem.address || null,
+        taxNumber: updatedItem.taxId || null,
+        taxOffice: updatedItem.taxOffice || null,
+        notes: updatedItem.notes || null,
+        city: updatedItem.city || null,
+        district: updatedItem.district || null,
+        website: updatedItem.website || null,
+        sector: updatedItem.sector || null,
+        createdAt: now,
         updatedAt: now,
       };
-      
-      // undefined değerleri null'a çevir
-      Object.keys(updatedCustomer).forEach(key => {
-        if (updatedCustomer[key] === undefined) {
-          updatedCustomer[key] = null;
+      Object.keys(newCustomer).forEach(key => {
+        if (newCustomer[key] === undefined) {
+          newCustomer[key] = null;
         }
       });
-      
-      await updateDoc(doc(customersRef, customerId), updatedCustomer);
+      await addDoc(customersRef, newCustomer);
     }
   }
 

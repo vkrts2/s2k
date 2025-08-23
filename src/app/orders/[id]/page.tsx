@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Printer, FileText, ArrowLeft, Edit } from 'lucide-react';
 import { format } from "date-fns";
-import { tr } from "date-fns/locale";
+import { tr } from "date-fns/locale/tr";
 import { useToast } from "@/hooks/use-toast";
 import { getOrderById } from '@/lib/storage';
 import { useAuth } from '@/contexts/AuthContext';
@@ -108,8 +108,7 @@ export default function OrderDetailPage() {
       kalemler: order.items.map(item => ({
         urun: item.productName,
         miktar: item.quantity,
-        birimFiyat: item.unitPrice,
-        toplam: item.total,
+        birim: item.unit,
         ozellikler: item.specifications
       })),
       notlar: order.notes
@@ -274,8 +273,8 @@ export default function OrderDetailPage() {
                   <TableRow>
                     <TableHead>Ürün/Hizmet</TableHead>
                     <TableHead>Miktar</TableHead>
-                    <TableHead>Birim Fiyat</TableHead>
-                    <TableHead>Toplam</TableHead>
+                    <TableHead>Birim</TableHead>
+                    <TableHead>Özellikler</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -284,26 +283,11 @@ export default function OrderDetailPage() {
                       <TableCell>
                         <div>
                           <p className="font-medium">{item.productName}</p>
-                          {item.specifications && (
-                            <p className="text-sm text-gray-500 mt-1">{item.specifications}</p>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell>{item.quantity}</TableCell>
-                      <TableCell>
-                        {item.unitPrice.toLocaleString('tr-TR', {
-                          style: 'currency',
-                          currency: order.currency
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-semibold">
-                          {item.total.toLocaleString('tr-TR', {
-                            style: 'currency',
-                            currency: order.currency
-                          })}
-                        </span>
-                      </TableCell>
+                      <TableCell>{item.unit}</TableCell>
+                      <TableCell>{item.specifications || '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

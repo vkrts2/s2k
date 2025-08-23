@@ -72,6 +72,7 @@ export default function CustomerExtractPage({ params }: ExtractPageProps) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -109,6 +110,55 @@ export default function CustomerExtractPage({ params }: ExtractPageProps) {
 
     fetchData();
   }, [user, customerId, router]);
+
+  // Basit mobil tespiti
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const ua = navigator.userAgent || '';
+    const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    setIsMobile(mobile);
+  }, []);
+
+  // ?print=1 geldiğinde, veri yüklendikten sonra ve kaynaklar hazır olunca yazdırmayı tetikle
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const wantsPrint = params.get('print') === '1';
+    if (!wantsPrint) return;
+    if (loading) return;
+    const waitForResources = async () => {
+      // Yazı tipleri
+      try { await (document as any).fonts?.ready; } catch {}
+      // Görseller
+      const imgs = Array.from(document.images || []);
+      await Promise.allSettled(
+        imgs.map(img => (img.complete && img.naturalWidth > 0) ? Promise.resolve(true) : new Promise(res => {
+          img.addEventListener('load', () => res(true), { once: true });
+          img.addEventListener('error', () => res(true), { once: true });
+        }))
+      );
+      // Reflow için küçük gecikme
+      await new Promise(res => setTimeout(res, 200));
+    };
+
+    const run = async () => {
+      await waitForResources();
+      // iOS için biraz daha bekleme
+      await new Promise(res => setTimeout(res, 400));
+      try {
+        window.print();
+      } catch (e) {
+        console.warn('window.print çağrısı başarısız oldu:', e);
+      } finally {
+        params.delete('print');
+        const clean = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+        window.history.replaceState({}, '', clean);
+      }
+    };
+
+    const timer = setTimeout(run, 100);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   const unifiedTransactions = useMemo(() => {
     const transactions: UnifiedTransaction[] = [...sales, ...payments];
@@ -157,7 +207,7 @@ export default function CustomerExtractPage({ params }: ExtractPageProps) {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8 print:p-0 print:m-0 print:w-full print:max-w-none">
+    <div className="container mx-auto p-4 md:p-8 print:p-0 print:m-0 print:w-full print:max-w-none pb-[calc(env(safe-area-inset-bottom,0)+16px)]">
        <style jsx global>{`
         @media print {
           body { margin: 0; padding: 0; }
@@ -194,20 +244,46 @@ export default function CustomerExtractPage({ params }: ExtractPageProps) {
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Genel Bilgiler</CardTitle>
-          <div className="flex gap-2 print:hidden">
-            <Button variant="outline" onClick={() => window.print()}>
+          <div className="flex gap-2 flex-wrap print:hidden">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (typeof window === 'undefined') return;
+                if (isMobile) {
+                  const params = new URLSearchParams(window.location.search);
+                  params.set('print', '1');
+                  const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+                  // iOS Safari'de aynı sekmede gezinmek daha güvenilir
+                  window.location.assign(url);
+                } else {
+                  window.print();
+                }
+              }}
+            >
               <Printer className="h-4 w-4 mr-2" />
               Yazdır
             </Button>
-            <Button variant="outline" onClick={() => {
-              if (navigator.share) {
-                navigator.share({
-                  title: `Müşteri Ekstresi: ${customer.name}`,
-                  text: 'Müşteri ekstresi detaylarını paylaşıyorum.',
-                  url: window.location.origin + window.location.pathname + '?print=1'
-                });
-              } else {
-                alert('Tarayıcınız paylaşım özelliğini desteklemiyor.');
+            <Button variant="outline" onClick={async () => {
+              try {
+                const shareUrl = window.location.origin + window.location.pathname + '?print=1';
+                if ((navigator as any).share) {
+                  await (navigator as any).share({
+                    title: `Müşteri Ekstresi: ${customer.name}`,
+                    text: 'Müşteri ekstresi detaylarını paylaşıyorum.',
+                    url: shareUrl,
+                  });
+                } else {
+                  // Fallback: linki panoya kopyala
+                  await navigator.clipboard.writeText(shareUrl);
+                  alert('Paylaşım desteklenmiyor. Bağlantı panoya kopyalandı.');
+                }
+              } catch (e) {
+                // iOS veya permission hatalarında kopyalama fallback
+                try {
+                  const fallbackUrl = window.location.origin + window.location.pathname;
+                  await navigator.clipboard.writeText(fallbackUrl);
+                  alert('Paylaşım başarısız. Bağlantı panoya kopyalandı.');
+                } catch {}
               }
             }}>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4 mr-2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-3A2.25 2.25 0 008.25 5.25V9m7.5 0v10.5A2.25 2.25 0 0113.5 21h-3a2.25 2.25 0 01-2.25-2.25V9m7.5 0h-7.5" /></svg>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { ChangeEvent } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { Dispatch, SetStateAction } from "react";
 import { tr } from 'date-fns/locale';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+// import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"; // not used here
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -37,8 +37,16 @@ export function PaymentModal({
   formValues,
   setFormValues,
 }: PaymentModalProps) {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Çoklu tıklamayı engelle
+    if (isSubmitting) {
+      return;
+    }
+    
     if (!formValues.dateInput || formValues.dateInput.length !== 10) {
       alert('Lütfen tarihi gg.aa.yyyy formatında ve eksiksiz giriniz!');
       return;
@@ -47,23 +55,27 @@ export function PaymentModal({
       alert('Lütfen geçerli bir tarih giriniz!');
       return;
     }
+    
+    setIsSubmitting(true);
     try {
       await onSubmit(formValues);
     } catch (error) {
       console.error("Error submitting payment form:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   React.useEffect(() => {
     if (formValues.date && !formValues.dateInput) {
-      setFormValues(prev => ({ ...prev, dateInput: format(formValues.date, 'dd.MM.yyyy') }));
+      setFormValues((prev: PaymentFormValues) => ({ ...prev, dateInput: format(formValues.date!, 'dd.MM.yyyy') }));
     }
-  }, [formValues.date]);
+  }, [formValues.date, setFormValues]);
 
   const isCheckMethod = formValues.method === 'cek';
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open: boolean) => { if (!open) onClose(); }}>
       <DialogContent className={cn(
         "sm:max-w-[425px]",
         isCheckMethod && "sm:max-w-[700px] max-h-[500px]"
@@ -85,7 +97,7 @@ export function PaymentModal({
                     type="number"
                     step="0.01"
                     value={formValues.amount}
-                    onChange={(e) => setFormValues({ ...formValues, amount: e.target.value })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setFormValues({ ...formValues, amount: e.target.value })}
                     required
                   />
                 </div>
@@ -95,20 +107,20 @@ export function PaymentModal({
                     type="text"
                     placeholder="gg.aa.yyyy"
                     value={formValues.dateInput ?? (formValues.date ? format(formValues.date, 'dd.MM.yyyy') : '')}
-                    onChange={e => {
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
                       let val = e.target.value.replace(/[^0-9]/g, ''); // Sadece rakamları al
                       if (val.length > 8) val = val.slice(0, 8);
                       // Noktalama: 2. ve 4. karakterden sonra otomatik ekle
                       if (val.length > 4) val = val.slice(0,2) + '.' + val.slice(2,4) + '.' + val.slice(4);
                       else if (val.length > 2) val = val.slice(0,2) + '.' + val.slice(2);
-                      setFormValues(prev => ({ ...prev, dateInput: val }));
+                      setFormValues((prev: PaymentFormValues) => ({ ...prev, dateInput: val }));
                       if (val.length === 10) {
                         const parsed = parse(val, 'dd.MM.yyyy', new Date());
                         if (isValid(parsed)) {
-                          setFormValues(prev => ({ ...prev, date: parsed, dateInput: val }));
+                          setFormValues((prev: PaymentFormValues) => ({ ...prev, date: parsed, dateInput: val }));
                         }
                       } else {
-                        setFormValues(prev => ({ ...prev, date: undefined }));
+                        setFormValues((prev: PaymentFormValues) => ({ ...prev, date: undefined }));
                       }
                     }}
                     className="w-32"
@@ -134,7 +146,7 @@ export function PaymentModal({
                   <Label htmlFor="method">Ödeme Yöntemi</Label>
                   <Select
                     value={formValues.method}
-                    onValueChange={(value: 'nakit' | 'krediKarti' | 'havale' | 'diger' | 'cek') => setFormValues({ ...formValues, method: value })}
+                    onValueChange={(value: PaymentFormValues['method']) => setFormValues({ ...formValues, method: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Ödeme yöntemi seçin" />
@@ -167,7 +179,7 @@ export function PaymentModal({
                       <Calendar
                         mode="single"
                         selected={formValues.checkDate || undefined}
-                        onSelect={(date) => setFormValues({ ...formValues, checkDate: date || null })}
+                        onSelect={(date?: Date) => setFormValues({ ...formValues, checkDate: date || null })}
                         initialFocus
                       />
                     </PopoverContent>
@@ -182,7 +194,7 @@ export function PaymentModal({
                   <Input
                     id="checkSerialNumber"
                     value={formValues.checkSerialNumber || ''}
-                    onChange={(e) => setFormValues({ ...formValues, checkSerialNumber: e.target.value || null })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setFormValues({ ...formValues, checkSerialNumber: e.target.value || null })}
                     placeholder="Çek seri numarasını girin"
                     required={formValues.method === 'cek'}
                   />
@@ -193,28 +205,15 @@ export function PaymentModal({
                     id="checkImage"
                     type="file"
                     accept="image/*,.pdf"
-                    onChange={async (e) => {
+                    onChange={async (e: ChangeEvent<HTMLInputElement>) => {
                       const file = e.target.files?.[0] || null;
                       if (!file) return;
                       try {
-                        // Önce local preview için base64 kaydet, kaydet'e basınca server'a yükleriz
+                        // Sadece local preview için base64 kaydet, server yüklemeyi form submit'te yap
                         const reader = new FileReader();
                         reader.onload = () => {
                           const dataUrl = reader.result as string;
-                          setFormValues({ ...formValues, checkImageFile: file as any, checkImageData: dataUrl as any, checkImageMimeType: file.type as any });
-                          // İsteğe bağlı: anında server yükleme (build uyumlu API route)
-                          const body = new FormData();
-                          body.append('uid', (window as any).currentUserId || 'public');
-                          body.append('dataUrl', dataUrl);
-                          body.append('mime', file.type);
-                          fetch('/api/upload-check-image', { method: 'POST', body })
-                            .then(res => res.json())
-                            .then(json => {
-                              if (json?.url) {
-                                setFormValues(prev => ({ ...prev, checkImageUrl: json.url as any }));
-                              }
-                            })
-                            .catch(() => {});
+                          setFormValues({ ...formValues, checkImageFile: file, checkImageData: dataUrl, checkImageMimeType: file.type });
                         };
                         reader.readAsDataURL(file);
                       } catch (err) {
@@ -230,7 +229,7 @@ export function PaymentModal({
                   <Input
                     id="referenceNumber"
                     value={formValues.referenceNumber || ''}
-                    onChange={(e) => setFormValues({ ...formValues, referenceNumber: e.target.value || null })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setFormValues({ ...formValues, referenceNumber: e.target.value || null })}
                     placeholder="Opsiyonel"
                   />
                 </div>
@@ -239,7 +238,7 @@ export function PaymentModal({
                   <Input
                     id="description"
                     value={formValues.description || ''}
-                    onChange={(e) => setFormValues({ ...formValues, description: e.target.value })}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setFormValues({ ...formValues, description: e.target.value })}
                     placeholder="Opsiyonel"
                   />
                 </div>
@@ -265,20 +264,20 @@ export function PaymentModal({
                   type="text"
                   placeholder="gg.aa.yyyy"
                   value={formValues.dateInput ?? (formValues.date ? format(formValues.date, 'dd.MM.yyyy') : '')}
-                  onChange={e => {
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
                     let val = e.target.value.replace(/[^0-9]/g, ''); // Sadece rakamları al
                     if (val.length > 8) val = val.slice(0, 8);
                     // Noktalama: 2. ve 4. karakterden sonra otomatik ekle
                     if (val.length > 4) val = val.slice(0,2) + '.' + val.slice(2,4) + '.' + val.slice(4);
                     else if (val.length > 2) val = val.slice(0,2) + '.' + val.slice(2);
-                    setFormValues(prev => ({ ...prev, dateInput: val }));
+                    setFormValues((prev: PaymentFormValues) => ({ ...prev, dateInput: val }));
                     if (val.length === 10) {
                       const parsed = parse(val, 'dd.MM.yyyy', new Date());
                       if (isValid(parsed)) {
-                        setFormValues(prev => ({ ...prev, date: parsed, dateInput: val }));
+                        setFormValues((prev: PaymentFormValues) => ({ ...prev, date: parsed, dateInput: val }));
                       }
                     } else {
-                      setFormValues(prev => ({ ...prev, date: undefined }));
+                      setFormValues((prev: PaymentFormValues) => ({ ...prev, date: undefined }));
                     }
                   }}
                   className="w-32"
@@ -304,7 +303,7 @@ export function PaymentModal({
                 <Label htmlFor="method">Ödeme Yöntemi</Label>
                 <Select
                   value={formValues.method}
-                  onValueChange={(value: 'nakit' | 'krediKarti' | 'havale' | 'diger' | 'cek') => setFormValues({ ...formValues, method: value })}
+                  onValueChange={(value: PaymentFormValues['method']) => setFormValues({ ...formValues, method: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Ödeme yöntemi seçin" />
@@ -342,7 +341,9 @@ export function PaymentModal({
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button type="submit">Kaydet</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
+            </Button>
           </div>
         </form>
       </DialogContent>

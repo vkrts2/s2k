@@ -222,6 +222,51 @@ export function SaleModal({
     }
   }, [editingSale]);
 
+  // Manuel düzenleme için başlangıç kalemleri/tarih/para birimi türet
+  const manualInitialItems = React.useMemo(() => {
+    // Eğer formValues içinde items varsa onları kullan
+    const fvItems = (formValues as any).items;
+    if (Array.isArray(fvItems) && fvItems.length > 0) {
+      return fvItems.map((it: any) => ({
+        id: it.id,
+        productName: it.productName || it.description || '',
+        description: it.description,
+        quantity: typeof it.quantity === 'number' ? it.quantity : Number(it.quantity ?? 1),
+        unitPrice: typeof it.unitPrice === 'number' ? it.unitPrice : Number(it.unitPrice ?? 0),
+        unit: it.unit || 'adet',
+        taxRate: typeof it.taxRate === 'number' ? it.taxRate : undefined,
+      }));
+    }
+    // editingSale varsa ondan tek kalem türet
+    if (editingSale && (editingSale as any).invoiceType !== 'invoice') {
+      const q = typeof editingSale.quantity === 'number' ? editingSale.quantity : 1;
+      // unitPrice yoksa amount'u kullan
+      const up = typeof editingSale.unitPrice === 'number' ? editingSale.unitPrice : (typeof editingSale.amount === 'number' ? editingSale.amount : 0);
+      return [{
+        id: '1',
+        productName: editingSale.description || 'Satış',
+        description: editingSale.description || 'Satış',
+        quantity: q,
+        unitPrice: up,
+        unit: 'adet',
+        taxRate: undefined,
+      }];
+    }
+    return undefined;
+  }, [formValues, editingSale]);
+
+  const manualInitialDate = React.useMemo(() => {
+    if (formValues?.date) return formValues.date;
+    if (editingSale && editingSale.date) return new Date(editingSale.date);
+    return undefined;
+  }, [formValues?.date, editingSale]);
+
+  const manualInitialCurrency = React.useMemo(() => {
+    if (formValues?.currency) return formValues.currency as 'TRY'|'USD'|'EUR';
+    if (editingSale && editingSale.currency) return editingSale.currency as 'TRY'|'USD'|'EUR';
+    return undefined;
+  }, [formValues?.currency, editingSale]);
+
   // Otomatik tutar hesaplama
   React.useEffect(() => {
     const quantity = parseFloat(String(formValues.quantity ?? '').replace(',', '.'));
@@ -390,7 +435,7 @@ export function SaleModal({
       <DialogContent className="sm:max-w-[860px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {editingSale ? 'Satışı Düzenle' : (invoiceType === InvoiceType.INVOICE ? 'Faturalı Satış Ekle' : 'Satış Ekle')}
+            {editingSale ? 'Satışı Düzenle' : (String(invoiceType) === 'invoice' ? 'Faturalı Satış Ekle' : 'Satış Ekle')}
           </DialogTitle>
           <DialogDescription>
             {'Yeni bir satış işlemi ekleyin veya mevcut bir satışı düzenleyin.'}
@@ -466,9 +511,9 @@ export function SaleModal({
                 {/* Manuel satış için faturalı formun hafif versiyonu, KDV kapalı */}
                 <LightweightInvoiceForm
                   customerName={customer?.name || ''}
-                  initialItems={Array.isArray((formValues as any).items) ? (formValues as any).items : undefined}
-                  initialDate={formValues.date}
-                  initialCurrency={formValues.currency}
+                  initialItems={manualInitialItems as any}
+                  initialDate={manualInitialDate}
+                  initialCurrency={manualInitialCurrency}
                   disableTax
                   onSubmit={(data: any) => {
                     const desc = Array.isArray(data.items) && data.items.length > 0
@@ -519,7 +564,7 @@ export function SaleModal({
             {saleType === SaleType.STOCK && (
             <div className="grid gap-2">
               <Label htmlFor="amount">
-                {invoiceType === InvoiceType.INVOICE ? 'Toplam Tutar (KDV Dahil)' : 'Tutar'}
+                {String(invoiceType) === 'invoice' ? 'Toplam Tutar (KDV Dahil)' : 'Tutar'}
               </Label>
               <Input
                 id="amount"

@@ -4,43 +4,46 @@ import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 
 interface ChartProps {
   data: any[];
+  xKey?: string;
+  yKey?: string;
+  valueFormatter?: (v: number) => string;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
-export function LineChart({ data }: ChartProps) {
+export function LineChart({ data, xKey = 'date', yKey = 'amount', valueFormatter }: ChartProps) {
   return (
     <div className="h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
         <RechartsLineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" />
-          <YAxis />
-          <Tooltip />
-          <Line type="monotone" dataKey="amount" stroke="#8884d8" />
+          <XAxis dataKey={xKey} />
+          <YAxis tickFormatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
+          <Tooltip formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
+          <Line type="monotone" dataKey={yKey} stroke="#8884d8" />
         </RechartsLineChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-export function BarChart({ data }: ChartProps) {
+export function BarChart({ data, xKey = 'category', yKey = 'count', valueFormatter }: ChartProps) {
   return (
     <div className="h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
         <RechartsBarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="category" />
-          <YAxis />
-          <Tooltip />
-          <Bar dataKey="count" fill="#8884d8" />
+          <XAxis dataKey={xKey} />
+          <YAxis tickFormatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
+          <Tooltip formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
+          <Bar dataKey={yKey} fill="#8884d8" />
         </RechartsBarChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-export function PieChart({ data }: ChartProps) {
+export function PieChart({ data, xKey = 'name', yKey = 'count', valueFormatter }: ChartProps) {
   return (
     <div className="h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
@@ -52,14 +55,14 @@ export function PieChart({ data }: ChartProps) {
             labelLine={false}
             outerRadius={80}
             fill="#8884d8"
-            dataKey="count"
+            dataKey={yKey}
             label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
           >
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip />
+          <Tooltip formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
         </RechartsPieChart>
       </ResponsiveContainer>
     </div>

@@ -4,7 +4,7 @@
 import React, { useMemo } from 'react';
 import type { Customer, Supplier, Sale, Payment, Purchase, PaymentToSupplier, Currency, UnifiedTransaction } from '@/lib/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { tr } from 'date-fns/locale';
+import { tr } from 'date-fns/locale/tr';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -120,37 +120,65 @@ export function StatementView({ entity, transactions, balances, entityType }: St
   };
 
   const handleExportPDF = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    try {
+      // Create a hidden iframe-based print flow (more reliable on mobile than window.open)
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(iframe);
 
-    const content = document.documentElement.outerHTML;
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!doc) throw new Error('Print iframe document not available');
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${entity.name} - Hesap Ekstresi</title>
-          <style>
-            ${document.querySelector('style')?.innerHTML || ''}
-            @media print {
-              /* Use global print styles for body, or set specific large padding */
-              /* We rely on globals.css for body padding and margins now */
-              @page { margin: 0; }
-            }
-          </style>
-        </head>
-        <body>
-          ${content}
-        </body>
-      </html>
-    `);
+      const content = document.querySelector('html')?.innerHTML ?? '';
 
-    printWindow.document.close();
-    printWindow.focus();
+      doc.open();
+      doc.write(`
+        <html>
+          <head>
+            <title>${entity.name} - Hesap Ekstresi</title>
+            <style>
+              ${document.querySelector('style')?.innerHTML || ''}
+              @media print {
+                @page { margin: 0; }
+              }
+            </style>
+          </head>
+          <body>
+            ${content}
+          </body>
+        </html>
+      `);
+      doc.close();
 
-    setTimeout(() => {
-      printWindow.print();
-      setTimeout(() => printWindow.close(), 1000);
-    }, 500);
+      const onLoadAndPrint = () => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } finally {
+          // Clean up the iframe after a short delay to allow print dialog
+          setTimeout(() => {
+            iframe.parentNode && iframe.parentNode.removeChild(iframe);
+          }, 1500);
+        }
+      };
+
+      // If the iframe loads synchronously, call immediately; otherwise wait for load
+      if ((iframe.contentDocument || iframe.contentWindow?.document)?.readyState === 'complete') {
+        onLoadAndPrint();
+      } else {
+        iframe.onload = onLoadAndPrint;
+      }
+    } catch (err) {
+      console.error('Print/PDF export failed:', err);
+      // As a last resort, attempt direct window.print
+      try { window.print(); } catch {}
+    }
   };
 
   const getTransactionTypeLabel = (type: UnifiedTransaction['transactionType']) => {

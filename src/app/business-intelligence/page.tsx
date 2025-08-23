@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import type { Customer, Supplier, Sale, Purchase } from '@/lib/types';
+import type { Customer, Supplier, Sale, Purchase, StockItem } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,11 +23,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import BackToHomeButton from '@/components/common/back-to-home-button';
 import { useAuth } from '@/contexts/AuthContext';
-import { getCustomers, getSuppliers, getSales, getPurchases } from "@/lib/storage";
+import { getCustomers, getSuppliers, getSales, getPurchases, getPayments, getPaymentsToSuppliers, getStockItems, getBIMonthlyTarget, setBIMonthlyTarget, getBIMarginMonthlyTarget, setBIMarginMonthlyTarget } from "@/lib/storage";
 import {
   LineChart as LineChartComponent,
-  BarChart as BarChartComponent,
-  PieChart as PieChartComponent
+  BarChart as BarChartComponent
 } from '@/components/ui/charts';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
@@ -55,12 +54,23 @@ export default function BusinessIntelligencePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [supplierPayments, setSupplierPayments] = useState<any[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Filtreler için state
   const [dateRange, setDateRange] = useState<{start: string, end: string} | null>(null);
   const [customerFilter, setCustomerFilter] = useState<string>('');
   const [supplierFilter, setSupplierFilter] = useState<string>('');
+  // Manuel aylık hedef (kullanıcı girişi)
+  const [targetManual, setTargetManual] = useState<number | null>(null);
+  // Kâr marjı aylık hedef (kullanıcı girişi)
+  const [marginTargetManual, setMarginTargetManual] = useState<number | null>(null);
+  // Değer formatlayıcılar
+  const fmtCurrency = (v: number) => `₺${Number(v||0).toLocaleString(undefined,{maximumFractionDigits:0})}`;
+  const fmtDays = (v: number) => `${Number(v||0).toFixed(0)} gün`;
+  const fmtPercent = (v: number) => `${(Number(v)||0) >= 0 ? '+' : ''}${Number(v).toFixed(1)}%`;
 
   useEffect(() => {
     if (!user) return;
@@ -70,12 +80,26 @@ export default function BusinessIntelligencePage() {
       getCustomers(user.uid),
       getSuppliers(user.uid),
       getSales(user.uid),
-      getPurchases(user.uid)
-    ]).then(([customers, suppliers, sales, purchases]) => {
+      getPurchases(user.uid),
+      getPayments(user.uid),
+      getPaymentsToSuppliers(user.uid),
+      getStockItems(user.uid)
+    ]).then(async ([customers, suppliers, sales, purchases, payments, supplierPayments, stockItems]) => {
       setCustomers(customers);
       setSuppliers(suppliers);
       setSales(sales);
       setPurchases(purchases);
+      setPayments(payments);
+      setSupplierPayments(supplierPayments);
+      setStockItems(stockItems);
+      try {
+        const d = new Date();
+        const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+        const savedSales = await getBIMonthlyTarget(user.uid, key);
+        if (typeof savedSales === 'number') setTargetManual(savedSales);
+        const savedMargin = await getBIMarginMonthlyTarget(user.uid, key);
+        if (typeof savedMargin === 'number') setMarginTargetManual(savedMargin);
+      } catch {}
     }).catch((err) => {
       setError("Veriler alınırken hata oluştu.");
       toast({ title: "Hata", description: "Veriler alınırken hata oluştu.", variant: "destructive" });
@@ -84,12 +108,14 @@ export default function BusinessIntelligencePage() {
 
   // Filtrelenmiş veriler
   const filteredSales = sales.filter(sale => {
-    const dateOk = !dateRange || (sale.date >= dateRange.start && sale.date <= dateRange.end);
+    const d = new Date(sale.date);
+    const dateOk = !dateRange || (d >= new Date(dateRange.start) && d <= new Date(dateRange.end));
     const customerOk = !customerFilter || sale.customerId === customerFilter;
     return dateOk && customerOk;
   });
   const filteredPurchases = purchases.filter(purchase => {
-    const dateOk = !dateRange || (purchase.date >= dateRange.start && purchase.date <= dateRange.end);
+    const d = new Date(purchase.date);
+    const dateOk = !dateRange || (d >= new Date(dateRange.start) && d <= new Date(dateRange.end));
     const supplierOk = !supplierFilter || purchase.supplierId === supplierFilter;
     return dateOk && supplierOk;
   });
@@ -103,8 +129,21 @@ export default function BusinessIntelligencePage() {
   const avgPurchase = filteredPurchases.length ? totalPurchases / filteredPurchases.length : 0;
   const profit = totalSales - totalPurchases;
 
-  // En çok satış yapılan müşteri
+  // En çok satış yapılan müşteri (erken hesapla, KPI'larda kullanılıyor)
   const salesByCustomer: {[id: string]: number} = {};
+
+const handleSaveMarginTarget = async () => {
+  try {
+    if (!user) return;
+    const d = new Date();
+    const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+    const value = marginTargetManual ?? marginTargetAuto;
+    await setBIMarginMonthlyTarget(user.uid, key, value);
+    toast({ title: 'Kaydedildi', description: 'Aylık kâr marjı hedefi kaydedildi.' });
+  } catch (e:any) {
+    toast({ title: 'Hata', description: 'Kâr marjı hedefi kaydedilemedi.', variant: 'destructive' });
+  }
+};
   filteredSales.forEach(sale => {
     salesByCustomer[sale.customerId] = (salesByCustomer[sale.customerId] || 0) + (sale.amount || 0);
   });
@@ -115,6 +154,164 @@ export default function BusinessIntelligencePage() {
       name: customers.find(c => c.id === id)?.name || 'Bilinmeyen',
       total
     }));
+
+  // Satış/Alış trendi için aylık agregasyonlar ve son 12 ay listesi
+  const salesByMonth: { [key: string]: number } = {};
+  filteredSales.forEach((sale: Sale) => {
+    const date = new Date(sale.date);
+    const key = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}`;
+    salesByMonth[key] = (salesByMonth[key] || 0) + (sale.amount || 0);
+  });
+  const last12Months = Array.from({length: 12}, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (11-i));
+    return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}`;
+  });
+  const salesTrend = last12Months.map(month => ({ date: month, amount: salesByMonth[month] || 0 }));
+
+  const purchasesByMonth: { [key: string]: number } = {};
+  filteredPurchases.forEach((purchase: Purchase) => {
+    const date = new Date(purchase.date);
+    const key = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}`;
+    purchasesByMonth[key] = (purchasesByMonth[key] || 0) + (purchase.amount || 0);
+  });
+  const purchasesTrend = last12Months.map(month => ({ date: month, amount: purchasesByMonth[month] || 0 }));
+
+  // Ödemeler bazlı nakit akışı agregasyonu (aylık)
+  const paymentsByMonth: { [key: string]: number } = {};
+  payments.forEach((p) => {
+    const d = new Date(p.date);
+    const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+    paymentsByMonth[key] = (paymentsByMonth[key] || 0) + (p.amount || 0);
+  });
+  const supplierPaymentsByMonth: { [key: string]: number } = {};
+  supplierPayments.forEach((sp) => {
+    const d = new Date(sp.date);
+    const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+    supplierPaymentsByMonth[key] = (supplierPaymentsByMonth[key] || 0) + (sp.amount || 0);
+  });
+
+  // Nakit Akış Projeksiyonu (Aylık, ödemeler bazlı): Son 6 ay tahsilat/ödemelerin ortalamasına göre 6 ay ileri
+  const last6Months = Array.from({length: 6}, (_, i) => {
+    const d = new Date(); d.setMonth(d.getMonth() - (5-i));
+    return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+  });
+  const inflowVals = last6Months.map(m => paymentsByMonth[m] || 0).filter(v => v > 0);
+  const outflowVals = last6Months.map(m => supplierPaymentsByMonth[m] || 0).filter(v => v > 0);
+  const inflowAvg = inflowVals.length ? inflowVals.reduce((a,b)=>a+b,0) / inflowVals.length : 0;
+  const outflowAvg = outflowVals.length ? outflowVals.reduce((a,b)=>a+b,0) / outflowVals.length : 0;
+  const next6Months = Array.from({length: 6}, (_, i) => {
+    const d = new Date(); d.setMonth(d.getMonth() + (i+1));
+    return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+  });
+  const cashProjectionMonthly = next6Months.map(label => ({ label, inflow: inflowAvg, outflow: outflowAvg, net: inflowAvg - outflowAvg }));
+
+  // Aging (yaklaşık): müşteri bazında açık bakiye = satış - ödeme; gün farkı = son satıştan bugüne
+  const paymentsByCustomer: Record<string, number> = {};
+  payments.forEach(p => { paymentsByCustomer[p.customerId] = (paymentsByCustomer[p.customerId]||0) + (p.amount||0); });
+  const salesByCustomerForAging: Record<string, {total:number,last:string}> = {};
+  filteredSales.forEach(s => {
+    const c = salesByCustomerForAging[s.customerId] || { total:0,last:s.date };
+    c.total += (s.amount||0);
+    if (!c.last || s.date > c.last) c.last = s.date;
+    salesByCustomerForAging[s.customerId] = c;
+  });
+  const agingBuckets = { b0_30:0, b31_60:0, b61_90:0, b90p:0 };
+  const agingDetails: Array<{customer:string, outstanding:number, days:number}> = [];
+  Object.keys(salesByCustomerForAging).forEach(cid => {
+    const total = salesByCustomerForAging[cid].total;
+    const paid = paymentsByCustomer[cid] || 0;
+    const outstanding = Math.max(0, total - paid);
+    if (outstanding <= 0) return;
+    const days = Math.floor((Date.now() - new Date(salesByCustomerForAging[cid].last).getTime()) / (1000*60*60*24));
+    if (days<=30) agingBuckets.b0_30 += outstanding; else if (days<=60) agingBuckets.b31_60 += outstanding; else if (days<=90) agingBuckets.b61_90 += outstanding; else agingBuckets.b90p += outstanding;
+    agingDetails.push({ customer: customers.find(c=>c.id===cid)?.name || 'Bilinmeyen', outstanding, days });
+  });
+
+  // Kâr Marjı Analizi (yaklaşık): Aylık satış - alış
+  // Marj: aynı ay içi COGS'i satış tutarıyla sınırlayarak negatif patlamayı önle
+  const marginByMonth: {date:string, margin:number}[] = last12Months.map(m => {
+    const s = salesByMonth[m] || 0;
+    const cogsApprox = Math.min(purchasesByMonth[m] || 0, s);
+    return { date: m, margin: s - cogsApprox };
+  });
+  const marginByCustomer: {name:string, margin:number}[] = Object.entries(salesByCustomer)
+    .map(([cid, sTotal]) => ({ name: customers.find(c=>c.id===cid)?.name || 'Bilinmeyen', margin: sTotal - (totalPurchases * (sTotal/(totalSales||1))) }))
+    .sort((a,b)=>b.margin-a.margin).slice(0,5);
+
+  // Müşteri satış listeleri (DSO hesaplaması için)
+  const salesByCustomerList: Record<string, Sale[]> = {};
+  filteredSales.forEach(s=>{ (salesByCustomerList[s.customerId] ||= []).push(s); });
+
+  // Churn (kayıp) kartı kaldırıldı – hesaplama yapılmıyor
+
+  // Hedef vs Gerçekleşen: hedef = geçen ay satışları
+  const currentMonthKey = (()=>{ const d=new Date(); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`; })();
+  const prevMonthKey = (()=>{ const d=new Date(); d.setMonth(d.getMonth()-1); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`; })();
+  const actualThisMonth = salesByMonth[currentMonthKey] || 0;
+  const targetAuto = salesByMonth[prevMonthKey] || 0;
+  const targetThisMonth = targetManual ?? targetAuto;
+  const salesDiff = actualThisMonth - targetThisMonth;
+  const salesDiffPct = targetThisMonth ? (salesDiff / targetThisMonth) * 100 : 0;
+
+  // Marj hedef/gerçekleşen hesapları
+  const marginByMonthMap: Record<string, number> = Object.fromEntries((marginByMonth || []).map(m => [m.date, m.margin || 0]));
+  const marginActualThisMonth = marginByMonthMap[currentMonthKey] || 0;
+  const marginTargetAuto = marginByMonthMap[prevMonthKey] || 0;
+  const marginTargetThisMonth = marginTargetManual ?? marginTargetAuto;
+  const marginDiff = marginActualThisMonth - marginTargetThisMonth;
+  const marginDiffPct = marginTargetThisMonth ? (marginDiff / marginTargetThisMonth) * 100 : 0;
+
+  const handleSaveTarget = async () => {
+    try {
+      if (!user) return;
+      const d = new Date();
+      const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+      const value = targetManual ?? targetAuto;
+      await setBIMonthlyTarget(user.uid, key, value);
+      toast({ title: 'Kaydedildi', description: 'Aylık satış hedefi kaydedildi.' });
+    } catch (e:any) {
+      toast({ title: 'Hata', description: 'Hedef kaydedilemedi.', variant: 'destructive' });
+    }
+  };
+
+  // Tahsilat performansı (FIFO eşleme, müşteri bazında basit)
+  const paymentsByCustomerList: Record<string, any[]> = {};
+  payments.forEach(p=>{ (paymentsByCustomerList[p.customerId] ||= []).push(p); });
+  const dsoList: Array<{name:string, dso:number}> = [];
+  Object.keys(salesByCustomerList).forEach(cid => {
+    // Bağımsız çalışma kopyaları (miktarlar yeni alanlarda)
+    const sList = salesByCustomerList[cid].slice().map(s=> ({ date: new Date(s.date), amt: s.amount||0 }))
+      .sort((a,b)=> a.date.getTime()-b.date.getTime());
+    const pList = (paymentsByCustomerList[cid]||[]).slice().map(p=> ({ date: new Date(p.date), amt: p.amount||0 }))
+      .sort((a,b)=> a.date.getTime()-b.date.getTime());
+    let i=0,j=0; let sumDays=0, matched=0;
+    while(i<sList.length && j<pList.length){
+      // sadece ödeme tarihi satış tarihinden büyük/eşit olanı eşleştir
+      if (pList[j].date < sList[i].date){ j++; continue; }
+      const sAmt = sList[i].amt; const pAmt = pList[j].amt;
+      const minAmt = Math.min(sAmt, pAmt);
+      if (minAmt<=0){ if (sAmt<=0) i++; if (pAmt<=0) j++; continue; }
+      const days = Math.max(0, Math.floor((pList[j].date.getTime() - sList[i].date.getTime())/(1000*60*60*24)));
+      sumDays += days * minAmt; matched += minAmt;
+      sList[i].amt -= minAmt; pList[j].amt -= minAmt;
+      if (sList[i].amt<=0) i++; if (pList[j].amt<=0) j++;
+    }
+    let dso = matched>0 ? (sumDays / matched) : 0;
+    if (matched===0){
+      // Fallback: Ortalama Alacak / Aylık Kredi Satışı * 30
+      const totalS = sList.reduce((a,b)=>a+b.amt,0) + filteredSales.filter(s=> s.customerId===cid).reduce((a,b)=>a+(b.amount||0),0);
+      const totalP = (paymentsByCustomerList[cid]||[]).reduce((a,b)=>a+(b.amount||0),0);
+      const ar = Math.max(0, totalS - totalP);
+      const monthsWithSales = Math.max(1, last12Months.filter(m => (salesByMonth[m]||0)>0).length);
+      const monthlyCreditSales = (last12Months.reduce((a,m)=>a+(salesByMonth[m]||0),0)) / monthsWithSales;
+      dso = monthlyCreditSales>0 ? (ar / monthlyCreditSales) * 30 : 0;
+    }
+    dsoList.push({ name: customers.find(c=>c.id===cid)?.name || 'Bilinmeyen', dso: Number(dso.toFixed(1)) });
+  });
+  const topDSO = dsoList.sort((a,b)=> b.dso - a.dso).slice(0,10);
+
+  // salesByCustomer ve topCustomers yukarıda tanımlandı
 
   // En çok alış yapılan tedarikçi
   const purchasesBySupplier: {[id: string]: number} = {};
@@ -129,48 +326,41 @@ export default function BusinessIntelligencePage() {
       total
     }));
 
-  // Satış trendi (son 12 ay)
-  const salesByMonth: { [key: string]: number } = {};
-  filteredSales.forEach((sale: Sale) => {
-    const date = new Date(sale.date);
-    const key = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}`;
-    salesByMonth[key] = (salesByMonth[key] || 0) + (sale.amount || 0);
-  });
-  const last12Months = Array.from({length: 12}, (_, i) => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - (11-i));
-    return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}`;
-  });
-  const salesTrend = last12Months.map(month => ({ date: month, amount: salesByMonth[month] || 0 }));
+  // salesByMonth/last12Months/purchasesByMonth/purchasesTrend yukarıda tanımlandı
 
-  // Alış trendi (son 12 ay)
-  const purchasesByMonth: { [key: string]: number } = {};
-  filteredPurchases.forEach((purchase: Purchase) => {
-    const date = new Date(purchase.date);
-    const key = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}`;
-    purchasesByMonth[key] = (purchasesByMonth[key] || 0) + (purchase.amount || 0);
-  });
-  const purchasesTrend = last12Months.map(month => ({ date: month, amount: purchasesByMonth[month] || 0 }));
-
-  // En çok satılan ürünler
-  const salesByProduct: {[name: string]: number} = {};
+  // En çok satılan ürünler (ID öncelikli)
+  const stockIndex: Record<string, string> = Object.fromEntries(stockItems.map(si => [si.id, si.name]));
+  const salesByProduct: {[key: string]: {name:string; total:number}} = {};
   filteredSales.forEach(sale => {
-    if (sale.description) {
-      salesByProduct[sale.description] = (salesByProduct[sale.description] || 0) + (sale.amount || 0);
-    }
+    const key = sale.stockItemId || sale.description || 'Diğer';
+    const name = sale.stockItemId ? (stockIndex[sale.stockItemId] || sale.description || sale.stockItemId) : (sale.description || 'Diğer');
+    const curr = salesByProduct[key] || { name, total: 0 };
+    curr.total += (sale.amount || 0);
+    salesByProduct[key] = curr;
   });
-  const topProducts = Object.entries(salesByProduct)
-    .sort((a, b) => b[1] - a[1])
+  const topProducts = Object.values(salesByProduct)
+    .sort((a, b) => b.total - a.total)
     .slice(0, 5)
-    .map(([name, total]) => ({ name, total }));
+    .map((item) => ({ name: item.name, total: item.total }));
 
-  // Müşteri segmentasyonu (örnek: eğer customer nesnesinde segment varsa)
-  const segmentCounts: {[segment: string]: number} = {};
-  customers.forEach(c => {
-    const segment = (c as any).segment || 'Bilinmeyen';
-    segmentCounts[segment] = (segmentCounts[segment] || 0) + 1;
+  // Ürün Kârlılık: ID öncelikli eşleme (stok), yoksa açıklama/manuel adı
+  const costByProduct: {[key: string]: {name:string; total:number}} = {};
+  filteredPurchases.forEach(p => {
+    const key = p.stockItemId || p.description || p.manualProductName || 'Diğer';
+    const name = p.stockItemId ? (stockIndex[p.stockItemId] || p.description || key) : (p.description || p.manualProductName || 'Diğer');
+    const curr = costByProduct[key] || { name, total: 0 };
+    curr.total += (p.amount || 0);
+    costByProduct[key] = curr;
   });
-  const segmentData = Object.entries(segmentCounts).map(([name, count]) => ({ name, count }));
+  const allKeys = new Set<string>([...Object.keys(salesByProduct), ...Object.keys(costByProduct)]);
+  const productProfitability: Array<{name:string; sales:number; cost:number; profit:number}> = Array.from(allKeys).map(key => {
+    const s = salesByProduct[key]?.total || 0;
+    const c = costByProduct[key]?.total || 0;
+    const name = salesByProduct[key]?.name || costByProduct[key]?.name || key;
+    return { name, sales: s, cost: c, profit: s - c };
+  }).sort((a,b)=> b.profit - a.profit).slice(0, 10);
+
+  // Müşteri segmentasyonu kaldırıldı
 
   // Son 10 satış/alış
   const lastSales = filteredSales.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
@@ -273,10 +463,176 @@ export default function BusinessIntelligencePage() {
 
           {/* Grafikler */}
           <div className="grid gap-6 md:grid-cols-2 mt-6">
-            <div><h3 className="font-semibold mb-2">Satış Trendi (Son 12 Ay)</h3><LineChartComponent data={salesTrend} /></div>
-            <div><h3 className="font-semibold mb-2">Alış Trendi (Son 12 Ay)</h3><LineChartComponent data={purchasesTrend} /></div>
-            <div><h3 className="font-semibold mb-2">En Çok Satılan Ürünler</h3><BarChartComponent data={topProducts.map(p => ({ category: p.name, count: p.total }))} /></div>
-            <div><h3 className="font-semibold mb-2">Müşteri Segmentasyonu</h3><PieChartComponent data={segmentData} /></div>
+            <div><h3 className="font-semibold mb-2">Satış Trendi (Son 12 Ay)</h3><LineChartComponent data={salesTrend} valueFormatter={fmtCurrency} /></div>
+            <div><h3 className="font-semibold mb-2">Alış Trendi (Son 12 Ay)</h3><LineChartComponent data={purchasesTrend} valueFormatter={fmtCurrency} /></div>
+            <div><h3 className="font-semibold mb-2">En Çok Satılan Ürünler</h3><BarChartComponent data={topProducts.map(p => ({ category: p.name, count: p.total }))} valueFormatter={fmtCurrency} /></div>
+          </div>
+
+          {/* Nakit Akış Projeksiyonu (6 Ay) */}
+          <div className="grid gap-6 md:grid-cols-2 mt-6">
+            <Card>
+              <CardHeader><CardTitle>Nakit Akış Projeksiyonu (6 Ay)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="mb-3">
+                  <LineChartComponent data={cashProjectionMonthly.map(m => ({ date: m.label, amount: m.net }))} valueFormatter={fmtCurrency} />
+                </div>
+                <table className="w-full text-xs border">
+                  <thead><tr><th>Ay</th><th>Giriş</th><th>Çıkış</th><th>Net</th></tr></thead>
+                  <tbody>
+                    {cashProjectionMonthly.map((m,idx)=> (
+                      <tr key={idx} className="border-t"><td>{m.label}</td><td>₺{Math.round(m.inflow).toLocaleString()}</td><td>₺{Math.round(m.outflow).toLocaleString()}</td><td>₺{Math.round(m.net).toLocaleString()}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="text-muted-foreground text-[10px] mt-2">Not: Vade verisi yoksa son 6 ayın ortalaması ile tahmin edilir.</div>
+              </CardContent>
+            </Card>
+
+            {/* Aging Özeti */}
+            <Card>
+              <CardHeader><CardTitle>Geciken Alacaklar (Aging) Özeti</CardTitle></CardHeader>
+              <CardContent>
+                <div className="mb-3">
+                  <BarChartComponent data={[
+                    { category: '0–30', count: agingBuckets.b0_30 },
+                    { category: '31–60', count: agingBuckets.b31_60 },
+                    { category: '61–90', count: agingBuckets.b61_90 },
+                    { category: '90+', count: agingBuckets.b90p },
+                  ]} valueFormatter={fmtCurrency} />
+                </div>
+                <table className="w-full text-xs border">
+                  <thead><tr><th>0–30</th><th>31–60</th><th>61–90</th><th>90+</th></tr></thead>
+                  <tbody><tr className="border-t"><td>₺{agingBuckets.b0_30.toLocaleString()}</td><td>₺{agingBuckets.b31_60.toLocaleString()}</td><td>₺{agingBuckets.b61_90.toLocaleString()}</td><td>₺{agingBuckets.b90p.toLocaleString()}</td></tr></tbody>
+                </table>
+                <div className="mt-3 max-h-40 overflow-auto">
+                  <table className="w-full text-xs border">
+                    <thead><tr><th>Müşteri</th><th>Gecikme (gün)</th><th>Tutar</th></tr></thead>
+                    <tbody>
+                      {agingDetails.sort((a,b)=> b.days-a.days).slice(0,10).map((r,idx)=> (
+                        <tr key={idx} className="border-t"><td>{r.customer}</td><td>{r.days}</td><td>₺{r.outstanding.toLocaleString()}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Kâr Marjı Analizi ve Hedef vs Gerçekleşen */}
+          <div className="grid gap-6 md:grid-cols-2 mt-6">
+            <Card>
+              <CardHeader><CardTitle>Kâr Marjı Analizi (Aylık)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="mb-3">
+                  <LineChartComponent data={marginByMonth.map(m => ({ date: m.date, amount: m.margin }))} valueFormatter={fmtCurrency} />
+                </div>
+                <table className="w-full text-xs border">
+                  <thead><tr><th>Ay</th><th>Marj</th></tr></thead>
+                  <tbody>{marginByMonth.map(m=> (<tr key={m.date} className="border-t"><td>{m.date}</td><td>₺{(m.margin||0).toLocaleString()}</td></tr>))}</tbody>
+                </table>
+                <div className="mt-3">
+                  <h4 className="font-semibold mb-1 text-sm">En Yüksek Marjlı 5 Müşteri</h4>
+                  <div className="mb-2">
+                    <BarChartComponent data={marginByCustomer.map(m => ({ category: m.name, count: m.margin }))} valueFormatter={fmtCurrency} />
+                  </div>
+                  <table className="w-full text-xs border"><tbody>
+                    {marginByCustomer.map((m,idx)=> (<tr key={idx} className="border-t"><td>{m.name}</td><td>₺{m.margin.toLocaleString()}</td></tr>))}
+                  </tbody></table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sağ kolon: Ciro Hedef vs Gerçekleşen + altında Marj Hedef vs Gerçekleşen */}
+            <div className="flex flex-col gap-6">
+              <Card>
+                <CardHeader><CardTitle>Hedef vs Gerçekleşen (Bu Ay)</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="flex gap-6 text-sm">
+                    <div>Hedef: <span className="font-semibold">₺{targetThisMonth.toLocaleString()}</span></div>
+                    <div>Gerçekleşen: <span className="font-semibold">₺{actualThisMonth.toLocaleString()}</span></div>
+                    <div>Fark: <span className={actualThisMonth>=targetThisMonth? 'text-green-600 font-semibold':'text-red-600 font-semibold'}>₺{(actualThisMonth-targetThisMonth).toLocaleString()} ({fmtPercent(salesDiffPct)})</span></div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Label className="text-xs">Aylık Hedef (₺)</Label>
+                    <Input type="number" className="h-8 w-48" value={targetManual ?? ''} placeholder={targetAuto.toString()} onChange={(e)=> {
+                      const v = e.target.value;
+                      setTargetManual(v === '' ? null : Number(v));
+                    }} />
+                    {targetManual !== null && (
+                      <Button variant="secondary" className="h-8" onClick={()=> setTargetManual(null)}>Otomatik (Geçen Ay)</Button>
+                    )}
+                    <Button className="h-8" onClick={handleSaveTarget}>Kaydet</Button>
+                  </div>
+                  <div className="mt-3">
+                    <BarChartComponent data={[{ category: 'Hedef', count: targetThisMonth }, { category: 'Gerçekleşen', count: actualThisMonth }]} valueFormatter={fmtCurrency} />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle>Kâr Marjı Hedef vs Gerçekleşen (Bu Ay)</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="flex gap-6 text-sm">
+                    <div>Hedef: <span className="font-semibold">₺{marginTargetThisMonth.toLocaleString()}</span></div>
+                    <div>Gerçekleşen: <span className="font-semibold">₺{marginActualThisMonth.toLocaleString()}</span></div>
+                    <div>Fark: <span className={marginActualThisMonth>=marginTargetThisMonth? 'text-green-600 font-semibold':'text-red-600 font-semibold'}>₺{(marginActualThisMonth-marginTargetThisMonth).toLocaleString()} ({fmtPercent(marginDiffPct)})</span></div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Label className="text-xs">Aylık Kâr Hedefi (₺)</Label>
+                    <Input type="number" className="h-8 w-48" value={marginTargetManual ?? ''} placeholder={marginTargetAuto.toString()} onChange={(e)=> {
+                      const v = e.target.value;
+                      setMarginTargetManual(v === '' ? null : Number(v));
+                    }} />
+                    {marginTargetManual !== null && (
+                      <Button variant="secondary" className="h-8" onClick={()=> setMarginTargetManual(null)}>Otomatik (Geçen Ay)</Button>
+                    )}
+                    <Button className="h-8" onClick={handleSaveMarginTarget}>Kaydet</Button>
+                  </div>
+                  <div className="mt-3">
+                    <BarChartComponent data={[{ category: 'Hedef', count: marginTargetThisMonth }, { category: 'Gerçekleşen', count: marginActualThisMonth }]} valueFormatter={fmtCurrency} />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* LTV/RFM bölümü kaldırıldı */}
+
+          {/* Tahsilat Performansı ve Ürün Kârlılık Ligi */}
+          <div className="grid gap-6 md:grid-cols-2 mt-6">
+            <Card>
+              <CardHeader><CardTitle>Tahsilat Performansı (DSO - Gün)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="text-[11px] text-muted-foreground mb-2">DSO: Tahsilat Süresi. Faturalardan ödemeye kadar geçen ortalama gün.</div>
+                <div className="mb-3">
+                  <BarChartComponent data={topDSO.map(d => ({ category: d.name, count: d.dso }))} valueFormatter={fmtDays} />
+                </div>
+                <table className="w-full text-xs border">
+                  <thead><tr><th>Müşteri</th><th>DSO</th></tr></thead>
+                  <tbody>
+                    {topDSO.map((d,idx)=> (<tr key={idx} className="border-t"><td>{d.name}</td><td>{d.dso}</td></tr>))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Ürün Kârlılık Ligi (Satış - Maliyet)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="text-[11px] text-muted-foreground mb-2">Not: Eşleşme stok ürünü ID (varsa) üzerinden yapılır; yoksa açıklama/manuel ürün adı kullanılır.</div>
+                <div className="mb-3">
+                  <BarChartComponent data={productProfitability.map(p => ({ category: p.name, count: p.profit }))} valueFormatter={fmtCurrency} />
+                </div>
+                <table className="w-full text-xs border">
+                  <thead><tr><th>Ürün</th><th>Satış</th><th>Maliyet</th><th>Kâr</th></tr></thead>
+                  <tbody>
+                    {productProfitability.map((p,idx)=> (
+                      <tr key={idx} className="border-t"><td>{p.name}</td><td>₺{p.sales.toLocaleString()}</td><td>₺{p.cost.toLocaleString()}</td><td>₺{p.profit.toLocaleString()}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Karşılaştırmalı Analiz */}

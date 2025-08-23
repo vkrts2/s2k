@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { PlusCircle, Edit, Trash2, CalendarIcon, FileText, Printer, Search, Check } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { tr } from "date-fns/locale";
+import { tr } from "date-fns/locale/tr";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -284,21 +284,23 @@ export default function OrdersPage() {
     }));
   };
 
-  const updateOrderItem = (index: number, field: keyof OrderItem, value: any) => {
+  const updateOrderItem = <K extends keyof OrderItem>(index: number, field: K, value: OrderItem[K]) => {
     setOrderForm(prev => {
       const newItems = [...prev.items];
-      const item = { ...newItems[index] };
-      item[field] = value;
+      const item = { ...newItems[index] } as OrderItem;
+      (item[field] as OrderItem[K]) = value;
       newItems[index] = item;
       return { ...prev, items: newItems };
     });
   };
 
   const filteredOrders = orders
-    .filter(order =>
-      order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    .filter(order => {
+      const orderNum = (order.orderNumber ?? '').toString().toLowerCase();
+      const customer = (order.customerName ?? '').toString().toLowerCase();
+      const query = (searchQuery ?? '').toString().toLowerCase();
+      return orderNum.includes(query) || customer.includes(query);
+    })
     .sort((a, b) => {
       // Tamamlanan siparişleri alta al, bekleyen siparişleri üste al
       const statusPriority = {
@@ -491,7 +493,7 @@ export default function OrdersPage() {
                           <select
                             className="border rounded px-2 py-1"
                             value={item.unit}
-                            onChange={e => updateOrderItem(index, 'unit', e.target.value)}
+                            onChange={e => updateOrderItem(index, 'unit', e.target.value as OrderItem['unit'])}
                           >
                             <option value="top">Top Adeti</option>
                             <option value="kg">Kg</option>
