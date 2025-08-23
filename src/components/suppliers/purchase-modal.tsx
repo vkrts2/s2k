@@ -17,6 +17,8 @@ import { tr } from 'date-fns/locale';
 import { Textarea } from '../ui/textarea';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import type { Currency, StockItem } from '@/lib/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { addStockItem } from '@/lib/storage';
 
 enum PurchaseType {
   STOCK = 'stock',
@@ -83,6 +85,7 @@ export function PurchaseModal({
   supplierName,
   invoiceMode,
 }: PurchaseModalProps) {
+  const { user } = useAuth();
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: initialData || {
@@ -186,6 +189,17 @@ export function PurchaseModal({
     },
     [availableStockItems]
   );
+
+  const addCurrentAsStock = async (name: string) => {
+    try {
+      if (!user?.uid) return;
+      const created = await addStockItem(user.uid, { name, currentStock: 0, unit: 'ad' });
+      return created;
+    } catch (e) {
+      console.error('Stok kalemine eklenemedi:', e);
+      return null;
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -312,14 +326,13 @@ export function PurchaseModal({
                         {(() => {
                           const list = getSuggestions(it.productName);
                           const hide = !!list.find((s) => s.name === it.productName);
-                          if (list.length === 0 || hide) return null;
                           return (
-                            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-auto rounded border bg-white shadow z-50">
-                              {list.map((s) => (
+                            <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
+                              {list.length > 0 && !hide && list.map((s) => (
                                 <button
                                   type="button"
                                   key={s.id}
-                                  className="w-full text-left px-3 py-2 hover:bg-accent"
+                                  className="w-full text-left px-3 py-2 hover:bg-primary/80"
                                   onClick={() => {
                                     const next = [...(items ?? [])];
                                     next[idx] = { ...next[idx], productName: s.name };
@@ -329,6 +342,25 @@ export function PurchaseModal({
                                   {s.name}
                                 </button>
                               ))}
+                              {list.length === 0 && (it.productName || '').trim().length > 0 && (
+                                <div className="px-3 py-2 flex items-center justify-between gap-2">
+                                  <span className="text-sm opacity-90">“{it.productName}” bulunamadı</span>
+                                  <button
+                                    type="button"
+                                    className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
+                                    onClick={async () => {
+                                      const created = await addCurrentAsStock(it.productName);
+                                      if (created) {
+                                        const next = [...(items ?? [])];
+                                        next[idx] = { ...next[idx], productName: created.name };
+                                        form.setValue('items', next);
+                                      }
+                                    }}
+                                  >
+                                    Stok kalemlerine ekle
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}
@@ -462,19 +494,33 @@ export function PurchaseModal({
                         {(() => {
                           const list = getSuggestions(field.value ?? '');
                           const hide = !!list.find((s) => s.name === (field.value ?? ''));
-                          if (list.length === 0 || hide) return null;
                           return (
-                            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-auto rounded border bg-white shadow z-50">
-                              {list.map((s) => (
+                            <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
+                              {list.length > 0 && !hide && list.map((s) => (
                                 <button
                                   type="button"
                                   key={s.id}
-                                  className="w-full text-left px-3 py-2 hover:bg-accent"
+                                  className="w-full text-left px-3 py-2 hover:bg-primary/80"
                                   onClick={() => field.onChange(s.name)}
                                 >
                                   {s.name}
                                 </button>
                               ))}
+                              {list.length === 0 && (field.value ?? '').trim().length > 0 && (
+                                <div className="px-3 py-2 flex items-center justify-between gap-2">
+                                  <span className="text-sm opacity-90">“{field.value}” bulunamadı</span>
+                                  <button
+                                    type="button"
+                                    className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
+                                    onClick={async () => {
+                                      const created = await addCurrentAsStock(field.value || '');
+                                      if (created) field.onChange(created.name);
+                                    }}
+                                  >
+                                    Stok kalemlerine ekle
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}
