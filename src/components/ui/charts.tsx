@@ -19,7 +19,13 @@ export function LineChart({ data, xKey = 'date', yKey = 'amount', valueFormatter
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey={xKey} />
           <YAxis tickFormatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
-          <Tooltip formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
+          <Tooltip
+            formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)}
+            contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+            itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+            labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+            wrapperStyle={{ outline: 'none' }}
+          />
           <Line type="monotone" dataKey={yKey} stroke="#8884d8" />
         </RechartsLineChart>
       </ResponsiveContainer>
@@ -35,7 +41,13 @@ export function BarChart({ data, xKey = 'category', yKey = 'count', valueFormatt
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey={xKey} />
           <YAxis tickFormatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
-          <Tooltip formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
+          <Tooltip
+            formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)}
+            contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+            itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+            labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+            wrapperStyle={{ outline: 'none' }}
+          />
           <Bar dataKey={yKey} fill="#8884d8" />
         </RechartsBarChart>
       </ResponsiveContainer>
@@ -62,9 +74,15 @@ export function PieChart({ data, xKey = 'name', yKey = 'count', valueFormatter }
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
+          <Tooltip
+            formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)}
+            contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+            itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+            labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+            wrapperStyle={{ outline: 'none' }}
+          />
         </RechartsPieChart>
       </ResponsiveContainer>
     </div>
   );
-} 
+}

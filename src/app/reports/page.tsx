@@ -244,7 +244,13 @@ const ReportsPage = () => {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="month" />
                         <YAxis tickFormatter={(value: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', notation: 'compact' }).format(value)} />
-                        <Tooltip formatter={(value: any) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(Number(value))} />
+                        <Tooltip
+                          formatter={(value: any) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(Number(value))}
+                          contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                          itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                          labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                          wrapperStyle={{ outline: 'none' }}
+                        />
                         <Legend />
                         <Bar dataKey="sales" fill="#22C55E" name="Satışlar" />
                         <Bar dataKey="purchases" fill="#EF4444" name="Alışlar" />

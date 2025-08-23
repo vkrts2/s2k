@@ -11,7 +11,6 @@ import { useRouter } from 'next/navigation';
 import { SalesTab } from "@/components/dashboard/sales-tab";
 import { StockTab } from "@/components/dashboard/stock-tab";
 import { PaymentsTab } from "@/components/dashboard/payments-tab";
-import { ReportsTab } from "@/components/dashboard/reports-tab";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
@@ -546,7 +545,13 @@ export default function DashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => value.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })} />
+                    <Tooltip
+                      formatter={(value: number) => value.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
+                      contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                      itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                      labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                      wrapperStyle={{ outline: 'none' }}
+                    />
                     <Legend />
                     <Line type="monotone" dataKey="sales" stroke="#8884d8" activeDot={{ r: 8 }} name="Satışlar" />
                   </LineChart>
@@ -568,7 +573,12 @@ export default function DashboardPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip />
+                      <Tooltip
+                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        wrapperStyle={{ outline: 'none' }}
+                      />
                       <Legend />
                       <Bar dataKey="satış" fill="#8884d8" />
                       <Bar dataKey="alış" fill="#82ca9d" />
@@ -599,7 +609,12 @@ export default function DashboardPage() {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip
+                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        wrapperStyle={{ outline: 'none' }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -618,7 +633,12 @@ export default function DashboardPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip />
+                      <Tooltip
+                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        wrapperStyle={{ outline: 'none' }}
+                      />
                       <Legend />
                       <Line type="monotone" dataKey="gelir" stroke="#8884d8" activeDot={{ r: 8 }} />
                       <Line type="monotone" dataKey="gider" stroke="#82ca9d" />
@@ -642,7 +662,13 @@ export default function DashboardPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="year" />
                       <YAxis />
-                      <Tooltip formatter={(value) => `₺${value.toLocaleString()}`} />
+                      <Tooltip
+                        formatter={(value) => `₺${value.toLocaleString()}`}
+                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        wrapperStyle={{ outline: 'none' }}
+                      />
                       <Legend />
                       <Line type="monotone" dataKey="gelir" stroke="#8884d8" name="Gelir" />
                       <Line type="monotone" dataKey="gider" stroke="#82ca9d" name="Gider" />
@@ -682,7 +708,13 @@ export default function DashboardPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="category" />
                       <YAxis />
-                      <Tooltip formatter={(value) => `₺${value.toLocaleString()}`} />
+                      <Tooltip
+                        formatter={(value) => `₺${value.toLocaleString()}`}
+                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        wrapperStyle={{ outline: 'none' }}
+                      />
                       <Legend />
                       <Bar dataKey="satış" fill="#8884d8" name="Satış" />
                       <Bar dataKey="kar" fill="#82ca9d" name="Kar" />
