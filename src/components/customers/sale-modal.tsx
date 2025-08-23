@@ -31,6 +31,8 @@ function LightweightInvoiceForm({
   initialDate,
   initialCurrency,
   disableTax,
+  availableStockItems = [],
+  onRequestAddStock,
 }: {
   onSubmit: (data: any) => void;
   customerName: string;
@@ -38,6 +40,8 @@ function LightweightInvoiceForm({
   initialDate?: Date | string;
   initialCurrency?: 'TRY' | 'USD' | 'EUR';
   disableTax?: boolean;
+  availableStockItems?: import("@/lib/types").StockItem[];
+  onRequestAddStock?: (name: string, onAdded: (newName: string) => void) => void;
 }) {
   const [date, setDate] = React.useState<Date>(new Date());
   const [currency, setCurrency] = React.useState<'TRY' | 'USD' | 'EUR'>('TRY');
@@ -83,6 +87,12 @@ function LightweightInvoiceForm({
     return { subTotal, taxAmount, grandTotal };
   }, [items, disableTax]);
 
+  const getSuggestions = React.useCallback((q: string) => {
+    const query = (q || '').toLowerCase().trim();
+    if (!query) return [] as Array<{ id: string; name: string }>;
+    return availableStockItems.filter(s => s.name.toLowerCase().includes(query)).slice(0, 8);
+  }, [availableStockItems]);
+
   return (
     <div className="space-y-3">
       <div className="grid gap-2">
@@ -112,7 +122,39 @@ function LightweightInvoiceForm({
         {items.length === 0 && <div className="text-sm text-muted-foreground">Henüz kalem eklenmedi.</div>}
 		{items.map(it => (
 			<div key={it.id} className={`grid ${disableTax ? 'grid-cols-5' : 'grid-cols-6'} gap-2`}>
-				<Input placeholder="Ürün/Hizmet" value={it.productName} onChange={e => updateItem(it.id, { productName: e.target.value })} />
+				<div className="relative">
+					<Input placeholder="Ürün/Hizmet" value={it.productName} onChange={e => updateItem(it.id, { productName: e.target.value })} />
+					{(() => {
+						const list = getSuggestions(it.productName);
+						const hide = !!list.find(s => s.name === it.productName);
+						return (
+							<div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
+								{list.length > 0 && !hide && list.map(s => (
+									<button
+										type="button"
+										key={s.id}
+										className="w-full text-left px-3 py-2 hover:bg-primary/80"
+										onClick={() => updateItem(it.id, { productName: s.name })}
+									>
+										{s.name}
+									</button>
+								))}
+								{list.length === 0 && (it.productName || '').trim().length > 0 && (
+									<div className="px-3 py-2 flex items-center justify-between gap-2">
+										<span className="text-sm opacity-90">“{it.productName}” bulunamadı</span>
+										<button
+											type="button"
+											className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
+											onClick={() => onRequestAddStock && onRequestAddStock(it.productName, (newName) => updateItem(it.id, { productName: newName }))}
+										>
+											Stok kalemlerine ekle
+										</button>
+									</div>
+								)}
+							</div>
+						);
+					})()}
+				</div>
 				<Input type="number" placeholder="Miktar" value={it.quantity} onChange={e => updateItem(it.id, { quantity: e.target.value })} />
 				<Select value={it.unit} onValueChange={v => updateItem(it.id, { unit: v })}>
 					<SelectTrigger><SelectValue placeholder="Birim" /></SelectTrigger>
@@ -171,6 +213,18 @@ import { Dispatch, SetStateAction } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { tr } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { addStockItem } from "@/lib/storage";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 interface SaleModalProps {
   isOpen: boolean;
@@ -203,6 +257,12 @@ export function SaleModal({
   customer,
   editingSale,
 }: SaleModalProps) {
+  const { user } = useAuth();
+  const [pendingAdd, setPendingAdd] = React.useState<{
+    open: boolean;
+    name: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
   const [openCombobox, setOpenCombobox] = React.useState(false)
   const [saleType, setSaleType] = React.useState<SaleType>(SaleType.STOCK);
   const [invoiceType, setInvoiceType] = React.useState<InvoiceType>(InvoiceType.NORMAL);
@@ -405,6 +465,18 @@ export function SaleModal({
               initialItems={editingSale?.items}
               initialDate={editingSale ? new Date(editingSale.date) : undefined}
               initialCurrency={editingSale?.currency}
+              availableStockItems={availableStockItems}
+              onRequestAddStock={(name, onAdded) => {
+                setPendingAdd({
+                  open: true,
+                  name,
+                  onConfirm: async () => {
+                    if (!user?.uid) return;
+                    const created = await addStockItem(user.uid, { name, currentStock: 0, unit: 'ad' });
+                    if (created) onAdded(created.name);
+                  }
+                });
+              }}
               onSubmit={(data: any) => {
                 try {
                   const desc = Array.isArray(data.items) && data.items.length > 0
@@ -431,6 +503,7 @@ export function SaleModal({
   }
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[860px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
@@ -515,6 +588,18 @@ export function SaleModal({
                   initialDate={manualInitialDate}
                   initialCurrency={manualInitialCurrency}
                   disableTax
+                  availableStockItems={availableStockItems}
+                  onRequestAddStock={(name, onAdded) => {
+                    setPendingAdd({
+                      open: true,
+                      name,
+                      onConfirm: async () => {
+                        if (!user?.uid) return;
+                        const created = await addStockItem(user.uid, { name, currentStock: 0, unit: 'ad' });
+                        if (created) onAdded(created.name);
+                      }
+                    });
+                  }}
                   onSubmit={(data: any) => {
                     const desc = Array.isArray(data.items) && data.items.length > 0
                       ? `${data.items[0].productName}${data.items.length > 1 ? ` +${data.items.length - 1} kalem` : ''}`
@@ -628,5 +713,32 @@ export function SaleModal({
         </form>
       </DialogContent>
     </Dialog>
+    {pendingAdd && (
+      <AlertDialog open={pendingAdd?.open ?? false} onOpenChange={(open) => setPendingAdd(prev => prev ? { ...prev, open } : prev)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Stok Kalemine Ekle</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{pendingAdd?.name ?? ''}” stok kalemine eklemek istediğinize emin misiniz?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingAdd(null)}>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                try {
+                  await pendingAdd?.onConfirm?.();
+                } finally {
+                  setPendingAdd(null);
+                }
+              }}
+            >
+              Stok Kalemine Ekle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )}
+    </>
   );
 } 
