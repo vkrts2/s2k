@@ -45,7 +45,7 @@ const purchaseFormSchema = z.object({
         quantity: z.number().min(0, 'Miktar geçersiz'),
         unit: z.string().optional().default('ad'),
         unitPrice: z.number().min(0, 'Birim fiyat geçersiz'),
-        taxRate: z.number().min(0).max(100).default(20),
+        taxRate: z.number().min(0).max(100).default(10),
       })
     )
     .optional(),
@@ -109,8 +109,8 @@ export function PurchaseModal({
   const quantity = useWatch({ control: form.control, name: 'quantityPurchased' });
   const unitPrice = useWatch({ control: form.control, name: 'unitPrice' });
   React.useEffect(() => {
-    const q = parseFloat(quantity);
-    const u = parseFloat(unitPrice);
+    const q = parseFloat(quantity ?? '');
+    const u = parseFloat(unitPrice ?? '');
     if (!isNaN(q) && !isNaN(u)) {
       const calculated = (q * u).toFixed(2);
       if (form.getValues('amount') !== calculated) {
@@ -129,26 +129,26 @@ export function PurchaseModal({
     }
   }, [initialData]);
 
-  // Stok ürünü seçildiğinde açıklamayı otomatik doldur
+  // Stok ürünü seçildiğinde açıklamayı otomatik doldurma (faturalı modda kapalı)
   React.useEffect(() => {
-    if (purchaseType === PurchaseType.STOCK) {
+    if (!useInvoiceItems && purchaseType === PurchaseType.STOCK) {
       const stockItemId = form.getValues('stockItemId');
       const selectedItem = availableStockItems.find(item => item.id === stockItemId);
       if (selectedItem && form.getValues('description') !== selectedItem.name) {
         form.setValue('description', selectedItem.name);
       }
     }
-  }, [form.watch('stockItemId'), purchaseType]);
+  }, [form.watch('stockItemId'), purchaseType, useInvoiceItems]);
 
-  // Manuel alışta ürün adı girildiğinde açıklamayı otomatik doldur
+  // Manuel alışta açıklamayı otomatik doldurma (faturalı modda kapalı)
   React.useEffect(() => {
-    if (purchaseType === PurchaseType.MANUAL) {
+    if (!useInvoiceItems && purchaseType === PurchaseType.MANUAL) {
       const manualProductName = form.getValues('manualProductName');
       if (manualProductName && form.getValues('description') !== manualProductName) {
         form.setValue('description', manualProductName);
       }
     }
-  }, [form.watch('manualProductName'), purchaseType]);
+  }, [form.watch('manualProductName'), purchaseType, useInvoiceItems]);
 
   // Faturalı kalemler toplamları
   const computedTotals = React.useMemo(() => {
@@ -170,13 +170,7 @@ export function PurchaseModal({
   }, [computedTotals, useInvoiceItems]);
 
   const handleSubmit = async (data: PurchaseFormValues) => {
-    // Faturalı modda açıklamayı otomatik derle
-    if (useInvoiceItems && items && items.length > 0) {
-      const summary = `${items.length} kalem faturalı alış`;
-      if (!data.description) {
-        data.description = summary;
-      }
-    }
+    // Faturalı modda açıklamayı otomatik doldurma: kullanıcıya bırak
     await onSubmit(data);
     form.reset();
   };
@@ -345,7 +339,7 @@ export function PurchaseModal({
                       />
                     </div>
                     <div className="col-span-2">
-                      <Select value={String(it.taxRate ?? 20)} onValueChange={(v) => {
+                      <Select value={String(it.taxRate ?? 10)} onValueChange={(v) => {
                         const next = [...(items ?? [])];
                         next[idx] = { ...next[idx], taxRate: Number(v) };
                         form.setValue('items', next);
@@ -354,7 +348,6 @@ export function PurchaseModal({
                           <SelectValue placeholder="KDV" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="0">%0</SelectItem>
                           <SelectItem value="10">%10</SelectItem>
                           <SelectItem value="20">%20</SelectItem>
                         </SelectContent>
@@ -378,7 +371,7 @@ export function PurchaseModal({
                     variant="secondary"
                     onClick={() => {
                       const next = [...(items ?? [])];
-                      next.push({ id: crypto.randomUUID(), productName: '', quantity: 0, unit: 'ad', unitPrice: 0, taxRate: 20 });
+                      next.push({ id: crypto.randomUUID(), productName: '', quantity: 0, unit: 'ad', unitPrice: 0, taxRate: 10 });
                       form.setValue('items', next);
                     }}
                   >
