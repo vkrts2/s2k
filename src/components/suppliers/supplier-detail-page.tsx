@@ -153,6 +153,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const [purchaseFormValues, setPurchaseFormValues] = useState<PurchaseFormValues>(EMPTY_PURCHASE_FORM_VALUES);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [showPurchaseTypeDialog, setShowPurchaseTypeDialog] = useState(false);
+  const [invoiceMode, setInvoiceMode] = useState<boolean>(false);
 
   const [showPaymentToSupplierModal, setShowPaymentToSupplierModal] = useState(false);
   const [paymentToSupplierFormValues, setPaymentToSupplierFormValues] = useState<PaymentToSupplierFormValues>(EMPTY_PAYMENT_TO_SUPPLIER_FORM_VALUES);
@@ -387,6 +388,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       purchaseType: type as PurchaseType,
       date: new Date(),
     });
+    // Invoiced flow is triggered when user selects 'stock' option from dialog
+    setInvoiceMode(type === 'stock');
     setShowPurchaseTypeDialog(false);
     setShowPurchaseModal(true);
   }, []);
@@ -1504,8 +1507,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         onSubmit={handlePurchaseSubmit}
         initialData={purchaseFormValues}
         availableStockItems={availableStockItems}
-        getStockItemName={getStockItemName}
-        stockItemDisplayNames={stockItemDisplayNames}
+        supplierName={supplier.name}
+        invoiceMode={invoiceMode}
       />
 
       <PaymentToSupplierModal
