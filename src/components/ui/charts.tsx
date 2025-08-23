@@ -21,7 +21,7 @@ export function LineChart({ data, xKey = 'date', yKey = 'amount', valueFormatter
           <YAxis tickFormatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
           <Tooltip
             formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)}
-            contentStyle={{ background: 'transparent', border: 'none', color: 'hsl(var(--popover-foreground))', borderRadius: 8, boxShadow: 'none' }}
+            contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
             itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
             labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
             wrapperStyle={{ outline: 'none' }}
@@ -43,10 +43,11 @@ export function BarChart({ data, xKey = 'category', yKey = 'count', valueFormatt
           <YAxis tickFormatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)} />
           <Tooltip
             formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)}
-            contentStyle={{ background: 'transparent', border: 'none', color: 'hsl(var(--popover-foreground))', borderRadius: 8, boxShadow: 'none' }}
+            contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
             itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
             labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
             wrapperStyle={{ outline: 'none' }}
+            cursor={{ fill: 'transparent' }}
           />
           <Bar dataKey={yKey}>
             {data.map((entry: any, index: number) => {
@@ -82,7 +83,7 @@ export function PieChart({ data, xKey = 'name', yKey = 'count', valueFormatter }
           </Pie>
           <Tooltip
             formatter={(v)=> valueFormatter ? valueFormatter(Number(v)) : String(v)}
-            contentStyle={{ background: 'transparent', border: 'none', color: 'hsl(var(--popover-foreground))', borderRadius: 8, boxShadow: 'none' }}
+            contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
             itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
             labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
             wrapperStyle={{ outline: 'none' }}
