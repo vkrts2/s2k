@@ -534,6 +534,7 @@ export function SaleModal({
   }
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[860px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
