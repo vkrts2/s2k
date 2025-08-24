@@ -257,10 +257,10 @@ export function PurchaseModal({
       <DialogContent className="sm:max-w-[860px]">
         <DialogHeader>
           <DialogTitle>
-            {'Alış Ekle'}
+            {'Satış Ekle'}
           </DialogTitle>
           <DialogDescription>
-            {'Yeni bir alış işlemi ekleyin veya mevcut bir alış\'ı düzenleyin.'}
+            {'Yeni bir satış işlemi ekleyin veya mevcut bir satışı düzenleyin.'}
           </DialogDescription>
         </DialogHeader>
         {/* Tür Seçimi Ekranı */}
@@ -328,11 +328,12 @@ export function PurchaseModal({
                 name="purchaseType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Alış Tipi</FormLabel>
+                    <FormLabel>Satış Tipi</FormLabel>
                     <FormControl>
                       {purchaseType === PurchaseType.MANUAL ? (
-                        <div className="h-11 flex items-center rounded-md border bg-background px-3 text-sm text-foreground/90 opacity-90">
-                          Manuel Alış
+                        <div className="relative h-11 flex items-center rounded-md border bg-background px-3 text-sm text-foreground/90 opacity-90">
+                          <span>Manuel Satış</span>
+                          <ChevronsUpDown className="absolute right-2 h-4 w-4 opacity-50" />
                         </div>
                       ) : (
                         <Select value={field.value} onValueChange={(val) => {
@@ -365,7 +366,7 @@ export function PurchaseModal({
 
               {supplierName && (
                 <div>
-                  <Label className="text-sm text-muted-foreground">Tedarikçi</Label>
+                  <Label className="text-sm text-muted-foreground">Müşteri</Label>
                   <Input value={supplierName} readOnly className="opacity-80 h-11" />
                 </div>
               )}
