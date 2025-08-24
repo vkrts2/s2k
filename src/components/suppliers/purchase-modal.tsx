@@ -340,6 +340,15 @@ export function PurchaseModal({
                   <Label>Kalemler</Label>
                   <Button type="button" variant="outline" size="sm" onClick={addItem}>Kalem Ekle</Button>
                 </div>
+                {/* Sütun Başlıkları */}
+                <div className="grid grid-cols-12 gap-2 text-xs text-foreground font-medium">
+                  <div className="col-span-3">Ürün/Hizmet</div>
+                  <div className="col-span-2">Miktar</div>
+                  <div className="col-span-2">Birim</div>
+                  <div className="col-span-3">Birim Fiyat</div>
+                  <div className="col-span-1">KDV</div>
+                  <div className="col-span-1 hidden" />
+                </div>
                 {items.length === 0 && (
                   <div className="text-sm text-muted-foreground">Henüz kalem eklenmedi.</div>
                 )}

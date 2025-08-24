@@ -129,6 +129,15 @@ function LightweightInvoiceForm({
           <Label>Kalemler</Label>
           <Button type="button" variant="outline" size="sm" onClick={addItem}>Kalem Ekle</Button>
         </div>
+        {/* Sütun Başlıkları */}
+        <div className={`grid ${disableTax ? 'grid-cols-8' : 'grid-cols-9'} gap-2 text-xs text-muted-foreground`}
+        >
+          <div className="col-span-3">Ürün/Hizmet</div>
+          <div className="col-span-2">Miktar</div>
+          <div className="col-span-1">Birim</div>
+          <div className="col-span-2">Birim Fiyat</div>
+          {!disableTax && <div className="col-span-1">KDV</div>}
+        </div>
         {items.length === 0 && <div className="text-sm text-muted-foreground">Henüz kalem eklenmedi.</div>}
 		{items.map(it => (
 			<div key={it.id} className={`grid ${disableTax ? 'grid-cols-5' : 'grid-cols-6'} gap-2`}>
