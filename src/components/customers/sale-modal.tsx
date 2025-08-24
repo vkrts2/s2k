@@ -160,24 +160,29 @@ function LightweightInvoiceForm({
 						const showAdd = list.length === 0 && hasQuery;
 						if (!showList && !showAdd) return null;
 						return (
-							<div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
-								{showList && list.map((s, sIdx) => (
-									<button
-										type="button"
-										key={s.id}
-										className={`w-full text-left px-3 py-2 hover:bg-primary/80 ${((activeIdxByItem[it.id] ?? 0) === sIdx) ? 'bg-primary/80' : ''}`}
-										onMouseDown={(e) => e.preventDefault()}
-										onClick={() => updateItem(it.id, { productName: s.name })}
-									>
-										{s.name}
-									</button>
-								))}
+							<div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/30 bg-white text-foreground shadow z-50">
+								{showList && list.map((s, sIdx) => {
+									const active = ((activeIdxByItem[it.id] ?? 0) === sIdx);
+									return (
+										<button
+											type="button"
+											key={s.id}
+											className={`w-full text-left px-3 py-2 transition-colors ${active ? 'bg-primary text-white' : 'hover:bg-muted'}`}
+											onMouseDown={(e) => e.preventDefault()}
+											onClick={() => updateItem(it.id, { productName: s.name })}
+											role="option"
+											aria-selected={active}
+										>
+											{s.name}
+										</button>
+									);
+								})}
 								{showAdd && (
 									<div className="px-3 py-2 flex items-center justify-between gap-2">
 										<span className="text-sm opacity-90">“{it.productName}” bulunamadı</span>
 										<button
 											type="button"
-											className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
+											className="px-2 py-1 text-xs border rounded hover:bg-muted"
 											onMouseDown={(e) => e.preventDefault()}
 											onClick={() => onRequestAddStock && onRequestAddStock(it.productName, (newName) => updateItem(it.id, { productName: newName }))}
 										>
