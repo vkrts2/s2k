@@ -406,13 +406,13 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
 
   const handleOpenEditPurchaseModal = useCallback((purchase: Purchase) => {
     setEditingPurchase(purchase);
-    // Düzenlerken faturalı kalem modunu kapatıyoruz; basit form gösterilsin
-    setInvoiceMode(false);
+    // Düzenlerken de faturalı kalem düzeni gösterilsin
+    setInvoiceMode(true);
     setPurchaseFormValues({
       amount: purchase.amount.toString(),
       date: purchase.date ? new Date(purchase.date) : new Date(),
       currency: purchase.currency,
-      stockItemId: purchase.stockItemId ?? undefined,
+      stockItemId: purchase.stockItemId || undefined,
       description: purchase.description || '',
       quantityPurchased: purchase.quantityPurchased?.toString() || '',
       unitPrice: purchase.unitPrice?.toString() || '',

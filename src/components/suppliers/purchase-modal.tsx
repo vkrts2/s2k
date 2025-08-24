@@ -154,6 +154,13 @@ export function PurchaseModal({
     }
   }, [initialData]);
 
+  // Faturalı mod aktifken ve kalem listesi boşken otomatik bir boş kalem ekle
+  React.useEffect(() => {
+    if (isOpen && useInvoiceItems && (!items || items.length === 0)) {
+      setItems([{ id: String(Date.now()), productName: '', quantity: undefined, unit: 'kg', unitPrice: undefined, taxRate: 10 }]);
+    }
+  }, [isOpen, useInvoiceItems, items?.length]);
+
   // Stok ürünü seçildiğinde açıklamayı otomatik doldurma (faturalı modda kapalı)
   React.useEffect(() => {
     if (!useInvoiceItems && purchaseType === PurchaseType.STOCK) {
@@ -254,13 +261,13 @@ export function PurchaseModal({
   return (
     <>
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[860px]">
+      <DialogContent className="sm:max-w-[720px]">
         <DialogHeader>
           <DialogTitle>
-            {'Satış Ekle'}
+            {'Satın Alım Ekle'}
           </DialogTitle>
           <DialogDescription>
-            {'Yeni bir satış işlemi ekleyin veya mevcut bir satışı düzenleyin.'}
+            {'Yeni bir satın alım işlemi ekleyin veya mevcut bir satın alımı düzenleyin.'}
           </DialogDescription>
         </DialogHeader>
         {/* Tür Seçimi Ekranı */}
@@ -320,7 +327,7 @@ export function PurchaseModal({
           </div>
         ) : (
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             {/* Üst bilgi */}
             <div className="space-y-3">
               <FormField
@@ -656,7 +663,7 @@ export function PurchaseModal({
                         KDV: <span className="tabular-nums">{computedTotals.taxAmount.toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="text-xl font-semibold">
+                    <div className="text-lg font-semibold">
                       Genel Toplam: <span className="tabular-nums">{computedTotals.grandTotal.toFixed(2)}</span>
                     </div>
                     <div className="mt-3 flex gap-2">
