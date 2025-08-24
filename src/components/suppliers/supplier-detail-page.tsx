@@ -1507,22 +1507,44 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       </Tabs>
 
       <Dialog open={showPurchaseTypeDialog} onOpenChange={setShowPurchaseTypeDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Satın Alma Türü Seçin</DialogTitle>
-            <DialogDescription>İşleme başlamadan önce satın alma türünü seçin.</DialogDescription>
+            <DialogTitle className="text-xl font-semibold">Satın Alma Türü Seçin</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">Hangi tür satın alma yapmak istiyorsunuz?</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
-            <Button variant="default" onClick={() => handleSelectPurchaseType(PurchaseType.STOCK)}>
-              Faturalı Alış
+          <div className="grid grid-cols-1 gap-3 py-2">
+            <Button
+              type="button"
+              className="w-full rounded-xl bg-sky-500 hover:bg-sky-600 text-white h-auto py-5 px-5 justify-start shadow-sm"
+              variant="default"
+              onClick={() => handleSelectPurchaseType(PurchaseType.MANUAL)}
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5"><ShoppingCart className="w-5 h-5" /></div>
+                <div className="flex flex-col -space-y-0.5 text-left">
+                  <span className="font-semibold text-base">Manuel Alış</span>
+                  <span className="text-xs opacity-90">Stok/manuel alanlı basit alış</span>
+                </div>
+              </div>
             </Button>
-            <Button variant="secondary" onClick={() => handleSelectPurchaseType(PurchaseType.MANUAL)}>
-              Manuel Alış
+            <Button
+              type="button"
+              className="w-full rounded-xl bg-sky-500 hover:bg-sky-600 text-white h-auto py-5 px-5 justify-start shadow-sm"
+              variant="default"
+              onClick={() => handleSelectPurchaseType(PurchaseType.STOCK)}
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5"><FileText className="w-5 h-5" /></div>
+                <div className="flex flex-col -space-y-0.5 text-left">
+                  <span className="font-semibold text-base">Faturalı Alış</span>
+                  <span className="text-xs opacity-90">Teklif formu ile detaylı alış</span>
+                </div>
+              </div>
             </Button>
           </div>
-          <DialogFooter>
+          <DialogFooter className="justify-end">
             <DialogClose asChild>
-              <Button type="button" variant="ghost">İptal</Button>
+              <Button type="button" variant="outline">İptal</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
