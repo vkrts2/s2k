@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, parse, isValid } from "date-fns";
-import { CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
+import { CalendarIcon, Check, ChevronsUpDown, ShoppingCart, FileText } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
@@ -75,7 +75,7 @@ export function PurchaseModal({
   const { user } = useAuth();
   // Faturalı alış modu ve kalemler artık form dışında, yerel state olarak tutuluyor
   const [useInvoiceItems, setUseInvoiceItems] = React.useState<boolean>(invoiceMode ?? false);
-  type InvoiceItem = { id: string; productName: string; quantity: number; unit?: string; unitPrice: number; taxRate: number };
+  type InvoiceItem = { id: string; productName: string; quantity?: number; unit?: string; unitPrice?: number; taxRate?: number };
   const [items, setItems] = React.useState<InvoiceItem[]>(invoiceMode ? [] : []);
   const [showTypeSelection, setShowTypeSelection] = React.useState<boolean>(!initialData);
   const [pendingAdd, setPendingAdd] = React.useState<{
@@ -92,8 +92,8 @@ export function PurchaseModal({
   const addItem = React.useCallback(() => {
     setItems(prev => ([
       ...(prev ?? []),
-      { id: String(Date.now()), productName: '', quantity: 1, unit: 'kg', unitPrice: 0, taxRate: 10 }
-    ] as any));
+      { id: String(Date.now()), productName: '', quantity: undefined, unit: 'kg', unitPrice: undefined, taxRate: 10 }
+    ]));
   }, []);
   const removeItem = React.useCallback((id: string) => {
     setItems(prev => (prev ?? []).filter(it => it.id !== id));
@@ -239,9 +239,15 @@ export function PurchaseModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[980px]">
         <DialogHeader>
-          <DialogTitle>{useInvoiceItems ? 'Faturalı Alış' : 'Alış Ekle'}</DialogTitle>
+          <DialogTitle>
+            {useInvoiceItems
+              ? (purchaseType === PurchaseType.MANUAL ? 'Manuel Alış' : 'Faturalı Alış')
+              : 'Alış Ekle'}
+          </DialogTitle>
           <DialogDescription>
-            {useInvoiceItems ? 'Kalemleri ekleyin; toplamlar otomatik hesaplanır. Kaydedince alış oluşturulur.' : 'Yeni alış işlemi ekleyin veya mevcut bir alış\'ı düzenleyin.'}
+            {useInvoiceItems
+              ? 'Kalemleri ekleyin; toplamlar otomatik hesaplanır. Kaydedince alış oluşturulur.'
+              : 'Yeni alış işlemi ekleyin veya mevcut bir alış\'ı düzenleyin.'}
           </DialogDescription>
         </DialogHeader>
         {/* Tür Seçimi Ekranı */}
@@ -251,10 +257,10 @@ export function PurchaseModal({
               <div className="text-lg font-semibold">Alış Türü Seçin</div>
               <div className="text-sm text-muted-foreground">Hangi tür alış yapmak istiyorsunuz?</div>
             </div>
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               <Button
                 type="button"
-                className="h-20 text-left justify-start"
+                className="w-full rounded-xl bg-sky-500 hover:bg-sky-600 text-white h-auto py-4 px-4 justify-start"
                 variant="default"
                 onClick={() => {
                   form.setValue('purchaseType', PurchaseType.MANUAL);
@@ -263,11 +269,19 @@ export function PurchaseModal({
                   setShowTypeSelection(false);
                 }}
               >
-                Manuel Alış
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <ShoppingCart className="w-5 h-5" />
+                  </div>
+                  <div className="flex flex-col -space-y-0.5 text-left">
+                    <span className="font-semibold">Manuel Alış</span>
+                    <span className="text-xs opacity-90">Stok/manuel alanlı basit alış</span>
+                  </div>
+                </div>
               </Button>
               <Button
                 type="button"
-                className="h-20 text-left justify-start"
+                className="w-full rounded-xl bg-sky-500 hover:bg-sky-600 text-white h-auto py-4 px-4 justify-start"
                 variant="default"
                 onClick={() => {
                   form.setValue('purchaseType', PurchaseType.STOCK);
@@ -276,7 +290,15 @@ export function PurchaseModal({
                   setShowTypeSelection(false);
                 }}
               >
-                Faturalı Alış
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="flex flex-col -space-y-0.5 text-left">
+                    <span className="font-semibold">Faturalı Alış</span>
+                    <span className="text-xs opacity-90">Teklif formu ile detaylı alış</span>
+                  </div>
+                </div>
               </Button>
             </div>
           </div>
@@ -520,10 +542,11 @@ export function PurchaseModal({
                         type="number"
                         step="1"
                         placeholder="Miktar"
-                        value={String(it.quantity ?? 0)}
+                        value={it.quantity === undefined ? '' : String(it.quantity)}
                         onChange={(e) => {
+                          const val = e.target.value;
                           const next = [...(items ?? [])];
-                          next[idx] = { ...next[idx], quantity: Number(e.target.value || 0) } as any;
+                          next[idx] = { ...next[idx], quantity: val === '' ? undefined : Number(val) } as any;
                           setItems(next);
                         }}
                       />
@@ -550,10 +573,11 @@ export function PurchaseModal({
                         type="number"
                         step="0.01"
                         placeholder="Birim Fiyat"
-                        value={String(it.unitPrice ?? 0)}
+                        value={it.unitPrice === undefined ? '' : String(it.unitPrice)}
                         onChange={(e) => {
+                          const val = e.target.value;
                           const next = [...(items ?? [])];
-                          next[idx] = { ...next[idx], unitPrice: Number(e.target.value || 0) } as any;
+                          next[idx] = { ...next[idx], unitPrice: val === '' ? undefined : Number(val) } as any;
                           setItems(next);
                         }}
                       />
@@ -580,6 +604,28 @@ export function PurchaseModal({
                   </div>
                   );
                 })}
+                {/* Totals panel and submit button aligned to the right */}
+                <div className="flex justify-end mt-2">
+                  <div className="w-full sm:w-auto flex flex-col items-end gap-1">
+                    <div className="text-sm text-muted-foreground">
+                      Ara Toplam: <span className="tabular-nums">{computedTotals.subTotal.toFixed(2)}</span>
+                    </div>
+                    {purchaseType !== PurchaseType.MANUAL && (
+                      <div className="text-sm text-muted-foreground">
+                        KDV: <span className="tabular-nums">{computedTotals.taxAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="text-base font-semibold">
+                      Genel Toplam: <span className="tabular-nums">{computedTotals.grandTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <Button type="button" variant="outline" onClick={onClose}>İptal</Button>
+                      <Button type="submit" disabled={form.formState.isSubmitting}>
+                        {form.formState.isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : !useInvoiceItems ? (
               <FormField
@@ -766,14 +812,16 @@ export function PurchaseModal({
                 </FormItem>
               )}
             />
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                İptal
-              </Button>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
-              </Button>
-            </div>
+            {!useInvoiceItems && (
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={onClose}>
+                  İptal
+                </Button>
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
+                </Button>
+              </div>
+            )}
           </form>
         </Form>
         )}
