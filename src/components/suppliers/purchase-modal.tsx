@@ -87,6 +87,13 @@ export function PurchaseModal({
   // Klavye navigasyonu için aktif indeksler
   const [activeIdxByItem, setActiveIdxByItem] = React.useState<Record<string, number>>({});
   const [activeManualIdx, setActiveManualIdx] = React.useState<number>(-1);
+  // Kalem ekleme/silme
+  const addItem = React.useCallback(() => {
+    setItems(prev => ([...(prev ?? []), { id: String(Date.now()), productName: '', quantity: 1, unit: 'adet', unitPrice: 0, taxRate: 20 }] as any));
+  }, []);
+  const removeItem = React.useCallback((id: string) => {
+    setItems(prev => (prev ?? []).filter(it => it.id !== id));
+  }, []);
   // Aktif öneriyi görünür alana kaydır
   const scrollActiveIntoView = React.useCallback((groupId: string, idx: number) => {
     const el = document.getElementById(`suggestion-${groupId}-${idx}`);
@@ -176,6 +183,16 @@ export function PurchaseModal({
       }
     }
   }, [computedTotals, useInvoiceItems]);
+
+  // Manuel modda kalem editörü kullanırken, şema doğrulaması için ilk kalem adını manualProductName'e yansıt
+  React.useEffect(() => {
+    if (useInvoiceItems && purchaseType === PurchaseType.MANUAL) {
+      const firstName = items?.[0]?.productName || '';
+      if ((form.getValues('manualProductName') || '') !== firstName) {
+        form.setValue('manualProductName', firstName);
+      }
+    }
+  }, [items, useInvoiceItems, purchaseType]);
 
   const handleSubmit = async (data: PurchaseFormValues) => {
     // Faturalı modda açıklamayı otomatik doldurma: kullanıcıya bırak
@@ -293,6 +310,10 @@ export function PurchaseModal({
                         if (val === PurchaseType.STOCK && invoiceMode) {
                           setUseInvoiceItems(true);
                           if (!items || items.length === 0) setItems([]);
+                        } else if (val === PurchaseType.MANUAL) {
+                          // Manuel alışta da kalem editörü açılsın
+                          setUseInvoiceItems(true);
+                          if (!items || items.length === 0) setItems([]);
                         } else {
                           setUseInvoiceItems(false);
                         }
@@ -312,10 +333,16 @@ export function PurchaseModal({
               />
             </div>
 
-            {/* Faturalı Alış Modu */}
-            {purchaseType === PurchaseType.STOCK && useInvoiceItems ? (
+            {/* Kalem Editörü (Faturalı veya Manuel) */}
+            {useInvoiceItems && (purchaseType === PurchaseType.STOCK || purchaseType === PurchaseType.MANUAL) ? (
               <div className="space-y-3">
-                <Label>Kalemler</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Kalemler</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addItem}>Kalem Ekle</Button>
+                </div>
+                {items.length === 0 && (
+                  <div className="text-sm text-muted-foreground">Henüz kalem eklenmedi.</div>
+                )}
                 {(items ?? []).map((it: InvoiceItem, idx: number) => (
                   <div key={it.id} className="grid grid-cols-12 gap-2 items-center">
                     <div className="col-span-3">
@@ -410,6 +437,60 @@ export function PurchaseModal({
                           );
                         })()}
                       </div>
+                    </div>
+                    <div className="col-span-2">
+                      <Input
+                        type="number"
+                        step="1"
+                        value={String(it.quantity ?? 0)}
+                        onChange={(e) => {
+                          const next = [...(items ?? [])];
+                          next[idx] = { ...next[idx], quantity: Number(e.target.value || 0) } as any;
+                          setItems(next);
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Select value={String(it.unit || 'adet')} onValueChange={(v) => {
+                        const next = [...(items ?? [])];
+                        next[idx] = { ...next[idx], unit: v } as any;
+                        setItems(next);
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="Birim" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="kg">kg</SelectItem>
+                          <SelectItem value="mt">mt</SelectItem>
+                          <SelectItem value="adet">ad</SelectItem>
+                          <SelectItem value="top">top</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={String(it.unitPrice ?? 0)}
+                        onChange={(e) => {
+                          const next = [...(items ?? [])];
+                          next[idx] = { ...next[idx], unitPrice: Number(e.target.value || 0) } as any;
+                          setItems(next);
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-1 flex items-center gap-2">
+                      <Select value={String(it.taxRate ?? 20)} onValueChange={(v) => {
+                        const next = [...(items ?? [])];
+                        next[idx] = { ...next[idx], taxRate: Number(v) } as any;
+                        setItems(next);
+                      }}>
+                        <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">%0</SelectItem>
+                          <SelectItem value="10">%10</SelectItem>
+                          <SelectItem value="20">%20</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
                     </div>
                   </div>
                 ))}

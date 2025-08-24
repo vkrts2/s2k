@@ -653,88 +653,44 @@ export function SaleModal({
               </div>
             ) : null}
             {saleType === SaleType.MANUAL && (
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="manualProductName">Ürün/Hizmet</Label>
-                <Input
-                  id="manualProductName"
-                  type="text"
-                  value={(formValues as any).manualProductName || ''}
-                  onChange={(e) => setFormValues(prev => ({ ...prev, manualProductName: e.target.value }))}
-                  placeholder="Ürün veya hizmet adı"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="quantity">Miktar</Label>
-                <Input
-                  id="quantity"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={formValues.quantity || ''}
-                  onChange={(e) => setFormValues({ ...formValues, quantity: e.target.value.replace(/[^0-9]/g, '') })}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="unitPrice">Birim Fiyat</Label>
-                <Input
-                  id="unitPrice"
-                  type="text"
-                  inputMode="decimal"
-                  value={formValues.unitPrice || ''}
-                  onChange={(e) => setFormValues({ ...formValues, unitPrice: e.target.value.replace(/,/g, '.') })}
-                  required
-                />
-                <span className="text-xs text-muted-foreground">Negatif değer girebilirsiniz (devreden bakiye için).</span>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="amount">Tutar</Label>
-                <Input
-                  id="amount"
-                  type="text"
-                  inputMode="decimal"
-                  value={formValues.amount}
-                  onChange={(e) => setFormValues({ ...formValues, amount: e.target.value.replace(/,/g, '.') })}
-                  required
-                />
-                <span className="text-xs text-muted-foreground">Negatif değer girebilirsiniz (devreden bakiye için).</span>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="date">Tarih</Label>
-                <Input
-                  type="text"
-                  placeholder="gg.aa.yyyy"
-                  value={formValues.dateInput ?? (formValues.date ? format(formValues.date, 'dd.MM.yyyy') : '')}
-                  onChange={e => {
-                    let val = e.target.value.replace(/[^0-9]/g, '');
-                    if (val.length > 8) val = val.slice(0, 8);
-                    if (val.length > 4) val = val.replace(/(\d{2})(\d{2})(\d{0,4})/, '$1.$2.$3');
-                    else if (val.length > 2) val = val.replace(/(\d{2})(\d{0,2})/, '$1.$2');
-                    setFormValues(prev => ({ ...prev, dateInput: val }));
-                    if (val.length === 10) {
-                      const parsed = parse(val, 'dd.MM.yyyy', new Date());
-                      if (isValid(parsed)) {
-                        setFormValues(prev => ({ ...prev, date: parsed, dateInput: val }));
+              <div className="py-2">
+                <LightweightInvoiceForm
+                  customerName={customer?.name || ''}
+                  initialItems={manualInitialItems as any}
+                  initialDate={manualInitialDate}
+                  initialCurrency={manualInitialCurrency}
+                  disableTax
+                  availableStockItems={availableStockItems}
+                  onRequestAddStock={(name, onAdded) => {
+                    setPendingAdd({
+                      open: true,
+                      name,
+                      onConfirm: async () => {
+                        if (!user?.uid) return;
+                        const created = await addStockItem(user.uid, { name, currentStock: 0, unit: 'ad' });
+                        if (created) onAdded(created.name);
                       }
-                    } else {
-                      setFormValues(prev => ({ ...prev, date: undefined }));
-                    }
+                    });
                   }}
-                  className="w-32"
-                  maxLength={10}
+                  onSubmit={(data: any) => {
+                    try {
+                      const desc = Array.isArray(data.items) && data.items.length > 0
+                        ? `${data.items[0].productName}${data.items.length > 1 ? ` +${data.items.length - 1} kalem` : ''}`
+                        : (formValues.description || 'Satış');
+                      const submitValues: any = {
+                        amount: String(data.grandTotal ?? 0),
+                        date: data.date,
+                        currency: data.currency ?? 'TRY',
+                        description: desc,
+                        items: data.items || [],
+                        invoiceType: 'normal',
+                      };
+                      onSubmit({ ...formValues, ...submitValues });
+                      onClose();
+                    } catch (e) { console.error(e); }
+                  }}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="description">Açıklama</Label>
-                <Textarea
-                  id="description"
-                  value={formValues.description || ''}
-                  onChange={(e) => setFormValues({ ...formValues, description: e.target.value })}
-                  placeholder="Opsiyonel"
-                />
-              </div>
-            </div>
             )}
             {saleType === SaleType.STOCK && (
             <div className="grid gap-2">
@@ -821,12 +777,14 @@ export function SaleModal({
             </div>
             )}
           </div>
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              İptal
-            </Button>
-            <Button type="submit">Kaydet</Button>
-          </div>
+          {saleType !== SaleType.MANUAL && (
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                İptal
+              </Button>
+              <Button type="submit">Kaydet</Button>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>
