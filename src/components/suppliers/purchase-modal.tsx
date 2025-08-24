@@ -16,7 +16,8 @@ import { cn } from "@/lib/utils";
 import { tr } from 'date-fns/locale';
 import { Textarea } from '../ui/textarea';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import type { Currency, StockItem } from '@/lib/types';
+import type { Currency, StockItem, PurchaseFormValues } from '@/lib/types';
+import { PurchaseType } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { addStockItem } from '@/lib/storage';
 import {
@@ -30,41 +31,19 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog';
 
-enum PurchaseType {
-  STOCK = 'stock',
-  MANUAL = 'manual',
-}
-
 const purchaseFormSchema = z.object({
-  purchaseType: z.enum([PurchaseType.STOCK, PurchaseType.MANUAL]),
-  stockItemId: z.string().optional(),
+  purchaseType: z.nativeEnum(PurchaseType),
+  stockItemId: z.string().nullable().optional(),
   manualProductName: z.string().optional(),
-  date: z.date({ required_error: 'Tarih zorunludur' }),
+  date: z.date().optional(),
   dateInput: z.string().optional(),
-  // Basit form alanları (faturalı değilken)
   quantityPurchased: z.string().optional(),
   unitPrice: z.string().optional(),
   amount: z.string().min(1, 'Tutar zorunludur'),
-  currency: z.string().min(1, 'Para birimi zorunludur'),
+  currency: z.enum(['TRY','USD','EUR']),
   description: z.string().optional(),
-  // Faturalı alış modu
-  useInvoiceItems: z.boolean().optional(),
-  items: z
-    .array(
-      z.object({
-        id: z.string(),
-        productName: z.string().min(1, 'Ürün/Hizmet zorunludur'),
-        quantity: z.number().min(0, 'Miktar geçersiz'),
-        unit: z.string().optional().default('ad'),
-        unitPrice: z.number().min(0, 'Birim fiyat geçersiz'),
-        taxRate: z.number().min(0).max(100).default(10),
-      })
-    )
-    .optional(),
 }).refine((data) => {
   if (data.purchaseType === PurchaseType.STOCK) {
-    // Faturalı moddaysa stok ürünü zorunlu tutma
-    if (data.useInvoiceItems) return true;
     return !!data.stockItemId;
   } else {
     return !!data.manualProductName;
@@ -73,8 +52,6 @@ const purchaseFormSchema = z.object({
   message: 'Ürün bilgisi zorunludur',
   path: ['stockItemId', 'manualProductName'],
 });
-
-type PurchaseFormValues = z.infer<typeof purchaseFormSchema>;
 
 interface PurchaseModalProps {
   isOpen: boolean;
@@ -96,11 +73,17 @@ export function PurchaseModal({
   invoiceMode,
 }: PurchaseModalProps) {
   const { user } = useAuth();
+  // Faturalı alış modu ve kalemler artık form dışında, yerel state olarak tutuluyor
+  const [useInvoiceItems, setUseInvoiceItems] = React.useState<boolean>(invoiceMode ?? false);
+  type InvoiceItem = { id: string; productName: string; quantity: number; unit?: string; unitPrice: number; taxRate: number };
+  const [items, setItems] = React.useState<InvoiceItem[]>(invoiceMode ? [] : []);
   const [pendingAdd, setPendingAdd] = React.useState<{
     open: boolean;
     name: string;
     onConfirm: () => Promise<void>;
   } | null>(null);
+  // Modal içinde yeni oluşturulan stok adlarını izleyerek öneri kutusunu gizlemek için kullanılır
+  const [createdNames, setCreatedNames] = React.useState<string[]>([]);
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: initialData || {
@@ -114,14 +97,10 @@ export function PurchaseModal({
       amount: '',
       currency: 'TRY' as Currency,
       description: '',
-      useInvoiceItems: invoiceMode ?? false,
-      items: invoiceMode ? [] : undefined,
     },
   });
 
   const purchaseType = useWatch({ control: form.control, name: 'purchaseType' });
-  const useInvoiceItems = useWatch({ control: form.control, name: 'useInvoiceItems' });
-  const items = useWatch({ control: form.control, name: 'items' });
 
   // Otomatik tutar hesaplama
   const quantity = useWatch({ control: form.control, name: 'quantityPurchased' });
@@ -140,10 +119,11 @@ export function PurchaseModal({
   React.useEffect(() => {
     if (initialData) {
       form.reset({
-        useInvoiceItems: invoiceMode ?? false,
-        items: invoiceMode ? [] : undefined,
         ...initialData,
       });
+      setUseInvoiceItems(invoiceMode ?? false);
+      setItems(invoiceMode ? [] : []);
+      setCreatedNames([]);
     }
   }, [initialData]);
 
@@ -171,8 +151,8 @@ export function PurchaseModal({
   // Faturalı kalemler toplamları
   const computedTotals = React.useMemo(() => {
     if (!useInvoiceItems || !items || items.length === 0) return { subTotal: 0, taxAmount: 0, grandTotal: 0 };
-    const sub = items.reduce((acc: number, it: any) => acc + (Number(it.quantity || 0) * Number(it.unitPrice || 0)), 0);
-    const tax = items.reduce((acc: number, it: any) => acc + ((Number(it.quantity || 0) * Number(it.unitPrice || 0)) * (Number(it.taxRate || 0) / 100)), 0);
+    const sub = items.reduce((acc: number, it: InvoiceItem) => acc + (Number(it.quantity || 0) * Number(it.unitPrice || 0)), 0);
+    const tax = items.reduce((acc: number, it: InvoiceItem) => acc + ((Number(it.quantity || 0) * Number(it.unitPrice || 0)) * (Number(it.taxRate || 0) / 100)), 0);
     const grand = sub + tax;
     return { subTotal: sub, taxAmount: tax, grandTotal: grand };
   }, [useInvoiceItems, items]);
@@ -299,12 +279,12 @@ export function PurchaseModal({
                     <FormLabel>Alış Tipi</FormLabel>
                     <FormControl>
                       <Select value={field.value} onValueChange={(val) => {
-                        field.onChange(val);
+                        field.onChange(val as PurchaseType);
                         if (val === PurchaseType.STOCK && invoiceMode) {
-                          form.setValue('useInvoiceItems', true);
-                          if (!form.getValues('items')) form.setValue('items', []);
+                          setUseInvoiceItems(true);
+                          if (!items || items.length === 0) setItems([]);
                         } else {
-                          form.setValue('useInvoiceItems', false);
+                          setUseInvoiceItems(false);
                         }
                       }}>
                         <SelectTrigger>
@@ -326,7 +306,7 @@ export function PurchaseModal({
             {purchaseType === PurchaseType.STOCK && useInvoiceItems ? (
               <div className="space-y-3">
                 <Label>Kalemler</Label>
-                {(items ?? []).map((it: any, idx: number) => (
+                {(items ?? []).map((it: InvoiceItem, idx: number) => (
                   <div key={it.id} className="grid grid-cols-12 gap-2 items-center">
                     <div className="col-span-3">
                       <div className="relative">
@@ -336,12 +316,12 @@ export function PurchaseModal({
                           onChange={(e) => {
                             const next = [...(items ?? [])];
                             next[idx] = { ...next[idx], productName: e.target.value };
-                            form.setValue('items', next);
+                            setItems(next);
                           }}
                         />
                         {(() => {
                           const list = getSuggestions(it.productName);
-                          const hide = !!list.find((s) => s.name === it.productName);
+                          const hide = !!list.find((s) => s.name === it.productName) || createdNames.includes(it.productName);
                           return (
                             <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
                               {list.length > 0 && !hide && list.map((s) => (
@@ -352,13 +332,13 @@ export function PurchaseModal({
                                   onClick={() => {
                                     const next = [...(items ?? [])];
                                     next[idx] = { ...next[idx], productName: s.name };
-                                    form.setValue('items', next);
+                                    setItems(next);
                                   }}
                                 >
                                   {s.name}
                                 </button>
                               ))}
-                              {list.length === 0 && (it.productName || '').trim().length > 0 && (
+                              {list.length === 0 && (it.productName || '').trim().length > 0 && !createdNames.includes(it.productName) && (
                                 <div className="px-3 py-2 flex items-center justify-between gap-2">
                                   <span className="text-sm opacity-90">“{it.productName}” bulunamadı</span>
                                   <button
@@ -373,7 +353,8 @@ export function PurchaseModal({
                                           if (created) {
                                             const next = [...(items ?? [])];
                                             next[idx] = { ...next[idx], productName: created.name };
-                                            form.setValue('items', next);
+                                            setItems(next);
+                                            setCreatedNames((prev) => prev.includes(created.name) ? prev : [...prev, created.name]);
                                           }
                                         }
                                       });
@@ -396,7 +377,7 @@ export function PurchaseModal({
                         onChange={(e) => {
                           const next = [...(items ?? [])];
                           next[idx] = { ...next[idx], quantity: Number(e.target.value) };
-                          form.setValue('items', next);
+                          setItems(next);
                         }}
                       />
                     </div>
@@ -404,7 +385,7 @@ export function PurchaseModal({
                       <Select value={it.unit ?? 'ad'} onValueChange={(v) => {
                         const next = [...(items ?? [])];
                         next[idx] = { ...next[idx], unit: v };
-                        form.setValue('items', next);
+                        setItems(next);
                       }}>
                         <SelectTrigger>
                           <SelectValue placeholder="Birim" />
@@ -425,7 +406,7 @@ export function PurchaseModal({
                         onChange={(e) => {
                           const next = [...(items ?? [])];
                           next[idx] = { ...next[idx], unitPrice: Number(e.target.value) };
-                          form.setValue('items', next);
+                          setItems(next);
                         }}
                       />
                     </div>
@@ -433,7 +414,7 @@ export function PurchaseModal({
                       <Select value={String(it.taxRate ?? 10)} onValueChange={(v) => {
                         const next = [...(items ?? [])];
                         next[idx] = { ...next[idx], taxRate: Number(v) };
-                        form.setValue('items', next);
+                        setItems(next);
                       }}>
                         <SelectTrigger>
                           <SelectValue placeholder="KDV" />
@@ -451,7 +432,7 @@ export function PurchaseModal({
                       <Button type="button" variant="ghost" onClick={() => {
                         const next = [...(items ?? [])];
                         next.splice(idx, 1);
-                        form.setValue('items', next);
+                        setItems(next);
                       }}>Sil</Button>
                     </div>
                   </div>
@@ -463,7 +444,7 @@ export function PurchaseModal({
                     onClick={() => {
                       const next = [...(items ?? [])];
                       next.push({ id: crypto.randomUUID(), productName: '', quantity: 0, unit: 'ad', unitPrice: 0, taxRate: 10 });
-                      form.setValue('items', next);
+                      setItems(next);
                     }}
                   >
                     Kalem Ekle
@@ -488,7 +469,7 @@ export function PurchaseModal({
                   <FormItem>
                     <FormLabel>Stok Ürünü</FormLabel>
                     <FormControl>
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select value={field.value ?? undefined} onValueChange={field.onChange}>
                         <SelectTrigger>
                           <SelectValue placeholder="Stok ürünü seçin..." />
                         </SelectTrigger>
@@ -515,7 +496,8 @@ export function PurchaseModal({
                         <Input placeholder="Ürün adını girin..." {...field} />
                         {(() => {
                           const list = getSuggestions(field.value ?? '');
-                          const hide = !!list.find((s) => s.name === (field.value ?? ''));
+                          const nameVal = field.value ?? '';
+                          const hide = !!list.find((s) => s.name === nameVal) || (nameVal && createdNames.includes(nameVal));
                           return (
                             <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
                               {list.length > 0 && !hide && list.map((s) => (
@@ -528,7 +510,7 @@ export function PurchaseModal({
                                   {s.name}
                                 </button>
                               ))}
-                              {list.length === 0 && (field.value ?? '').trim().length > 0 && (
+                              {list.length === 0 && (field.value ?? '').trim().length > 0 && !(field.value && createdNames.includes(field.value)) && (
                                 <div className="px-3 py-2 flex items-center justify-between gap-2">
                                   <span className="text-sm opacity-90">“{field.value}” bulunamadı</span>
                                   <button
@@ -541,7 +523,10 @@ export function PurchaseModal({
                                         name,
                                         onConfirm: async () => {
                                           const created = await addCurrentAsStock(name);
-                                          if (created) field.onChange(created.name);
+                                          if (created) {
+                                            field.onChange(created.name);
+                                            setCreatedNames((prev) => prev.includes(created.name) ? prev : [...prev, created.name]);
+                                          }
                                         }
                                       });
                                     }}

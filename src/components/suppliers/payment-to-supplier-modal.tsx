@@ -12,25 +12,25 @@ import { tr } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import type { Currency } from '@/lib/types';
+import type { Currency, PaymentToSupplierFormValues } from '@/lib/types';
 
 const paymentFormSchema = z.object({
   amount: z.string().min(1, 'Tutar zorunludur'),
-  date: z.date({ required_error: 'Tarih zorunludur' }),
+  date: z.date().optional(),
   dateInput: z.string().optional(),
-  currency: z.string().min(1, 'Para birimi zorunludur'),
+  currency: z.enum(['TRY','USD','EUR']),
   method: z.string().min(1, 'Ödeme yöntemi zorunludur'),
-  referenceNumber: z.string().optional(),
+  referenceNumber: z.string().nullable().optional(),
   description: z.string().optional(),
+  checkDate: z.date().nullable().optional(),
+  checkSerialNumber: z.string().nullable().optional(),
 });
-
-type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 
 interface PaymentToSupplierModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (values: PaymentFormValues) => Promise<void>;
-  initialData?: Partial<PaymentFormValues>;
+  onSubmit: (values: PaymentToSupplierFormValues) => Promise<void>;
+  initialData?: Partial<PaymentToSupplierFormValues>;
 }
 
 export function PaymentToSupplierModal({
@@ -39,20 +39,22 @@ export function PaymentToSupplierModal({
   onSubmit,
   initialData,
 }: PaymentToSupplierModalProps) {
-  const form = useForm<PaymentFormValues>({
+  const form = useForm<PaymentToSupplierFormValues>({
     resolver: zodResolver(paymentFormSchema),
     defaultValues: initialData || {
       amount: '',
       date: undefined,
       dateInput: '',
-      currency: 'TRY',
+      currency: 'TRY' as Currency,
       method: 'nakit',
-      referenceNumber: '',
+      referenceNumber: null,
       description: '',
+      checkDate: null,
+      checkSerialNumber: null,
     },
   });
 
-  const handleSubmit = async (data: PaymentFormValues) => {
+  const handleSubmit = async (data: PaymentToSupplierFormValues) => {
     await onSubmit(data);
     form.reset();
   };
@@ -133,6 +135,7 @@ export function PaymentToSupplierModal({
                       <SelectContent>
                         <SelectItem value="TRY">TRY</SelectItem>
                         <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormControl>
@@ -171,7 +174,10 @@ export function PaymentToSupplierModal({
                 <FormItem>
                   <FormLabel>Referans No</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

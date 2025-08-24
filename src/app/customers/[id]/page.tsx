@@ -161,16 +161,21 @@ export default function CustomerDetailPage() {
     const handlePaymentSubmit = async (values: PaymentFormValues, editingPayment: Payment | null) => {
         if (!user || !customer) return;
         try {
+            // Ensure date is a valid Date before formatting
+            if (!values.date || !(values.date instanceof Date) || isNaN(values.date.getTime())) {
+                toast({ title: "Hata", description: "Lütfen geçerli bir tarih girin.", variant: "destructive" });
+                return;
+            }
             if (editingPayment) {
                  const paymentData: Payment = {
                     ...editingPayment,
-                    date: formatISO(values.date),
+                    date: formatISO(values.date as Date),
                     amount: parseFloat(values.amount.toString()),
                     currency: values.currency,
                     method: values.method,
                     description: values.description,
                     referenceNumber: values.referenceNumber,
-                    checkDate: values.checkDate ? formatISO(values.checkDate) : undefined,
+                    checkDate: values.checkDate ? formatISO(values.checkDate as Date) : undefined,
                     checkSerialNumber: values.checkSerialNumber,
                     updatedAt: formatISO(new Date())
                 };
@@ -181,13 +186,13 @@ export default function CustomerDetailPage() {
                 const now = new Date().toISOString();
                 const newPaymentData: Omit<Payment, 'id' | 'createdAt' | 'updatedAt' | 'transactionType'> = {
                     customerId: customer.id,
-                    date: formatISO(values.date),
+                    date: formatISO(values.date as Date),
                     amount: parseFloat(values.amount.toString()),
                     currency: values.currency,
                     method: values.method,
                     description: values.description,
                     referenceNumber: values.referenceNumber,
-                    checkDate: values.checkDate ? formatISO(values.checkDate) : undefined,
+                    checkDate: values.checkDate ? formatISO(values.checkDate as Date) : undefined,
                     checkSerialNumber: values.checkSerialNumber,
                     category: 'odeme',
                     tags: [],
@@ -233,8 +238,8 @@ export default function CustomerDetailPage() {
                       branchName: undefined,
                       accountNumber: undefined,
                       amount: parseFloat(values.amount.toString()),
-                      issueDate: formatISO(values.date),
-                      dueDate: values.checkDate ? formatISO(values.checkDate) : formatISO(values.date),
+                      issueDate: formatISO(values.date as Date),
+                      dueDate: values.checkDate ? (values.checkDate instanceof Date && !isNaN(values.checkDate.getTime()) ? formatISO(values.checkDate) : formatISO(values.date as Date)) : formatISO(values.date as Date),
                       status: 'pending',
                       partyName: customer.name,
                       partyType: 'customer',
@@ -445,13 +450,6 @@ export default function CustomerDetailPage() {
       onContactHistoryDelete={handleContactHistoryDelete}
       onTaskSubmit={handleTaskSubmit}
       onTaskDelete={handleTaskDelete}
-    >
-      <Label htmlFor="date">Tarih</Label>
-      <Input
-        type="text"
-        placeholder="gg.aa.yyyy"
-        // value ve onChange ile manuel tarih girişi
     />
-    </CustomerDetailPageClient>
   );
 }

@@ -381,7 +381,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     setShowPurchaseTypeDialog(true);
   }, []);
 
-  const handleSelectPurchaseType = useCallback((type: PurchaseType | 'stock' | 'manual') => {
+  const handleSelectPurchaseType = useCallback((type: PurchaseType) => {
     setEditingPurchase(null);
     setPurchaseFormValues({
       ...EMPTY_PURCHASE_FORM_VALUES,
@@ -389,13 +389,15 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       date: new Date(),
     });
     // Invoiced flow is triggered when user selects 'stock' option from dialog
-    setInvoiceMode(type === 'stock');
+    setInvoiceMode(type === PurchaseType.STOCK);
     setShowPurchaseTypeDialog(false);
     setShowPurchaseModal(true);
   }, []);
 
   const handleOpenEditPurchaseModal = useCallback((purchase: Purchase) => {
     setEditingPurchase(purchase);
+    // Düzenlerken faturalı kalem modunu kapatıyoruz; basit form gösterilsin
+    setInvoiceMode(false);
     setPurchaseFormValues({
       amount: purchase.amount.toString(),
       date: purchase.date ? new Date(purchase.date) : new Date(),
@@ -416,30 +418,36 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       const amount = parseFloat(values.amount);
       const quantityPurchased = values.quantityPurchased ? parseFloat(values.quantityPurchased) : undefined;
       const unitPrice = values.unitPrice ? parseFloat(values.unitPrice) : undefined;
+      // Ensure date is a valid Date
+      if (!(values.date instanceof Date) || isNaN(values.date.getTime())) {
+        toast({ title: "Hata", description: "Lütfen geçerli bir tarih girin.", variant: "destructive" });
+        return;
+      }
 
       if (editingPurchase) {
         const updatedPurchase: Purchase = {
           ...editingPurchase,
           amount: amount,
-          date: formatISO(typeof values.date === 'string' ? values.date : (values.date ?? new Date())) || "",
-          currency: values.currency,
-          stockItemId: values.purchaseType === 'stock' ? (values.stockItemId === '' || values.stockItemId === undefined ? undefined : values.stockItemId) : undefined,
-          manualProductName: values.purchaseType === 'manual' ? values.manualProductName : undefined,
+          date: formatISO(values.date as Date) || "",
+          currency: values.currency as Currency,
+          stockItemId: values.purchaseType === PurchaseType.STOCK ? (values.stockItemId === '' || values.stockItemId === undefined ? undefined : values.stockItemId) : undefined,
+          manualProductName: values.purchaseType === PurchaseType.MANUAL ? values.manualProductName : undefined,
           purchaseType: values.purchaseType,
           description: values.description,
           quantityPurchased: quantityPurchased,
           unitPrice: unitPrice,
           updatedAt: new Date().toISOString(),
         };
-        // --- undefined alanları sil ---
-        Object.keys(updatedPurchase).forEach(key => {
-          if (updatedPurchase[key] === undefined) {
-            delete updatedPurchase[key];
+        // --- undefined alanları sil (tip hatası olmadan) ---
+        const updatedAny: any = { ...updatedPurchase };
+        Object.keys(updatedAny).forEach((key) => {
+          if (updatedAny[key] === undefined) {
+            delete updatedAny[key];
           }
         });
         // ---
-        await storageUpdatePurchase(user.uid, updatedPurchase);
-        setPurchases(prev => prev.map(p => p.id === updatedPurchase.id ? updatedPurchase : p));
+        await storageUpdatePurchase(user.uid, updatedAny);
+        setPurchases(prev => prev.map(p => p.id === updatedAny.id ? updatedAny : p));
         toast({
           title: "Satın alma güncellendi",
           description: "Satın alma kaydı başarıyla güncellendi.",
@@ -448,8 +456,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         const purchaseData: any = {
           supplierId: supplier.id,
           amount: amount,
-          date: formatISO(typeof values.date === 'string' ? values.date : (values.date ?? new Date())) || "",
-          currency: values.currency,
+          date: formatISO(values.date as Date) || "",
+          currency: values.currency as Currency,
           transactionType: 'purchase',
           category: 'diger',
           tags: [],
@@ -457,9 +465,9 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           updatedAt: new Date().toISOString(),
           purchaseType: values.purchaseType,
         };
-        if (values.purchaseType === 'stock') {
+        if (values.purchaseType === PurchaseType.STOCK) {
           purchaseData.stockItemId = values.stockItemId;
-        } else if (values.purchaseType === 'manual') {
+        } else if (values.purchaseType === PurchaseType.MANUAL) {
           purchaseData.manualProductName = values.manualProductName;
         }
         if (values.description) {
@@ -523,15 +531,20 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     if (!user || !supplier?.id) return;
     try {
       const amount = parseFloat(values.amount);
-      const checkDateISO = values.checkDate ? formatISO(typeof values.checkDate === 'string' ? values.checkDate : (values.checkDate ?? new Date())) : null;
+      // Validate dates
+      if (!(values.date instanceof Date) || isNaN(values.date.getTime())) {
+        toast({ title: "Hata", description: "Lütfen geçerli bir tarih girin.", variant: "destructive" });
+        return;
+      }
+      const checkDateISO = values.checkDate instanceof Date && !isNaN(values.checkDate.getTime()) ? formatISO(values.checkDate) : null;
 
       if (editingPaymentToSupplier) {
         const updatedPayment: PaymentToSupplier = {
           ...editingPaymentToSupplier,
           amount: amount,
-          date: formatISO(typeof values.date === 'string' ? values.date : (values.date ?? new Date())) || "",
+          date: formatISO(values.date as Date) || "",
           method: values.method,
-          currency: values.currency,
+          currency: values.currency as Currency,
           referenceNumber: values.referenceNumber || null,
           description: values.description || '',
           checkDate: checkDateISO,
@@ -548,9 +561,9 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         const paymentData: any = {
           supplierId: supplier.id,
           amount: amount,
-          date: formatISO(typeof values.date === 'string' ? values.date : (values.date ?? new Date())) || "",
+          date: formatISO(values.date as Date) || "",
           method: values.method,
-          currency: values.currency,
+          currency: values.currency as Currency,
           referenceNumber: values.referenceNumber || null,
           description: values.description || '',
           checkDate: checkDateISO,
@@ -703,7 +716,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const handleOpenEditContactHistoryModal = useCallback((item: ContactHistoryItem) => {
     setEditingContactHistoryItem(item);
     setContactHistoryFormValues({
-      date: parseISO(typeof item.date === 'string' ? item.date : "") || "",
+      date: item.date ? parseISO(item.date as string) : new Date(),
       type: item.type,
       summary: item.summary,
       notes: item.notes || '',
@@ -714,10 +727,14 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const handleContactHistorySubmit = useCallback(async (values: ContactHistoryFormValues) => {
     if (!user || !supplier?.id) return;
     try {
+      if (!(values.date instanceof Date) || isNaN(values.date.getTime())) {
+        toast({ title: "Hata", description: "Lütfen geçerli bir tarih girin.", variant: "destructive" });
+        return;
+      }
       if (editingContactHistoryItem) {
         const updatedItem: ContactHistoryItem = {
           ...editingContactHistoryItem,
-          date: formatISO(typeof values.date === 'string' ? values.date : "") || "",
+          date: formatISO(values.date as Date) || "",
           type: values.type,
           summary: values.summary,
           notes: values.notes || '',
@@ -732,7 +749,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       } else {
         const newItem: Omit<ContactHistoryItem, 'id'> = {
           supplierId: supplier.id,
-          date: formatISO(typeof values.date === 'string' ? values.date : "") || "",
+          date: formatISO(values.date as Date) || "",
           type: values.type,
           summary: values.summary,
           notes: values.notes || '',
@@ -787,7 +804,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         const updatedTask: SupplierTask = {
           ...editingTask,
           description: values.description,
-          dueDate: values.dueDate ? formatISO(typeof values.dueDate === 'string' ? values.dueDate : "") : undefined,
+          dueDate: values.dueDate instanceof Date && !isNaN(values.dueDate.getTime()) ? formatISO(values.dueDate) : undefined,
           status: values.status,
           updatedAt: new Date().toISOString(),
         };
@@ -801,7 +818,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         const newTask: Omit<SupplierTask, 'id'> = {
           supplierId: supplier.id,
           description: values.description,
-          dueDate: values.dueDate ? formatISO(typeof values.dueDate === 'string' ? values.dueDate : "") : undefined,
+          dueDate: values.dueDate instanceof Date && !isNaN(values.dueDate.getTime()) ? formatISO(values.dueDate) : undefined,
           status: values.status,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -836,7 +853,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
     setEditingTask(task);
     setTaskFormValues({
       description: task.description,
-      dueDate: task.dueDate ? parseISO(typeof task.dueDate === 'string' ? task.dueDate : "") : undefined,
+      dueDate: task.dueDate ? parseISO(task.dueDate as string) : undefined,
       status: task.status,
     });
     setShowTaskModal(true);
@@ -960,23 +977,27 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   const handleAddPaymentToSupplier = async (values: PaymentToSupplierFormValues) => {
     try {
       const amount = parseFloat(values.amount);
+      if (!(values.date instanceof Date) || isNaN(values.date.getTime())) {
+        toast({ title: "Hata", description: "Lütfen geçerli bir tarih girin.", variant: "destructive" });
+        return;
+      }
 
       const newPayment: PaymentToSupplier = {
         id: Math.random().toString(36).substr(2, 9),
         supplierId: supplier.id,
         amount: amount,
-        date: formatISO(typeof values.date === 'string' ? values.date : "") || "",
-        currency: values.currency,
+        date: formatISO(values.date as Date) || "",
+        currency: values.currency as Currency,
         method: values.method,
         description: values.description || `${values.method} ile ödeme`,
         transactionType: 'paymentToSupplier',
         category: 'odeme',
         tags: [],
+        referenceNumber: values.referenceNumber || null,
+        checkDate: values.checkDate instanceof Date && !isNaN(values.checkDate.getTime()) ? formatISO(values.checkDate) : null,
+        checkSerialNumber: values.checkSerialNumber || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        ...(values.referenceNumber && { referenceNumber: values.referenceNumber }),
-        ...(values.checkDate && { checkDate: formatISO(typeof values.checkDate === 'string' ? values.checkDate : "") }),
-        ...(values.checkSerialNumber && { checkSerialNumber: values.checkSerialNumber }),
       };
 
       setPaymentsToSupplier(prevPayments => [...prevPayments, newPayment]);
@@ -1482,10 +1503,10 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
             <DialogDescription>İşleme başlamadan önce satın alma türünü seçin.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
-            <Button variant="default" onClick={() => handleSelectPurchaseType('stock')}>
+            <Button variant="default" onClick={() => handleSelectPurchaseType(PurchaseType.STOCK)}>
               Faturalı Alış
             </Button>
-            <Button variant="secondary" onClick={() => handleSelectPurchaseType('manual')}>
+            <Button variant="secondary" onClick={() => handleSelectPurchaseType(PurchaseType.MANUAL)}>
               Manuel Alış
             </Button>
           </div>
