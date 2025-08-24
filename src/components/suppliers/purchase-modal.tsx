@@ -257,14 +257,10 @@ export function PurchaseModal({
       <DialogContent className="sm:max-w-[980px]">
         <DialogHeader>
           <DialogTitle>
-            {useInvoiceItems
-              ? (purchaseType === PurchaseType.MANUAL ? 'Manuel Alış' : 'Faturalı Alış')
-              : 'Alış Ekle'}
+            {'Alış Ekle'}
           </DialogTitle>
           <DialogDescription>
-            {useInvoiceItems
-              ? 'Kalemleri ekleyin; toplamlar otomatik hesaplanır. Kaydedince alış oluşturulur.'
-              : 'Yeni alış işlemi ekleyin veya mevcut bir alış\'ı düzenleyin.'}
+            {'Yeni bir alış işlemi ekleyin veya mevcut bir alış\'ı düzenleyin.'}
           </DialogDescription>
         </DialogHeader>
         {/* Tür Seçimi Ekranı */}
@@ -326,14 +322,48 @@ export function PurchaseModal({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             {/* Üst bilgi */}
-            {supplierName && (
-              <div>
-                <Label className="text-sm text-muted-foreground">Tedarikçi</Label>
-                <Input value={supplierName} readOnly className="opacity-80" />
-              </div>
-            )}
+            <div className="space-y-3">
+              <FormField
+                control={form.control}
+                name="purchaseType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Alış Tipi</FormLabel>
+                    <FormControl>
+                      <Select value={field.value} onValueChange={(val) => {
+                        field.onChange(val as PurchaseType);
+                        if (val === PurchaseType.STOCK && invoiceMode) {
+                          setUseInvoiceItems(true);
+                          if (!items || items.length === 0) setItems([]);
+                        } else if (val === PurchaseType.MANUAL) {
+                          // Manuel alışta da kalem editörü açılsın
+                          setUseInvoiceItems(true);
+                          if (!items || items.length === 0) setItems([]);
+                        } else {
+                          setUseInvoiceItems(false);
+                        }
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Alış tipi seçin..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={PurchaseType.STOCK}>Faturalı Alış</SelectItem>
+                          <SelectItem value={PurchaseType.MANUAL}>Manuel Alış</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {supplierName && (
+                <div>
+                  <Label className="text-sm text-muted-foreground">Tedarikçi</Label>
+                  <Input value={supplierName} readOnly className="opacity-80" />
+                </div>
+              )}
+
               <FormField
                 control={form.control}
                 name="date"
@@ -383,39 +413,6 @@ export function PurchaseModal({
                           <SelectItem value="TRY">TRY</SelectItem>
                           <SelectItem value="USD">USD</SelectItem>
                           <SelectItem value="EUR">EUR</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="purchaseType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Alış Tipi</FormLabel>
-                    <FormControl>
-                      <Select value={field.value} onValueChange={(val) => {
-                        field.onChange(val as PurchaseType);
-                        if (val === PurchaseType.STOCK && invoiceMode) {
-                          setUseInvoiceItems(true);
-                          if (!items || items.length === 0) setItems([]);
-                        } else if (val === PurchaseType.MANUAL) {
-                          // Manuel alışta da kalem editörü açılsın
-                          setUseInvoiceItems(true);
-                          if (!items || items.length === 0) setItems([]);
-                        } else {
-                          setUseInvoiceItems(false);
-                        }
-                      }}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Alış tipi seçin..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={PurchaseType.STOCK}>Faturalı Alış</SelectItem>
-                          <SelectItem value={PurchaseType.MANUAL}>Manuel Alış</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormControl>
