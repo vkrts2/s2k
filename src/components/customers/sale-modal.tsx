@@ -197,7 +197,7 @@ function LightweightInvoiceForm({
                   const showAdd = list.length === 0 && hasQuery;
                   if (!showList && !showAdd) return null;
                   return (
-                    <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/30 bg-white text-foreground shadow z-50">
+                    <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-border bg-popover text-popover-foreground shadow z-50">
                       {showList && list.map((s, sIdx) => {
                         const active = ((activeIdxByItem[it.id] ?? 0) === sIdx);
                         return (
@@ -205,7 +205,7 @@ function LightweightInvoiceForm({
                             type="button"
                             key={s.id}
                             id={`suggestion-${it.id}-${sIdx}`}
-                            className={`w-full text-left px-3 py-2 transition-colors ${active ? 'bg-primary text-white' : 'hover:bg-muted text-foreground'}`}
+                            className={`w-full text-left px-3 py-2 transition-colors ${active ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-foreground'}`}
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => updateItem(it.id, { productName: s.name })}
                             role="option"
@@ -580,11 +580,20 @@ export function SaleModal({
                     const desc = Array.isArray(data.items) && data.items.length > 0
                       ? `${data.items[0].productName}${data.items.length > 1 ? ` +${data.items.length - 1} kalem` : ''}`
                       : (formValues.description || 'Faturalı Satış');
+                    const grand = Number(data.grandTotal ?? 0);
+                    const sub = Number(data.subTotal ?? 0);
+                    const tax = Number(data.taxAmount ?? 0);
                     const submitValues: any = {
-                      amount: String(data.grandTotal ?? 0),
+                      amount: String(grand),
+                      amountNumber: grand,
                       date: data.date,
                       currency: data.currency ?? 'TRY',
                       description: desc,
+                      items: data.items || [],
+                      subTotal: sub,
+                      taxAmount: tax,
+                      grandTotal: grand,
+                      invoiceType: 'invoice',
                     };
                     onSubmit({ ...formValues, ...submitValues });
                     onClose();

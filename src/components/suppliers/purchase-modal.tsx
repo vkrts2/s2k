@@ -463,7 +463,7 @@ export function PurchaseModal({
                           const list = getSuggestions(it.productName);
                           const hide = !!list.find((s) => s.name === it.productName) || createdNames.includes(it.productName);
                           return (
-                            <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-neutral/30 bg-white text-foreground shadow z-50">
+                            <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-border bg-popover text-popover-foreground shadow z-50">
                               {list.length > 0 && !hide && list.map((s, sIdx) => {
                                 const active = (activeIdxByItem[it.id] ?? 0) === sIdx;
                                 return (
@@ -471,7 +471,7 @@ export function PurchaseModal({
                                     type="button"
                                     key={`suggestion-${it.id}-${sIdx}`}
                                     id={`suggestion-${it.id}-${sIdx}`}
-                                    className={cn("w-full text-left px-3 py-2 transition-colors", active ? "bg-primary text-white" : "hover:bg-muted text-foreground")}
+                                    className={cn("w-full text-left px-3 py-2 transition-colors", active ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground")}
                                     onClick={() => {
                                       const next = [...(items ?? [])];
                                       next[idx] = { ...next[idx], productName: s.name };
@@ -625,7 +625,7 @@ export function PurchaseModal({
                           const nameVal = field.value ?? '';
                           const hide = !!list.find((s) => s.name === nameVal) || (nameVal && createdNames.includes(nameVal));
                           return (
-                            <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-neutral/30 bg-white text-foreground shadow z-50">
+                            <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-border bg-popover text-popover-foreground shadow z-50">
                               {list.length > 0 && !hide && list.map((s, sIdx) => {
                                 const active = (activeManualIdx < 0 ? 0 : activeManualIdx) === sIdx;
                                 return (
@@ -633,7 +633,7 @@ export function PurchaseModal({
                                     type="button"
                                     key={s.id}
                                     id={`suggestion-manual-${sIdx}`}
-                                    className={cn("w-full text-left px-3 py-2 transition-colors", active ? "bg-primary text-white" : "hover:bg-muted")}
+                                    className={cn("w-full text-left px-3 py-2 transition-colors", active ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground")}
                                     onClick={() => field.onChange(s.name)}
                                     role="option"
                                     aria-selected={active}
