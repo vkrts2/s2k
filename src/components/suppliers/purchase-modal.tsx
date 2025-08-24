@@ -330,27 +330,33 @@ export function PurchaseModal({
                   <FormItem>
                     <FormLabel>Alış Tipi</FormLabel>
                     <FormControl>
-                      <Select value={field.value} onValueChange={(val) => {
-                        field.onChange(val as PurchaseType);
-                        if (val === PurchaseType.STOCK && invoiceMode) {
-                          setUseInvoiceItems(true);
-                          if (!items || items.length === 0) setItems([]);
-                        } else if (val === PurchaseType.MANUAL) {
-                          // Manuel alışta da kalem editörü açılsın
-                          setUseInvoiceItems(true);
-                          if (!items || items.length === 0) setItems([]);
-                        } else {
-                          setUseInvoiceItems(false);
-                        }
-                      }}>
-                        <SelectTrigger className="h-11">
-                          <SelectValue placeholder="Alış tipi seçin..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={PurchaseType.STOCK}>Faturalı Alış</SelectItem>
-                          <SelectItem value={PurchaseType.MANUAL}>Manuel Alış</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {purchaseType === PurchaseType.MANUAL ? (
+                        <div className="h-11 flex items-center rounded-md border bg-background px-3 text-sm text-foreground/90 opacity-90">
+                          Manuel Alış
+                        </div>
+                      ) : (
+                        <Select value={field.value} onValueChange={(val) => {
+                          field.onChange(val as PurchaseType);
+                          if (val === PurchaseType.STOCK && invoiceMode) {
+                            setUseInvoiceItems(true);
+                            if (!items || items.length === 0) setItems([]);
+                          } else if (val === PurchaseType.MANUAL) {
+                            // Manuel alışta da kalem editörü açılsın
+                            setUseInvoiceItems(true);
+                            if (!items || items.length === 0) setItems([]);
+                          } else {
+                            setUseInvoiceItems(false);
+                          }
+                        }}>
+                          <SelectTrigger className="h-11">
+                            <SelectValue placeholder="Alış tipi seçin..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={PurchaseType.STOCK}>Faturalı Alış</SelectItem>
+                            <SelectItem value={PurchaseType.MANUAL}>Manuel Alış</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -427,10 +433,18 @@ export function PurchaseModal({
 
             {/* Kalem Editörü (Faturalı veya Manuel) */}
             {useInvoiceItems && (purchaseType === PurchaseType.STOCK || purchaseType === PurchaseType.MANUAL) ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Kalemler</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addItem}>Kalem Ekle</Button>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pt-1">
+                  <Label className="text-base font-medium">Kalemler</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-md px-3"
+                    onClick={addItem}
+                  >
+                    Kalem Ekle
+                  </Button>
                 </div>
                 {/* Sütun Başlıkları */}
                 {purchaseType === PurchaseType.MANUAL ? (
@@ -628,7 +642,7 @@ export function PurchaseModal({
                   );
                 })}
                 {/* Totals panel and submit button aligned to the right */}
-                <div className="flex justify-end mt-2">
+                <div className="flex justify-end mt-3">
                   <div className="w-full sm:w-auto flex flex-col items-end gap-1">
                     <div className="text-sm text-muted-foreground">
                       Ara Toplam: <span className="tabular-nums">{computedTotals.subTotal.toFixed(2)}</span>
@@ -638,10 +652,10 @@ export function PurchaseModal({
                         KDV: <span className="tabular-nums">{computedTotals.taxAmount.toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="text-base font-semibold">
+                    <div className="text-lg font-bold">
                       Genel Toplam: <span className="tabular-nums">{computedTotals.grandTotal.toFixed(2)}</span>
                     </div>
-                    <div className="mt-2 flex gap-2">
+                    <div className="mt-3 flex gap-2">
                       <Button
                         type="submit"
                         disabled={
