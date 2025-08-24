@@ -1172,7 +1172,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Toplam Satın Alma</CardTitle>
+            <CardTitle className="text-sm font-medium">Toplam Satış</CardTitle>
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -1230,7 +1230,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                       <SelectItem value="asc">Eskiden Yeniye</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button onClick={() => handleOpenAddPurchaseModal()}><PlusCircle className="mr-2 h-4 w-4"/> Satın Alma Ekle</Button>
+                  <Button onClick={() => handleOpenAddPurchaseModal()}><PlusCircle className="mr-2 h-4 w-4"/> Satış Ekle</Button>
                   <Button onClick={() => handleOpenAddPaymentToSupplierModal()}><PlusCircle className="mr-2 h-4 w-4"/> Ödeme Ekle</Button>
                 </div>
               </div>
@@ -1509,8 +1509,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       <Dialog open={showPurchaseTypeDialog} onOpenChange={setShowPurchaseTypeDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">Satın Alma Türü Seçin</DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">Hangi tür satın alma yapmak istiyorsunuz?</DialogDescription>
+            <DialogTitle className="text-xl font-semibold">Satış Türü Seçin</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">Hangi tür satış yapmak istiyorsunuz?</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3 py-2">
             <Button
@@ -1522,8 +1522,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
               <div className="flex items-start gap-3">
                 <div className="mt-0.5"><ShoppingCart className="w-5 h-5" /></div>
                 <div className="flex flex-col -space-y-0.5 text-left">
-                  <span className="font-semibold text-base">Manuel Alış</span>
-                  <span className="text-xs opacity-90">Stok/manuel alanlı basit alış</span>
+                  <span className="font-semibold text-base">Manuel Satış</span>
+                  <span className="text-xs opacity-90">Stok/manuel alanlı basit satış</span>
                 </div>
               </div>
             </Button>
@@ -1536,8 +1536,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
               <div className="flex items-start gap-3">
                 <div className="mt-0.5"><FileText className="w-5 h-5" /></div>
                 <div className="flex flex-col -space-y-0.5 text-left">
-                  <span className="font-semibold text-base">Faturalı Alış</span>
-                  <span className="text-xs opacity-90">Teklif formu ile detaylı alış</span>
+                  <span className="font-semibold text-base">Faturalı Satış</span>
+                  <span className="text-xs opacity-90">Teklif formu ile detaylı satış</span>
                 </div>
               </div>
             </Button>

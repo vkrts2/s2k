@@ -331,15 +331,12 @@ export function PurchaseModal({
                     <FormLabel>Satış Tipi</FormLabel>
                     <FormControl>
                       {purchaseType === PurchaseType.MANUAL ? (
-                        <Select disabled value={PurchaseType.MANUAL}>
-                          <SelectTrigger className="h-11">
+                        <Select value={PurchaseType.MANUAL}>
+                          <SelectTrigger className="h-11 pointer-events-none cursor-not-allowed">
                             <SelectValue placeholder="Satış tipi" defaultValue={PurchaseType.MANUAL}>
                               Manuel Satış
                             </SelectValue>
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={PurchaseType.MANUAL}>Manuel Satış</SelectItem>
-                          </SelectContent>
                         </Select>
                       ) : (
                         <Select value={field.value} onValueChange={(val) => {
@@ -447,7 +444,7 @@ export function PurchaseModal({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-9 rounded-md px-3"
+                    className="h-9 rounded-md px-4 shadow-sm"
                     onClick={addItem}
                   >
                     Kalem Ekle
@@ -659,7 +656,7 @@ export function PurchaseModal({
                         KDV: <span className="tabular-nums">{computedTotals.taxAmount.toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="text-lg font-bold">
+                    <div className="text-xl font-semibold">
                       Genel Toplam: <span className="tabular-nums">{computedTotals.grandTotal.toFixed(2)}</span>
                     </div>
                     <div className="mt-3 flex gap-2">
