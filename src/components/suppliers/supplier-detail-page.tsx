@@ -359,8 +359,18 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
   useEffect(() => {
     const fetchTasks = async () => {
       if (user?.uid && supplier?.id) {
-        const fetchedTasks = await getSupplierTasks(user.uid, supplier.id);
-        setTasks(fetchedTasks);
+        try {
+          const fetchedTasks = await getSupplierTasks(user.uid, supplier.id);
+          setTasks(fetchedTasks);
+        } catch (err: any) {
+          // Missing index or any read error should not block UI flows like saving purchases
+          const msg = typeof err?.message === 'string' ? err.message : '';
+          if (msg.toLowerCase().includes('the query requires an index')) {
+            console.warn('supplierTasks index missing; skipping tasks fetch until index is ready.');
+          } else {
+            console.warn('supplierTasks fetch failed; continuing without tasks.', err);
+          }
+        }
       }
     };
     fetchTasks();

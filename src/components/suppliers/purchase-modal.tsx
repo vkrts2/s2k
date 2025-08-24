@@ -206,9 +206,24 @@ export function PurchaseModal({
   }, [items, useInvoiceItems, purchaseType]);
 
   const handleSubmit = async (data: PurchaseFormValues) => {
-    // Faturalı modda açıklamayı otomatik doldurma: kullanıcıya bırak
-    await onSubmit(data);
-    form.reset();
+    try {
+      if (useInvoiceItems) {
+        const desc = Array.isArray(items) && items.length > 0
+          ? `${items[0].productName || 'Ürün'}${items.length > 1 ? ` +${items.length - 1} kalem` : ''}`
+          : (data.description || 'Faturalı Alış');
+        const grand = Number((computedTotals?.grandTotal ?? 0).toFixed(2));
+        const submitValues: any = {
+          amount: grand > 0 ? String(grand) : (data.amount || ''),
+          description: data.description && data.description.trim() !== '' ? data.description : desc,
+        };
+        await onSubmit({ ...data, ...submitValues });
+      } else {
+        await onSubmit(data);
+      }
+      form.reset();
+    } catch (e) {
+      console.error('Purchase form submit error:', e);
+    }
   };
 
   // Basit öneri filtresi
