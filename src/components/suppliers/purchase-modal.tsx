@@ -43,14 +43,15 @@ const purchaseFormSchema = z.object({
   currency: z.enum(['TRY','USD','EUR']),
   description: z.string().optional(),
 }).refine((data) => {
+  // STOCK = faturalı akışta stok seçimi zorunlu değil; kalem editörü kullanılıyor
   if (data.purchaseType === PurchaseType.STOCK) {
-    return !!data.stockItemId;
-  } else {
-    return !!data.manualProductName;
+    return true;
   }
+  // MANUAL akışta ürün adı gerekli
+  return !!data.manualProductName;
 }, {
   message: 'Ürün bilgisi zorunludur',
-  path: ['stockItemId', 'manualProductName'],
+  path: ['manualProductName'],
 });
 
 interface PurchaseModalProps {
@@ -220,6 +221,7 @@ export function PurchaseModal({
       } else {
         await onSubmit(data);
       }
+      onClose();
       form.reset();
     } catch (e) {
       console.error('Purchase form submit error:', e);
@@ -635,7 +637,14 @@ export function PurchaseModal({
                     </div>
                     <div className="mt-2 flex gap-2">
                       <Button type="button" variant="outline" onClick={onClose}>İptal</Button>
-                      <Button type="submit" disabled={form.formState.isSubmitting}>
+                      <Button
+                        type="submit"
+                        disabled={
+                          form.formState.isSubmitting ||
+                          (useInvoiceItems && (computedTotals.grandTotal <= 0 || items.length === 0))
+                        }
+                        title={useInvoiceItems && (computedTotals.grandTotal <= 0 || items.length === 0) ? 'Kalem ekleyin ve tutar > 0 olmalı' : undefined}
+                      >
                         {form.formState.isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
                       </Button>
                     </div>
