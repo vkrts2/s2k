@@ -130,18 +130,36 @@ function LightweightInvoiceForm({
           <Button type="button" variant="outline" size="sm" onClick={addItem}>Kalem Ekle</Button>
         </div>
         {/* Sütun Başlıkları */}
-        <div className={`grid ${disableTax ? 'grid-cols-8' : 'grid-cols-9'} gap-2 text-xs text-muted-foreground`}
-        >
-          <div className="col-span-3">Ürün/Hizmet</div>
-          <div className="col-span-2">Miktar</div>
-          <div className="col-span-1">Birim</div>
-          <div className="col-span-2">Birim Fiyat</div>
-          {!disableTax && <div className="col-span-1">KDV</div>}
-        </div>
+        {disableTax ? (
+          // Manuel: Ürün/Hizmet | Miktar | Birim Fiyatı | Toplam | Sil
+          <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground">
+            <div className="col-span-6">Ürün/Hizmet</div>
+            <div className="col-span-2">Miktar</div>
+            <div className="col-span-2">Birim Fiyatı</div>
+            <div className="col-span-1 text-right">Toplam</div>
+            <div className="col-span-1 text-right">Sil</div>
+          </div>
+        ) : (
+          // Faturalı: Ürün/Hizmet | Miktar | Birim | Birim Fiyat | KDV | Toplam | Sil
+          <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground">
+            <div className="col-span-4">Ürün/Hizmet</div>
+            <div className="col-span-2">Miktar</div>
+            <div className="col-span-1">Birim</div>
+            <div className="col-span-2">Birim Fiyat</div>
+            <div className="col-span-1">KDV</div>
+            <div className="col-span-1 text-right">Toplam</div>
+            <div className="col-span-1 text-right">Sil</div>
+          </div>
+        )}
         {items.length === 0 && <div className="text-sm text-muted-foreground">Henüz kalem eklenmedi.</div>}
-		{items.map(it => (
-			<div key={it.id} className={`grid ${disableTax ? 'grid-cols-5' : 'grid-cols-6'} gap-2`}>
-				<div className="relative">
+		{items.map(it => {
+			const q = parseFloat(it.quantity || '0') || 0;
+			const p = parseFloat(it.unitPrice || '0') || 0;
+			const t = disableTax ? 0 : (parseFloat(it.taxRate || '0') || 0);
+			const lineTotal = disableTax ? (q * p) : (q * p * (1 + t / 100));
+			return (
+			<div key={it.id} className={`grid grid-cols-12 gap-2 items-center`}>
+				<div className={disableTax ? 'col-span-6 relative' : 'col-span-4 relative'}>
 					<Input
 						placeholder="Ürün/Hizmet"
 						value={it.productName}
@@ -214,29 +232,44 @@ function LightweightInvoiceForm({
 						);
 					})()}
 				</div>
-				<Input type="number" placeholder="Miktar" value={it.quantity} onChange={e => updateItem(it.id, { quantity: e.target.value })} />
-				<Select value={it.unit} onValueChange={v => updateItem(it.id, { unit: v })}>
-					<SelectTrigger><SelectValue placeholder="Birim" /></SelectTrigger>
-					<SelectContent>
-						<SelectItem value="kg">kg</SelectItem>
-						<SelectItem value="mt">mt</SelectItem>
-						<SelectItem value="adet">ad</SelectItem>
-						<SelectItem value="top">top</SelectItem>
-					</SelectContent>
-				</Select>
-				<Input type="number" placeholder="Birim Fiyat" value={it.unitPrice} onChange={e => updateItem(it.id, { unitPrice: e.target.value })} />
-				{!disableTax && (
-				  <Select value={it.taxRate} onValueChange={v => updateItem(it.id, { taxRate: v })}>
-					  <SelectTrigger><SelectValue /></SelectTrigger>
-					  <SelectContent>
-						  <SelectItem value="10">%10</SelectItem>
-						  <SelectItem value="20">%20</SelectItem>
-					  </SelectContent>
-				  </Select>
+				<div className={disableTax ? 'col-span-2' : 'col-span-2'}>
+					<Input type="number" placeholder="Miktar" value={it.quantity} onChange={e => updateItem(it.id, { quantity: e.target.value })} />
+				</div>
+				{disableTax ? null : (
+				  <div className="col-span-1">
+				    <Select value={it.unit} onValueChange={v => updateItem(it.id, { unit: v })}>
+				    	<SelectTrigger><SelectValue placeholder="Birim" /></SelectTrigger>
+				    	<SelectContent>
+				    		<SelectItem value="kg">kg</SelectItem>
+				    		<SelectItem value="mt">mt</SelectItem>
+				    		<SelectItem value="adet">ad</SelectItem>
+				    		<SelectItem value="top">top</SelectItem>
+				    	</SelectContent>
+				    </Select>
+				  </div>
 				)}
-				<Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
+				<div className={disableTax ? 'col-span-2' : 'col-span-2'}>
+					<Input type="number" placeholder="Birim Fiyat" value={it.unitPrice} onChange={e => updateItem(it.id, { unitPrice: e.target.value })} />
+				</div>
+				{disableTax ? null : (
+				  <div className="col-span-1">
+				    <Select value={it.taxRate} onValueChange={v => updateItem(it.id, { taxRate: v })}>
+				    	<SelectTrigger><SelectValue /></SelectTrigger>
+				    	<SelectContent>
+				    		<SelectItem value="0">%0</SelectItem>
+				    		<SelectItem value="10">%10</SelectItem>
+				    		<SelectItem value="20">%20</SelectItem>
+				    	</SelectContent>
+				    </Select>
+				  </div>
+				)}
+				<div className="col-span-1 text-right font-medium pr-1 tabular-nums">{lineTotal.toFixed(2)}</div>
+				<div className="col-span-1 flex justify-end">
+					<Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
+				</div>
 			</div>
-		))}
+			);
+		})}
       </div>
       <div className="space-y-1 text-right">
         <div className="text-sm">Ara Toplam: {totals.subTotal.toFixed(2)}</div>
@@ -668,6 +701,7 @@ export function SaleModal({
                   initialItems={manualInitialItems as any}
                   initialDate={manualInitialDate}
                   initialCurrency={manualInitialCurrency}
+                  disableTax
                   availableStockItems={availableStockItems}
                   onRequestAddStock={(name, onAdded) => {
                     setPendingAdd({

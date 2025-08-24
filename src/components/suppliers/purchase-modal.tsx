@@ -388,22 +388,36 @@ export function PurchaseModal({
                   <Button type="button" variant="outline" size="sm" onClick={addItem}>Kalem Ekle</Button>
                 </div>
                 {/* Sütun Başlıkları */}
-                <div className="grid grid-cols-12 gap-2 text-xs text-foreground font-medium">
-                  <div className="col-span-3">Ürün/Hizmet</div>
-                  <div className="col-span-2">Miktar</div>
-                  <div className="col-span-2">Birim</div>
-                  <div className="col-span-3">Birim Fiyat</div>
-                  {purchaseType === PurchaseType.MANUAL ? (
-                    <div className="col-span-1"></div>
-                  ) : (
+                {purchaseType === PurchaseType.MANUAL ? (
+                  // Manuel: Ürün/Hizmet | Miktar | Birim Fiyatı | Toplam | Sil
+                  <div className="grid grid-cols-12 gap-2 text-xs text-foreground font-medium">
+                    <div className="col-span-6">Ürün/Hizmet</div>
+                    <div className="col-span-2">Miktar</div>
+                    <div className="col-span-2">Birim Fiyatı</div>
+                    <div className="col-span-1 text-right">Toplam</div>
+                    <div className="col-span-1 text-right">Sil</div>
+                  </div>
+                ) : (
+                  // Faturalı: Ürün/Hizmet | Miktar | Birim | Birim Fiyat | KDV | Toplam | Sil
+                  <div className="grid grid-cols-12 gap-2 text-xs text-foreground font-medium">
+                    <div className="col-span-4">Ürün/Hizmet</div>
+                    <div className="col-span-2">Miktar</div>
+                    <div className="col-span-1">Birim</div>
+                    <div className="col-span-2">Birim Fiyat</div>
                     <div className="col-span-1">KDV</div>
-                  )}
-                  <div className="col-span-1 hidden" />
-                </div>
+                    <div className="col-span-1 text-right">Toplam</div>
+                    <div className="col-span-1 text-right">Sil</div>
+                  </div>
+                )}
                 {items.length === 0 && (
                   <div className="text-sm text-muted-foreground">Henüz kalem eklenmedi.</div>
                 )}
-                {(items ?? []).map((it: InvoiceItem, idx: number) => (
+                {(items ?? []).map((it: InvoiceItem, idx: number) => {
+                  const q = Number(it.quantity || 0);
+                  const p = Number(it.unitPrice || 0);
+                  const tr = purchaseType === PurchaseType.MANUAL ? 0 : Number(it.taxRate || 0);
+                  const lineTotal = purchaseType === PurchaseType.MANUAL ? (q * p) : (q * p * (1 + tr / 100));
+                  return (
                   <div key={it.id} className="grid grid-cols-12 gap-2 items-center">
                     <div className="col-span-3">
                       <div className="relative">
@@ -511,22 +525,24 @@ export function PurchaseModal({
                         }}
                       />
                     </div>
-                    <div className="col-span-2">
-                      <Select value={String(it.unit || 'adet')} onValueChange={(v) => {
-                        const next = [...(items ?? [])];
-                        next[idx] = { ...next[idx], unit: v } as any;
-                        setItems(next);
-                      }}>
-                        <SelectTrigger><SelectValue placeholder="Birim" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="kg">kg</SelectItem>
-                          <SelectItem value="mt">mt</SelectItem>
-                          <SelectItem value="adet">ad</SelectItem>
-                          <SelectItem value="top">top</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-3">
+                    {purchaseType === PurchaseType.MANUAL ? null : (
+                      <div className="col-span-1">
+                        <Select value={String(it.unit || 'adet')} onValueChange={(v) => {
+                          const next = [...(items ?? [])];
+                          next[idx] = { ...next[idx], unit: v } as any;
+                          setItems(next);
+                        }}>
+                          <SelectTrigger><SelectValue placeholder="Birim" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="kg">kg</SelectItem>
+                            <SelectItem value="mt">mt</SelectItem>
+                            <SelectItem value="adet">ad</SelectItem>
+                            <SelectItem value="top">top</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className={purchaseType === PurchaseType.MANUAL ? 'col-span-2' : 'col-span-2'}>
                       <Input
                         type="number"
                         step="0.01"
@@ -539,12 +555,8 @@ export function PurchaseModal({
                         }}
                       />
                     </div>
-                    {purchaseType === PurchaseType.MANUAL ? (
-                      <div className="col-span-1 flex items-center justify-end">
-                        <Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
-                      </div>
-                    ) : (
-                      <div className="col-span-1 flex items-center gap-2">
+                    {purchaseType === PurchaseType.MANUAL ? null : (
+                      <div className="col-span-1">
                         <Select value={String(it.taxRate ?? 20)} onValueChange={(v) => {
                           const next = [...(items ?? [])];
                           next[idx] = { ...next[idx], taxRate: Number(v) } as any;
@@ -557,11 +569,15 @@ export function PurchaseModal({
                             <SelectItem value="20">%20</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
                       </div>
                     )}
+                    <div className="col-span-1 text-right font-medium pr-1 tabular-nums">{lineTotal.toFixed(2)}</div>
+                    <div className="col-span-1 flex justify-end">
+                      <Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : !useInvoiceItems ? (
               <FormField
