@@ -79,20 +79,16 @@ export function PortfolioList({ items, onEdit, onDelete, onAddToCustomers, onCon
         <CardDescription>Eklenen tüm portföy kayıtlarınız (veya filtre sonuçlarınız) burada listelenir.</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
-        <p className="text-xs text-muted-foreground mb-2 ml-2">Tablonun tamamını görmek için sağa kaydırın &rarr;</p>
-        <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-gray-200" style={{ scrollbarWidth: 'thin', overflowX: 'auto' }}>
-          <Table className="min-w-[1500px]">
+        <div className="w-full overflow-x-auto">
+          <Table className="w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>Firma İsmi</TableHead>
                 <TableHead>Bulunduğu İl</TableHead>
                 <TableHead>İlçe</TableHead>
-                <TableHead className="max-w-[100px]">Adres</TableHead>
                 <TableHead>Telefon</TableHead>
-                <TableHead>E-posta</TableHead>
-                <TableHead>Web</TableHead>
                 <TableHead>Sektör</TableHead>
-                <TableHead className="max-w-[100px]">Notlar</TableHead>
+                <TableHead>Görüşme</TableHead>
                 <TableHead className="text-right">İşlemler</TableHead>
               </TableRow>
             </TableHeader>
@@ -106,12 +102,8 @@ export function PortfolioList({ items, onEdit, onDelete, onAddToCustomers, onCon
                   </TableCell>
                   <TableCell>{item.city || "-"}</TableCell>
                   <TableCell>{item.district || "-"}</TableCell>
-                  <TableCell className="max-w-[100px] truncate">{item.address || "-"}</TableCell>
                   <TableCell>{item.phone || "-"}</TableCell>
-                  <TableCell>{item.email || "-"}</TableCell>
-                  <TableCell>{item.website || "-"}</TableCell>
                   <TableCell>{item.sector || "-"}</TableCell>
-                  <TableCell className="max-w-[100px] truncate">{item.notes || "-"}</TableCell>
                   <TableCell>
                     {onContactedChange && (
                       <Button

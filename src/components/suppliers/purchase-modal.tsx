@@ -261,7 +261,7 @@ export function PurchaseModal({
   return (
     <>
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {'Satın Alım Ekle'}
@@ -327,7 +327,7 @@ export function PurchaseModal({
           </div>
         ) : (
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-2">
             {/* Üst bilgi */}
             <div className="space-y-2">
               <FormField
@@ -339,7 +339,7 @@ export function PurchaseModal({
                     <FormControl>
                       {purchaseType === PurchaseType.MANUAL ? (
                         <Select value={PurchaseType.MANUAL}>
-                          <SelectTrigger className="h-10 pointer-events-none cursor-not-allowed">
+                          <SelectTrigger className="h-9 pointer-events-none cursor-not-allowed">
                             <SelectValue placeholder="Satış tipi" defaultValue={PurchaseType.MANUAL}>
                               Manuel Satış
                             </SelectValue>
@@ -359,7 +359,7 @@ export function PurchaseModal({
                             setUseInvoiceItems(false);
                           }
                         }}>
-                          <SelectTrigger className="h-10">
+                          <SelectTrigger className="h-9">
                             <SelectValue placeholder="Satış tipi seçin..." />
                           </SelectTrigger>
                           <SelectContent>
@@ -377,7 +377,7 @@ export function PurchaseModal({
               {supplierName && (
                 <div>
                   <Label className="text-sm text-muted-foreground">Müşteri</Label>
-                  <Input value={supplierName} readOnly className="opacity-80 h-10" />
+                  <Input value={supplierName} readOnly className="opacity-80 h-9" />
                 </div>
               )}
 
@@ -408,7 +408,7 @@ export function PurchaseModal({
                               field.onChange(undefined);
                             }
                           }}
-                          className="w-full pr-9 h-10"
+                          className="w-full pr-9 h-9"
                           maxLength={10}
                         />
                         <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-70" />
@@ -426,7 +426,7 @@ export function PurchaseModal({
                     <FormLabel>Para Birimi</FormLabel>
                     <FormControl>
                       <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger className="h-10">
+                        <SelectTrigger className="h-9">
                           <SelectValue placeholder="Para birimi seçin" />
                         </SelectTrigger>
                         <SelectContent>
@@ -525,7 +525,7 @@ export function PurchaseModal({
                               }
                             }
                           }}
-                          className="h-10"
+                          className="h-9"
                         />
                         {(() => {
                           const list = getSuggestions(it.productName);
@@ -595,7 +595,7 @@ export function PurchaseModal({
                           next[idx] = { ...next[idx], quantity: val === '' ? undefined : Number(val) } as any;
                           setItems(next);
                         }}
-                        className="h-10"
+                        className="h-9"
                       />
                     </div>
                     {purchaseType === PurchaseType.MANUAL ? null : (
@@ -605,7 +605,7 @@ export function PurchaseModal({
                           next[idx] = { ...next[idx], unit: v } as any;
                           setItems(next);
                         }}>
-                          <SelectTrigger className="h-10"><SelectValue placeholder="Birim" /></SelectTrigger>
+                          <SelectTrigger className="h-9"><SelectValue placeholder="Birim" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="kg">kg</SelectItem>
                             <SelectItem value="mt">mt</SelectItem>
@@ -627,7 +627,7 @@ export function PurchaseModal({
                           next[idx] = { ...next[idx], unitPrice: val === '' ? undefined : Number(val) } as any;
                           setItems(next);
                         }}
-                        className="h-10"
+                        className="h-9"
                       />
                     </div>
                     {purchaseType === PurchaseType.MANUAL ? null : (
@@ -637,7 +637,7 @@ export function PurchaseModal({
                           next[idx] = { ...next[idx], taxRate: Number(v) } as any;
                           setItems(next);
                         }}>
-                          <SelectTrigger className="w-24 h-10"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="w-24 h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="10">%10</SelectItem>
                             <SelectItem value="20">%20</SelectItem>
