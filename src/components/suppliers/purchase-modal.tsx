@@ -87,6 +87,13 @@ export function PurchaseModal({
   // Klavye navigasyonu için aktif indeksler
   const [activeIdxByItem, setActiveIdxByItem] = React.useState<Record<string, number>>({});
   const [activeManualIdx, setActiveManualIdx] = React.useState<number>(-1);
+  // Aktif öneriyi görünür alana kaydır
+  const scrollActiveIntoView = React.useCallback((groupId: string, idx: number) => {
+    const el = document.getElementById(`suggestion-${groupId}-${idx}`);
+    if (el) {
+      try { el.scrollIntoView({ block: 'nearest' }); } catch {}
+    }
+  }, []);
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: initialData || {
@@ -331,10 +338,12 @@ export function PurchaseModal({
                               e.preventDefault();
                               const nextIdx = (current + 1) % list.length;
                               setActiveIdxByItem((prev) => ({ ...prev, [it.id]: nextIdx }));
+                              setTimeout(() => scrollActiveIntoView(it.id, nextIdx), 0);
                             } else if (e.key === 'ArrowUp') {
                               e.preventDefault();
                               const nextIdx = (current - 1 + list.length) % list.length;
                               setActiveIdxByItem((prev) => ({ ...prev, [it.id]: nextIdx }));
+                              setTimeout(() => scrollActiveIntoView(it.id, nextIdx), 0);
                             } else if (e.key === 'Enter') {
                               e.preventDefault();
                               const chosen = list[current];
@@ -350,27 +359,33 @@ export function PurchaseModal({
                           const list = getSuggestions(it.productName);
                           const hide = !!list.find((s) => s.name === it.productName) || createdNames.includes(it.productName);
                           return (
-                            <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
-                              {list.length > 0 && !hide && list.map((s, sIdx) => (
-                                <button
-                                  type="button"
-                                  key={s.id}
-                                  className={cn("w-full text-left px-3 py-2 hover:bg-primary/80", (activeIdxByItem[it.id] ?? 0) === sIdx ? "bg-primary/80" : "")}
-                                  onClick={() => {
-                                    const next = [...(items ?? [])];
-                                    next[idx] = { ...next[idx], productName: s.name };
-                                    setItems(next);
-                                  }}
-                                >
-                                  {s.name}
-                                </button>
-                              ))}
+                            <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-neutral/30 bg-white text-foreground shadow z-50">
+                              {list.length > 0 && !hide && list.map((s, sIdx) => {
+                                const active = (activeIdxByItem[it.id] ?? 0) === sIdx;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={`suggestion-${it.id}-${sIdx}`}
+                                    id={`suggestion-${it.id}-${sIdx}`}
+                                    className={cn("w-full text-left px-3 py-2 transition-colors", active ? "bg-primary text-white" : "hover:bg-muted")}
+                                    onClick={() => {
+                                      const next = [...(items ?? [])];
+                                      next[idx] = { ...next[idx], productName: s.name };
+                                      setItems(next);
+                                    }}
+                                    role="option"
+                                    aria-selected={active}
+                                  >
+                                    {s.name}
+                                  </button>
+                                );
+                              })}
                               {list.length === 0 && (it.productName || '').trim().length > 0 && !createdNames.includes(it.productName) && (
                                 <div className="px-3 py-2 flex items-center justify-between gap-2">
                                   <span className="text-sm opacity-90">“{it.productName}” bulunamadı</span>
                                   <button
                                     type="button"
-                                    className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
+                                    className="px-2 py-1 text-xs border rounded hover:bg-muted"
                                     onClick={async () => {
                                       setPendingAdd({
                                         open: true,
@@ -395,117 +410,6 @@ export function PurchaseModal({
                           );
                         })()}
                       </div>
-                    </div>
-                    <div className="col-span-2">
-                      <Input
-                        placeholder="Miktar"
-                        type="number"
-                        value={it.quantity}
-                        onChange={(e) => {
-                          const next = [...(items ?? [])];
-                          next[idx] = { ...next[idx], quantity: Number(e.target.value) };
-                          setItems(next);
-                        }}
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <Select value={it.unit ?? 'ad'} onValueChange={(v) => {
-                        const next = [...(items ?? [])];
-                        next[idx] = { ...next[idx], unit: v };
-                        setItems(next);
-                      }}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Birim" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ad">ad</SelectItem>
-                          <SelectItem value="mt">mt</SelectItem>
-                          <SelectItem value="kg">kg</SelectItem>
-                          <SelectItem value="top">top</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-2">
-                      <Input
-                        placeholder="Birim Fiyat"
-                        type="number"
-                        value={it.unitPrice}
-                        onChange={(e) => {
-                          const next = [...(items ?? [])];
-                          next[idx] = { ...next[idx], unitPrice: Number(e.target.value) };
-                          setItems(next);
-                        }}
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Select value={String(it.taxRate ?? 10)} onValueChange={(v) => {
-                        const next = [...(items ?? [])];
-                        next[idx] = { ...next[idx], taxRate: Number(v) };
-                        setItems(next);
-                      }}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="KDV" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="10">%10</SelectItem>
-                          <SelectItem value="20">%20</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-1 text-right text-sm">
-                      {((Number(it.quantity || 0) * Number(it.unitPrice || 0)) * (1 + Number(it.taxRate || 0) / 100)).toFixed(2)}
-                    </div>
-                    <div className="col-span-1 text-right">
-                      <Button type="button" variant="ghost" onClick={() => {
-                        const next = [...(items ?? [])];
-                        next.splice(idx, 1);
-                        setItems(next);
-                      }}>Sil</Button>
-                    </div>
-                  </div>
-                ))}
-                <div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      const next = [...(items ?? [])];
-                      next.push({ id: crypto.randomUUID(), productName: '', quantity: 0, unit: 'ad', unitPrice: 0, taxRate: 10 });
-                      setItems(next);
-                    }}
-                  >
-                    Kalem Ekle
-                  </Button>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:justify-end gap-2 text-sm">
-                  <div className="sm:w-72 space-y-1">
-                    <div className="flex justify-between"><span>Ara Toplam:</span><span>{computedTotals.subTotal.toFixed(2)}</span></div>
-                    <div className="flex justify-between"><span>KDV Tutar:</span><span>{computedTotals.taxAmount.toFixed(2)}</span></div>
-                    <div className="flex justify-between font-semibold"><span>Genel Toplam:</span><span>{computedTotals.grandTotal.toFixed(2)}</span></div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {/* Basit stok/manüel form (faturalı değilken) */}
-            {purchaseType === PurchaseType.STOCK && !useInvoiceItems ? (
-              <FormField
-                control={form.control}
-                name="stockItemId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stok Ürünü</FormLabel>
-                    <FormControl>
-                      <Select value={field.value ?? undefined} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Stok ürünü seçin..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableStockItems.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -537,10 +441,12 @@ export function PurchaseModal({
                               e.preventDefault();
                               const nextIdx = (current + 1) % list.length;
                               setActiveManualIdx(nextIdx);
+                              setTimeout(() => scrollActiveIntoView('manual', nextIdx), 0);
                             } else if (e.key === 'ArrowUp') {
                               e.preventDefault();
                               const nextIdx = (current - 1 + list.length) % list.length;
                               setActiveManualIdx(nextIdx);
+                              setTimeout(() => scrollActiveIntoView('manual', nextIdx), 0);
                             } else if (e.key === 'Enter') {
                               e.preventDefault();
                               const chosen = list[current];
@@ -553,23 +459,29 @@ export function PurchaseModal({
                           const nameVal = field.value ?? '';
                           const hide = !!list.find((s) => s.name === nameVal) || (nameVal && createdNames.includes(nameVal));
                           return (
-                            <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
-                              {list.length > 0 && !hide && list.map((s, sIdx) => (
-                                <button
-                                  type="button"
-                                  key={s.id}
-                                  className={cn("w-full text-left px-3 py-2 hover:bg-primary/80", (activeManualIdx < 0 ? 0 : activeManualIdx) === sIdx ? "bg-primary/80" : "")}
-                                  onClick={() => field.onChange(s.name)}
-                                >
-                                  {s.name}
-                                </button>
-                              ))}
+                            <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-neutral/30 bg-white text-foreground shadow z-50">
+                              {list.length > 0 && !hide && list.map((s, sIdx) => {
+                                const active = (activeManualIdx < 0 ? 0 : activeManualIdx) === sIdx;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={s.id}
+                                    id={`suggestion-manual-${sIdx}`}
+                                    className={cn("w-full text-left px-3 py-2 transition-colors", active ? "bg-primary text-white" : "hover:bg-muted")}
+                                    onClick={() => field.onChange(s.name)}
+                                    role="option"
+                                    aria-selected={active}
+                                  >
+                                    {s.name}
+                                  </button>
+                                );
+                              })}
                               {list.length === 0 && (field.value ?? '').trim().length > 0 && !(field.value && createdNames.includes(field.value)) && (
                                 <div className="px-3 py-2 flex items-center justify-between gap-2">
                                   <span className="text-sm opacity-90">“{field.value}” bulunamadı</span>
                                   <button
                                     type="button"
-                                    className="px-2 py-1 text-xs bg-white/10 border border-white/20 rounded hover:bg-white/20"
+                                    className="px-2 py-1 text-xs border rounded hover:bg-muted"
                                     onClick={async () => {
                                       const name = field.value || '';
                                       setPendingAdd({

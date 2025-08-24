@@ -178,7 +178,7 @@ function LightweightInvoiceForm({
 											type="button"
 											key={s.id}
 											id={`suggestion-${it.id}-${sIdx}`}
-											className={`w-full text-left px-3 py-2 transition-colors ${active ? 'bg-primary text-white' : 'hover:bg-muted'}`}
+											className={`w-full text-left px-3 py-2 transition-colors ${active ? 'bg-primary text-white' : 'hover:bg-muted text-foreground'}`}
 											onMouseDown={(e) => e.preventDefault()}
 											onClick={() => updateItem(it.id, { productName: s.name })}
 											role="option"
@@ -631,13 +631,10 @@ export function SaleModal({
                             value={item.name}
                             onSelect={(currentValue) => {
                               const selectedItem = availableStockItems.find(i => i.name.toLowerCase() === currentValue.toLowerCase());
-                              const newId = selectedItem ? selectedItem.id : undefined;
-                              setFormValues(prev => ({ 
-                                ...prev, 
-                                stockItemId: newId === prev.stockItemId ? undefined : newId,
-                                description: selectedItem ? selectedItem.name : prev.description
-                              }))
-                              setOpenCombobox(false)
+                              if (selectedItem) {
+                                setFormValues(prev => ({ ...prev, stockItemId: selectedItem.id }));
+                              }
+                              setOpenCombobox(false);
                             }}
                           >
                             <Check
@@ -654,44 +651,7 @@ export function SaleModal({
                   </PopoverContent>
                 </Popover>
               </div>
-            ) : (
-              <div className="grid gap-2">
-                {/* Manuel satış için faturalı formun hafif versiyonu, KDV kapalı */}
-                <LightweightInvoiceForm
-                  customerName={customer?.name || ''}
-                  initialItems={manualInitialItems as any}
-                  initialDate={manualInitialDate}
-                  initialCurrency={manualInitialCurrency}
-                  disableTax
-                  availableStockItems={availableStockItems}
-                  onRequestAddStock={(name, onAdded) => {
-                    setPendingAdd({
-                      open: true,
-                      name,
-                      onConfirm: async () => {
-                        if (!user?.uid) return;
-                        const created = await addStockItem(user.uid, { name, currentStock: 0, unit: 'ad' });
-                        if (created) onAdded(created.name);
-                      }
-                    });
-                  }}
-                  onSubmit={(data: any) => {
-                    const desc = Array.isArray(data.items) && data.items.length > 0
-                      ? `${data.items[0].productName}${data.items.length > 1 ? ` +${data.items.length - 1} kalem` : ''}`
-                      : (formValues.description || 'Satış');
-                    // Manuel satışta doğrudan kaydet
-                    onSubmit({
-                      amount: String(data.grandTotal ?? 0),
-                      date: data.date,
-                      currency: data.currency ?? 'TRY',
-                      description: desc,
-                      items: data.items || [],
-                      invoiceType: 'normal',
-                    } as any);
-                  }}
-                />
-              </div>
-            )}
+            ) : null}
             {saleType === SaleType.STOCK && (
             <div className="grid gap-2">
               <Label htmlFor="quantity">Miktar</Label>
