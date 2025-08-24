@@ -267,8 +267,8 @@ export function PurchaseModal({
         {showTypeSelection ? (
           <div className="space-y-4">
             <div className="space-y-1">
-              <div className="text-xl font-semibold">Satın Alma Türü Seçin</div>
-              <div className="text-sm text-muted-foreground">Hangi tür satın alma yapmak istiyorsunuz?</div>
+              <div className="text-xl font-semibold">Satış Türü Seçin</div>
+              <div className="text-sm text-muted-foreground">Hangi tür satış yapmak istiyorsunuz?</div>
             </div>
             <div className="grid grid-cols-1 gap-3">
               <Button
@@ -287,8 +287,8 @@ export function PurchaseModal({
                     <ShoppingCart className="w-5 h-5" />
                   </div>
                   <div className="flex flex-col -space-y-0.5 text-left">
-                    <span className="font-semibold text-base">Manuel Alış</span>
-                    <span className="text-xs opacity-90">Stok/manuel alanlı basit alış</span>
+                    <span className="font-semibold text-base">Manuel Satış</span>
+                    <span className="text-xs opacity-90">Stok/manuel alanlı basit satış</span>
                   </div>
                 </div>
               </Button>
@@ -308,8 +308,8 @@ export function PurchaseModal({
                     <FileText className="w-5 h-5" />
                   </div>
                   <div className="flex flex-col -space-y-0.5 text-left">
-                    <span className="font-semibold text-base">Faturalı Alış</span>
-                    <span className="text-xs opacity-90">Teklif formu ile detaylı alış</span>
+                    <span className="font-semibold text-base">Faturalı Satış</span>
+                    <span className="text-xs opacity-90">Teklif formu ile detaylı satış</span>
                   </div>
                 </div>
               </Button>
