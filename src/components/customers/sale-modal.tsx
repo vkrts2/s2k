@@ -668,7 +668,6 @@ export function SaleModal({
                   initialItems={manualInitialItems as any}
                   initialDate={manualInitialDate}
                   initialCurrency={manualInitialCurrency}
-                  disableTax
                   availableStockItems={availableStockItems}
                   onRequestAddStock={(name, onAdded) => {
                     setPendingAdd({

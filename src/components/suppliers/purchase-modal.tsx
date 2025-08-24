@@ -77,6 +77,7 @@ export function PurchaseModal({
   const [useInvoiceItems, setUseInvoiceItems] = React.useState<boolean>(invoiceMode ?? false);
   type InvoiceItem = { id: string; productName: string; quantity: number; unit?: string; unitPrice: number; taxRate: number };
   const [items, setItems] = React.useState<InvoiceItem[]>(invoiceMode ? [] : []);
+  const [showTypeSelection, setShowTypeSelection] = React.useState<boolean>(!initialData);
   const [pendingAdd, setPendingAdd] = React.useState<{
     open: boolean;
     name: string;
@@ -107,8 +108,8 @@ export function PurchaseModal({
       purchaseType: PurchaseType.STOCK,
       stockItemId: undefined,
       manualProductName: '',
-      date: undefined,
-      dateInput: '',
+      date: new Date(),
+      dateInput: format(new Date(), 'dd.MM.yyyy'),
       quantityPurchased: '',
       unitPrice: '',
       amount: '',
@@ -116,6 +117,11 @@ export function PurchaseModal({
       description: '',
     },
   });
+
+  // Modal açıldığında varsayılan olarak tür seçimi gösterilsin
+  React.useEffect(() => {
+    if (isOpen) setShowTypeSelection(!initialData);
+  }, [isOpen, initialData]);
 
   const purchaseType = useWatch({ control: form.control, name: 'purchaseType' });
 
@@ -169,10 +175,12 @@ export function PurchaseModal({
   const computedTotals = React.useMemo(() => {
     if (!useInvoiceItems || !items || items.length === 0) return { subTotal: 0, taxAmount: 0, grandTotal: 0 };
     const sub = items.reduce((acc: number, it: InvoiceItem) => acc + (Number(it.quantity || 0) * Number(it.unitPrice || 0)), 0);
-    const tax = items.reduce((acc: number, it: InvoiceItem) => acc + ((Number(it.quantity || 0) * Number(it.unitPrice || 0)) * (Number(it.taxRate || 0) / 100)), 0);
+    const tax = purchaseType === PurchaseType.MANUAL
+      ? 0
+      : items.reduce((acc: number, it: InvoiceItem) => acc + ((Number(it.quantity || 0) * Number(it.unitPrice || 0)) * (Number(it.taxRate || 0) / 100)), 0);
     const grand = sub + tax;
     return { subTotal: sub, taxAmount: tax, grandTotal: grand };
-  }, [useInvoiceItems, items]);
+  }, [useInvoiceItems, items, purchaseType]);
 
   React.useEffect(() => {
     if (useInvoiceItems) {
@@ -226,11 +234,50 @@ export function PurchaseModal({
   return (
     <>
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Alış Ekle</DialogTitle>
-          <DialogDescription>Yeni bir alış işlemi ekleyin veya mevcut bir alışı düzenleyin.</DialogDescription>
+          <DialogTitle>{useInvoiceItems ? 'Faturalı Alış' : 'Alış Ekle'}</DialogTitle>
+          <DialogDescription>
+            {useInvoiceItems ? 'Kalemleri ekleyin; toplamlar otomatik hesaplanır. Kaydedince alış oluşturulur.' : 'Yeni alış işlemi ekleyin veya mevcut bir alış\'ı düzenleyin.'}
+          </DialogDescription>
         </DialogHeader>
+        {/* Tür Seçimi Ekranı */}
+        {showTypeSelection ? (
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <div className="text-lg font-semibold">Alış Türü Seçin</div>
+              <div className="text-sm text-muted-foreground">Hangi tür alış yapmak istiyorsunuz?</div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Button
+                type="button"
+                className="h-20 text-left justify-start"
+                variant="default"
+                onClick={() => {
+                  form.setValue('purchaseType', PurchaseType.MANUAL);
+                  setUseInvoiceItems(true);
+                  if (items.length === 0) setItems([]);
+                  setShowTypeSelection(false);
+                }}
+              >
+                Manuel Alış
+              </Button>
+              <Button
+                type="button"
+                className="h-20 text-left justify-start"
+                variant="default"
+                onClick={() => {
+                  form.setValue('purchaseType', PurchaseType.STOCK);
+                  setUseInvoiceItems(true);
+                  if (items.length === 0) setItems([]);
+                  setShowTypeSelection(false);
+                }}
+              >
+                Faturalı Alış
+              </Button>
+            </div>
+          </div>
+        ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             {/* Üst bilgi */}
@@ -346,7 +393,11 @@ export function PurchaseModal({
                   <div className="col-span-2">Miktar</div>
                   <div className="col-span-2">Birim</div>
                   <div className="col-span-3">Birim Fiyat</div>
-                  <div className="col-span-1">KDV</div>
+                  {purchaseType === PurchaseType.MANUAL ? (
+                    <div className="col-span-1"></div>
+                  ) : (
+                    <div className="col-span-1">KDV</div>
+                  )}
                   <div className="col-span-1 hidden" />
                 </div>
                 {items.length === 0 && (
@@ -451,6 +502,7 @@ export function PurchaseModal({
                       <Input
                         type="number"
                         step="1"
+                        placeholder="Miktar"
                         value={String(it.quantity ?? 0)}
                         onChange={(e) => {
                           const next = [...(items ?? [])];
@@ -478,6 +530,7 @@ export function PurchaseModal({
                       <Input
                         type="number"
                         step="0.01"
+                        placeholder="Birim Fiyat"
                         value={String(it.unitPrice ?? 0)}
                         onChange={(e) => {
                           const next = [...(items ?? [])];
@@ -486,21 +539,27 @@ export function PurchaseModal({
                         }}
                       />
                     </div>
-                    <div className="col-span-1 flex items-center gap-2">
-                      <Select value={String(it.taxRate ?? 20)} onValueChange={(v) => {
-                        const next = [...(items ?? [])];
-                        next[idx] = { ...next[idx], taxRate: Number(v) } as any;
-                        setItems(next);
-                      }}>
-                        <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">%0</SelectItem>
-                          <SelectItem value="10">%10</SelectItem>
-                          <SelectItem value="20">%20</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
-                    </div>
+                    {purchaseType === PurchaseType.MANUAL ? (
+                      <div className="col-span-1 flex items-center justify-end">
+                        <Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
+                      </div>
+                    ) : (
+                      <div className="col-span-1 flex items-center gap-2">
+                        <Select value={String(it.taxRate ?? 20)} onValueChange={(v) => {
+                          const next = [...(items ?? [])];
+                          next[idx] = { ...next[idx], taxRate: Number(v) } as any;
+                          setItems(next);
+                        }}>
+                          <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">%0</SelectItem>
+                            <SelectItem value="10">%10</SelectItem>
+                            <SelectItem value="20">%20</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -699,6 +758,7 @@ export function PurchaseModal({
             </div>
           </form>
         </Form>
+        )}
       </DialogContent>
     </Dialog>
     {pendingAdd && (
