@@ -46,6 +46,8 @@ function LightweightInvoiceForm({
   const [date, setDate] = React.useState<Date>(new Date());
   const [currency, setCurrency] = React.useState<'TRY' | 'USD' | 'EUR'>('TRY');
   const [items, setItems] = React.useState<Array<{ id: string; productName: string; quantity: string; unitPrice: string; taxRate: string; unit: string }>>([]);
+  // Klavye navigasyonu: her kalem için aktif öneri indeksini tut
+  const [activeIdxByItem, setActiveIdxByItem] = React.useState<Record<string, number>>({});
 
   React.useEffect(() => {
     if (initialDate) {
@@ -123,7 +125,33 @@ function LightweightInvoiceForm({
 		{items.map(it => (
 			<div key={it.id} className={`grid ${disableTax ? 'grid-cols-5' : 'grid-cols-6'} gap-2`}>
 				<div className="relative">
-					<Input placeholder="Ürün/Hizmet" value={it.productName} onChange={e => updateItem(it.id, { productName: e.target.value })} />
+					<Input
+						placeholder="Ürün/Hizmet"
+						value={it.productName}
+						onChange={e => {
+							updateItem(it.id, { productName: e.target.value });
+							setActiveIdxByItem(prev => ({ ...prev, [it.id]: 0 }));
+						}}
+						onKeyDown={(e) => {
+							const list = getSuggestions(it.productName);
+							const hasExact = !!list.find(s => s.name === it.productName);
+							if (hasExact || list.length === 0) return;
+							const current = activeIdxByItem[it.id] ?? 0;
+							if (e.key === 'ArrowDown') {
+								e.preventDefault();
+								const nextIdx = (current + 1) % list.length;
+								setActiveIdxByItem(prev => ({ ...prev, [it.id]: nextIdx }));
+							} else if (e.key === 'ArrowUp') {
+								e.preventDefault();
+								const nextIdx = (current - 1 + list.length) % list.length;
+								setActiveIdxByItem(prev => ({ ...prev, [it.id]: nextIdx }));
+							} else if (e.key === 'Enter') {
+								e.preventDefault();
+								const chosen = list[current];
+								if (chosen) updateItem(it.id, { productName: chosen.name });
+							}
+						}}
+					/>
 					{(() => {
 						const list = getSuggestions(it.productName);
 						const hasQuery = (it.productName || '').trim().length > 0;
@@ -133,11 +161,11 @@ function LightweightInvoiceForm({
 						if (!showList && !showAdd) return null;
 						return (
 							<div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
-								{showList && list.map(s => (
+								{showList && list.map((s, sIdx) => (
 									<button
 										type="button"
 										key={s.id}
-										className="w-full text-left px-3 py-2 hover:bg-primary/80"
+										className={`w-full text-left px-3 py-2 hover:bg-primary/80 ${((activeIdxByItem[it.id] ?? 0) === sIdx) ? 'bg-primary/80' : ''}`}
 										onMouseDown={(e) => e.preventDefault()}
 										onClick={() => updateItem(it.id, { productName: s.name })}
 									>

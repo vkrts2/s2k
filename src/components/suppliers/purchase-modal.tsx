@@ -84,6 +84,9 @@ export function PurchaseModal({
   } | null>(null);
   // Modal içinde yeni oluşturulan stok adlarını izleyerek öneri kutusunu gizlemek için kullanılır
   const [createdNames, setCreatedNames] = React.useState<string[]>([]);
+  // Klavye navigasyonu için aktif indeksler
+  const [activeIdxByItem, setActiveIdxByItem] = React.useState<Record<string, number>>({});
+  const [activeManualIdx, setActiveManualIdx] = React.useState<number>(-1);
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: initialData || {
@@ -317,6 +320,30 @@ export function PurchaseModal({
                             const next = [...(items ?? [])];
                             next[idx] = { ...next[idx], productName: e.target.value };
                             setItems(next);
+                            setActiveIdxByItem((prev) => ({ ...prev, [it.id]: 0 }));
+                          }}
+                          onKeyDown={(e) => {
+                            const list = getSuggestions(it.productName);
+                            const hide = !!list.find((s) => s.name === it.productName) || createdNames.includes(it.productName);
+                            if (hide || list.length === 0) return;
+                            const current = activeIdxByItem[it.id] ?? 0;
+                            if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              const nextIdx = (current + 1) % list.length;
+                              setActiveIdxByItem((prev) => ({ ...prev, [it.id]: nextIdx }));
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              const nextIdx = (current - 1 + list.length) % list.length;
+                              setActiveIdxByItem((prev) => ({ ...prev, [it.id]: nextIdx }));
+                            } else if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const chosen = list[current];
+                              if (chosen) {
+                                const next = [...(items ?? [])];
+                                next[idx] = { ...next[idx], productName: chosen.name };
+                                setItems(next);
+                              }
+                            }
                           }}
                         />
                         {(() => {
@@ -324,11 +351,11 @@ export function PurchaseModal({
                           const hide = !!list.find((s) => s.name === it.productName) || createdNames.includes(it.productName);
                           return (
                             <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
-                              {list.length > 0 && !hide && list.map((s) => (
+                              {list.length > 0 && !hide && list.map((s, sIdx) => (
                                 <button
                                   type="button"
                                   key={s.id}
-                                  className="w-full text-left px-3 py-2 hover:bg-primary/80"
+                                  className={cn("w-full text-left px-3 py-2 hover:bg-primary/80", (activeIdxByItem[it.id] ?? 0) === sIdx ? "bg-primary/80" : "")}
                                   onClick={() => {
                                     const next = [...(items ?? [])];
                                     next[idx] = { ...next[idx], productName: s.name };
@@ -493,18 +520,45 @@ export function PurchaseModal({
                     <FormLabel>Ürün Adı</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input placeholder="Ürün adını girin..." {...field} />
+                        <Input
+                          placeholder="Ürün adını girin..."
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setActiveManualIdx(0);
+                          }}
+                          onKeyDown={(e) => {
+                            const list = getSuggestions(field.value ?? '');
+                            const nameVal = field.value ?? '';
+                            const hide = !!list.find((s) => s.name === nameVal) || (nameVal && createdNames.includes(nameVal));
+                            if (hide || list.length === 0) return;
+                            const current = activeManualIdx < 0 ? 0 : activeManualIdx;
+                            if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              const nextIdx = (current + 1) % list.length;
+                              setActiveManualIdx(nextIdx);
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              const nextIdx = (current - 1 + list.length) % list.length;
+                              setActiveManualIdx(nextIdx);
+                            } else if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const chosen = list[current];
+                              if (chosen) field.onChange(chosen.name);
+                            }
+                          }}
+                        />
                         {(() => {
                           const list = getSuggestions(field.value ?? '');
                           const nameVal = field.value ?? '';
                           const hide = !!list.find((s) => s.name === nameVal) || (nameVal && createdNames.includes(nameVal));
                           return (
                             <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/50 bg-primary text-white shadow z-50">
-                              {list.length > 0 && !hide && list.map((s) => (
+                              {list.length > 0 && !hide && list.map((s, sIdx) => (
                                 <button
                                   type="button"
                                   key={s.id}
-                                  className="w-full text-left px-3 py-2 hover:bg-primary/80"
+                                  className={cn("w-full text-left px-3 py-2 hover:bg-primary/80", (activeManualIdx < 0 ? 0 : activeManualIdx) === sIdx ? "bg-primary/80" : "")}
                                   onClick={() => field.onChange(s.name)}
                                 >
                                   {s.name}
