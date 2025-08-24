@@ -331,10 +331,16 @@ export function PurchaseModal({
                     <FormLabel>Satış Tipi</FormLabel>
                     <FormControl>
                       {purchaseType === PurchaseType.MANUAL ? (
-                        <div className="relative h-11 flex items-center rounded-md border bg-background px-3 text-sm text-foreground/90 opacity-90">
-                          <span>Manuel Satış</span>
-                          <ChevronsUpDown className="absolute right-2 h-4 w-4 opacity-50" />
-                        </div>
+                        <Select disabled value={PurchaseType.MANUAL}>
+                          <SelectTrigger className="h-11">
+                            <SelectValue placeholder="Satış tipi" defaultValue={PurchaseType.MANUAL}>
+                              Manuel Satış
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={PurchaseType.MANUAL}>Manuel Satış</SelectItem>
+                          </SelectContent>
+                        </Select>
                       ) : (
                         <Select value={field.value} onValueChange={(val) => {
                           field.onChange(val as PurchaseType);
