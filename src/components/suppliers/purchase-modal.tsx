@@ -271,13 +271,13 @@ export function PurchaseModal({
         {showTypeSelection ? (
           <div className="space-y-4">
             <div className="space-y-1">
-              <div className="text-lg font-semibold">Alış Türü Seçin</div>
-              <div className="text-sm text-muted-foreground">Hangi tür alış yapmak istiyorsunuz?</div>
+              <div className="text-xl font-semibold">Satın Alma Türü Seçin</div>
+              <div className="text-sm text-muted-foreground">Hangi tür satın alma yapmak istiyorsunuz?</div>
             </div>
             <div className="grid grid-cols-1 gap-3">
               <Button
                 type="button"
-                className="w-full rounded-xl bg-sky-500 hover:bg-sky-600 text-white h-auto py-4 px-4 justify-start"
+                className="w-full rounded-xl bg-sky-500 hover:bg-sky-600 text-white h-auto py-5 px-5 justify-start shadow-sm"
                 variant="default"
                 onClick={() => {
                   form.setValue('purchaseType', PurchaseType.MANUAL);
@@ -291,14 +291,14 @@ export function PurchaseModal({
                     <ShoppingCart className="w-5 h-5" />
                   </div>
                   <div className="flex flex-col -space-y-0.5 text-left">
-                    <span className="font-semibold">Manuel Alış</span>
+                    <span className="font-semibold text-base">Manuel Alış</span>
                     <span className="text-xs opacity-90">Stok/manuel alanlı basit alış</span>
                   </div>
                 </div>
               </Button>
               <Button
                 type="button"
-                className="w-full rounded-xl bg-sky-500 hover:bg-sky-600 text-white h-auto py-4 px-4 justify-start"
+                className="w-full rounded-xl bg-sky-500 hover:bg-sky-600 text-white h-auto py-5 px-5 justify-start shadow-sm"
                 variant="default"
                 onClick={() => {
                   form.setValue('purchaseType', PurchaseType.STOCK);
@@ -312,11 +312,14 @@ export function PurchaseModal({
                     <FileText className="w-5 h-5" />
                   </div>
                   <div className="flex flex-col -space-y-0.5 text-left">
-                    <span className="font-semibold">Faturalı Alış</span>
+                    <span className="font-semibold text-base">Faturalı Alış</span>
                     <span className="text-xs opacity-90">Teklif formu ile detaylı alış</span>
                   </div>
                 </div>
               </Button>
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button type="button" variant="outline" onClick={onClose}>İptal</Button>
             </div>
           </div>
         ) : (
