@@ -398,8 +398,8 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       purchaseType: type as PurchaseType,
       date: new Date(),
     });
-    // Invoiced flow is triggered when user selects 'stock' option from dialog
-    setInvoiceMode(type === PurchaseType.STOCK);
+    // Invoiced flow should be used for both Manual and Stock to show items table layout
+    setInvoiceMode(true);
     setShowPurchaseTypeDialog(false);
     setShowPurchaseModal(true);
   }, []);
