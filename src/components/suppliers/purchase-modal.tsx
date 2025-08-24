@@ -90,7 +90,10 @@ export function PurchaseModal({
   const [activeManualIdx, setActiveManualIdx] = React.useState<number>(-1);
   // Kalem ekleme/silme
   const addItem = React.useCallback(() => {
-    setItems(prev => ([...(prev ?? []), { id: String(Date.now()), productName: '', quantity: 1, unit: 'adet', unitPrice: 0, taxRate: 20 }] as any));
+    setItems(prev => ([
+      ...(prev ?? []),
+      { id: String(Date.now()), productName: '', quantity: 1, unit: 'kg', unitPrice: 0, taxRate: 10 }
+    ] as any));
   }, []);
   const removeItem = React.useCallback((id: string) => {
     setItems(prev => (prev ?? []).filter(it => it.id !== id));
@@ -234,7 +237,7 @@ export function PurchaseModal({
   return (
     <>
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl">
+      <DialogContent className="sm:max-w-[980px]">
         <DialogHeader>
           <DialogTitle>{useInvoiceItems ? 'Faturalı Alış' : 'Alış Ekle'}</DialogTitle>
           <DialogDescription>
@@ -527,7 +530,7 @@ export function PurchaseModal({
                     </div>
                     {purchaseType === PurchaseType.MANUAL ? null : (
                       <div className="col-span-1">
-                        <Select value={String(it.unit || 'adet')} onValueChange={(v) => {
+                        <Select value={String(it.unit || 'kg')} onValueChange={(v) => {
                           const next = [...(items ?? [])];
                           next[idx] = { ...next[idx], unit: v } as any;
                           setItems(next);
@@ -557,14 +560,13 @@ export function PurchaseModal({
                     </div>
                     {purchaseType === PurchaseType.MANUAL ? null : (
                       <div className="col-span-1">
-                        <Select value={String(it.taxRate ?? 20)} onValueChange={(v) => {
+                        <Select value={String(it.taxRate ?? 10)} onValueChange={(v) => {
                           const next = [...(items ?? [])];
                           next[idx] = { ...next[idx], taxRate: Number(v) } as any;
                           setItems(next);
                         }}>
-                          <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="0">%0</SelectItem>
                             <SelectItem value="10">%10</SelectItem>
                             <SelectItem value="20">%20</SelectItem>
                           </SelectContent>

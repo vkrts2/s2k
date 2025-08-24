@@ -70,14 +70,14 @@ function LightweightInvoiceForm({
           productName: it.productName,
           quantity: String(it.quantity ?? ''),
           unitPrice: String(it.unitPrice ?? ''),
-          taxRate: String(disableTax ? '0' : (it.taxRate ?? 20)),
-          unit: it.unit || 'adet',
+          taxRate: String(disableTax ? '0' : (it.taxRate ?? 10)),
+          unit: it.unit || 'kg',
         }))
       );
     }
   }, [initialDate, initialCurrency, initialItems, disableTax]);
 
-	const addItem = () => setItems(prev => [...prev, { id: `${Date.now()}`, productName: '', quantity: '', unitPrice: '', taxRate: '20', unit: 'adet' }]);
+	const addItem = () => setItems(prev => [...prev, { id: `${Date.now()}`, productName: '', quantity: '', unitPrice: '', taxRate: '10', unit: 'kg' }]);
   const removeItem = (id: string) => setItems(prev => prev.filter(i => i.id !== id));
   const updateItem = (id: string, patch: Partial<{ productName: string; quantity: string; unitPrice: string; taxRate: string; unit: string }>) =>
     setItems(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i));
@@ -152,124 +152,129 @@ function LightweightInvoiceForm({
           </div>
         )}
         {items.length === 0 && <div className="text-sm text-muted-foreground">Henüz kalem eklenmedi.</div>}
-		{items.map(it => {
-			const q = parseFloat(it.quantity || '0') || 0;
-			const p = parseFloat(it.unitPrice || '0') || 0;
-			const t = disableTax ? 0 : (parseFloat(it.taxRate || '0') || 0);
-			const lineTotal = disableTax ? (q * p) : (q * p * (1 + t / 100));
-			return (
-			<div key={it.id} className={`grid grid-cols-12 gap-2 items-center`}>
-				<div className={disableTax ? 'col-span-6 relative' : 'col-span-4 relative'}>
-					<Input
-						placeholder="Ürün/Hizmet"
-						value={it.productName}
-						onChange={e => {
-							updateItem(it.id, { productName: e.target.value });
-							setActiveIdxByItem(prev => ({ ...prev, [it.id]: 0 }));
-						}}
-						onKeyDown={(e) => {
-							const list = getSuggestions(it.productName);
-							const hasExact = !!list.find(s => s.name === it.productName);
-							if (hasExact || list.length === 0) return;
-							const current = activeIdxByItem[it.id] ?? 0;
-							if (e.key === 'ArrowDown') {
-								e.preventDefault();
-								const nextIdx = (current + 1) % list.length;
-								setActiveIdxByItem(prev => ({ ...prev, [it.id]: nextIdx }));
-								setTimeout(() => scrollActiveIntoView(it.id, nextIdx), 0);
-							} else if (e.key === 'ArrowUp') {
-								e.preventDefault();
-								const nextIdx = (current - 1 + list.length) % list.length;
-								setActiveIdxByItem(prev => ({ ...prev, [it.id]: nextIdx }));
-								setTimeout(() => scrollActiveIntoView(it.id, nextIdx), 0);
-							} else if (e.key === 'Enter') {
-								e.preventDefault();
-								const chosen = list[current];
-								if (chosen) updateItem(it.id, { productName: chosen.name });
-							}
-						}}
-					/>
-					{(() => {
-						const list = getSuggestions(it.productName);
-						const hasQuery = (it.productName || '').trim().length > 0;
-						const hideExact = !!list.find(s => s.name === it.productName);
-						const showList = list.length > 0 && !hideExact;
-						const showAdd = list.length === 0 && hasQuery;
-						if (!showList && !showAdd) return null;
-						return (
-							<div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/30 bg-white text-foreground shadow z-50">
-								{showList && list.map((s, sIdx) => {
-									const active = ((activeIdxByItem[it.id] ?? 0) === sIdx);
-									return (
-										<button
-											type="button"
-											key={s.id}
-											id={`suggestion-${it.id}-${sIdx}`}
-											className={`w-full text-left px-3 py-2 transition-colors ${active ? 'bg-primary text-white' : 'hover:bg-muted text-foreground'}`}
-											onMouseDown={(e) => e.preventDefault()}
-											onClick={() => updateItem(it.id, { productName: s.name })}
-											role="option"
-											aria-selected={active}
-										>
-											{s.name}
-										</button>
-									);
-								})}
-								{showAdd && (
-									<div className="px-3 py-2 flex items-center justify-between gap-2">
-										<span className="text-sm opacity-90">“{it.productName}” bulunamadı</span>
-										<button
-											type="button"
-											className="px-2 py-1 text-xs border rounded hover:bg-muted"
-											onMouseDown={(e) => e.preventDefault()}
-											onClick={() => onRequestAddStock && onRequestAddStock(it.productName, (newName) => updateItem(it.id, { productName: newName }))}
-										>
-											Stok kalemlerine ekle
-										</button>
-									</div>
-								)}
-							</div>
-						);
-					})()}
-				</div>
-				<div className={disableTax ? 'col-span-2' : 'col-span-2'}>
-					<Input type="number" placeholder="Miktar" value={it.quantity} onChange={e => updateItem(it.id, { quantity: e.target.value })} />
-				</div>
-				{disableTax ? null : (
-				  <div className="col-span-1">
-				    <Select value={it.unit} onValueChange={v => updateItem(it.id, { unit: v })}>
-				    	<SelectTrigger><SelectValue placeholder="Birim" /></SelectTrigger>
-				    	<SelectContent>
-				    		<SelectItem value="kg">kg</SelectItem>
-				    		<SelectItem value="mt">mt</SelectItem>
-				    		<SelectItem value="adet">ad</SelectItem>
-				    		<SelectItem value="top">top</SelectItem>
-				    	</SelectContent>
-				    </Select>
-				  </div>
-				)}
-				<div className={disableTax ? 'col-span-2' : 'col-span-2'}>
-					<Input type="number" placeholder="Birim Fiyat" value={it.unitPrice} onChange={e => updateItem(it.id, { unitPrice: e.target.value })} />
-				</div>
-				{disableTax ? null : (
-				  <div className="col-span-1">
-				    <Select value={it.taxRate} onValueChange={v => updateItem(it.id, { taxRate: v })}>
-				    	<SelectTrigger><SelectValue /></SelectTrigger>
-				    	<SelectContent>
-				    		<SelectItem value="0">%0</SelectItem>
-				    		<SelectItem value="10">%10</SelectItem>
-				    		<SelectItem value="20">%20</SelectItem>
-				    	</SelectContent>
-				    </Select>
-				  </div>
-				)}
-				<div className="col-span-1 text-right font-medium pr-1 tabular-nums">{lineTotal.toFixed(2)}</div>
-				<div className="col-span-1 flex justify-end">
-					<Button type="button" variant="ghost" onClick={() => removeItem(it.id)}>Sil</Button>
-				</div>
-			</div>
-			);
-		})}
+        {items.map((it) => {
+          const q = parseFloat(it.quantity || '0') || 0;
+          const p = parseFloat(it.unitPrice || '0') || 0;
+          const t = disableTax ? 0 : (parseFloat(it.taxRate || '0') || 0);
+          const lineTotal = disableTax ? (q * p) : (q * p * (1 + t / 100));
+          return (
+            <div key={it.id} className="grid grid-cols-12 gap-2 items-center">
+              <div className={disableTax ? 'col-span-6 relative' : 'col-span-4 relative'}>
+                <Input
+                  placeholder="Ürün/Hizmet"
+                  value={it.productName}
+                  onChange={e => {
+                    updateItem(it.id, { productName: e.target.value });
+                    setActiveIdxByItem(prev => ({ ...prev, [it.id]: 0 }));
+                  }}
+                  onKeyDown={(e) => {
+                    const list = getSuggestions(it.productName);
+                    const hasExact = !!list.find(s => s.name === it.productName);
+                    if (hasExact || list.length === 0) return;
+                    const current = activeIdxByItem[it.id] ?? 0;
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      const nextIdx = (current + 1) % list.length;
+                      setActiveIdxByItem(prev => ({ ...prev, [it.id]: nextIdx }));
+                      setTimeout(() => scrollActiveIntoView(it.id, nextIdx), 0);
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      const nextIdx = (current - 1 + list.length) % list.length;
+                      setActiveIdxByItem(prev => ({ ...prev, [it.id]: nextIdx }));
+                      setTimeout(() => scrollActiveIntoView(it.id, nextIdx), 0);
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const chosen = list[current];
+                      if (chosen) updateItem(it.id, { productName: chosen.name });
+                    }
+                  }}
+                />
+                {(() => {
+                  const list = getSuggestions(it.productName);
+                  const hasQuery = (it.productName || '').trim().length > 0;
+                  const hideExact = !!list.find(s => s.name === it.productName);
+                  const showList = list.length > 0 && !hideExact;
+                  const showAdd = list.length === 0 && hasQuery;
+                  if (!showList && !showAdd) return null;
+                  return (
+                    <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-auto rounded border border-primary/30 bg-white text-foreground shadow z-50">
+                      {showList && list.map((s, sIdx) => {
+                        const active = ((activeIdxByItem[it.id] ?? 0) === sIdx);
+                        return (
+                          <button
+                            type="button"
+                            key={s.id}
+                            id={`suggestion-${it.id}-${sIdx}`}
+                            className={`w-full text-left px-3 py-2 transition-colors ${active ? 'bg-primary text-white' : 'hover:bg-muted text-foreground'}`}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => updateItem(it.id, { productName: s.name })}
+                            role="option"
+                            aria-selected={active}
+                          >
+                            {s.name}
+                          </button>
+                        );
+                      })}
+                      {showAdd && (
+                        <div className="px-3 py-2 flex items-center justify-between gap-2">
+                          <span className="text-sm opacity-90">“{it.productName}” bulunamadı</span>
+                          <button
+                            type="button"
+                            className="px-2 py-1 text-xs border rounded hover:bg-muted"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => onRequestAddStock && onRequestAddStock(it.productName, (newName) => updateItem(it.id, { productName: newName }))}
+                          >
+                            Stok kalemlerine ekle
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="col-span-2">
+                <Input type="number" placeholder="Miktar" value={it.quantity} onChange={e => updateItem(it.id, { quantity: e.target.value })} />
+              </div>
+              {!disableTax ? (
+                <>
+                  <div className="col-span-1">
+                    <Select value={it.unit} onValueChange={v => updateItem(it.id, { unit: v })}>
+                      <SelectTrigger><SelectValue placeholder="Birim" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="kg">kg</SelectItem>
+                        <SelectItem value="mt">mt</SelectItem>
+                        <SelectItem value="adet">ad</SelectItem>
+                        <SelectItem value="top">top</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <Input type="number" placeholder="Birim Fiyat" value={it.unitPrice} onChange={e => updateItem(it.id, { unitPrice: e.target.value })} />
+                  </div>
+                  <div className="col-span-1">
+                    <Select value={it.taxRate} onValueChange={v => updateItem(it.id, { taxRate: v })}>
+                      <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">%10</SelectItem>
+                        <SelectItem value="20">%20</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              ) : (
+                <div className="col-span-2">
+                  <Input type="number" placeholder="Birim Fiyatı" value={it.unitPrice} onChange={e => updateItem(it.id, { unitPrice: e.target.value })} />
+                </div>
+              )}
+              <div className="col-span-1 text-right text-sm">
+                {lineTotal.toFixed(2)}
+              </div>
+              <div className="col-span-1 text-right">
+                <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(it.id)}>Sil</Button>
+              </div>
+            </div>
+          );
+        })}
       </div>
       <div className="space-y-1 text-right">
         <div className="text-sm">Ara Toplam: {totals.subTotal.toFixed(2)}</div>
@@ -545,7 +550,7 @@ export function SaleModal({
     return (
       <>
         <Dialog open={isOpen} onOpenChange={onClose}>
-          <DialogContent className="sm:max-w-[860px] max-h-[85vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[980px] max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingSale ? 'Faturalı Satış Düzenle' : 'Faturalı Satış'}</DialogTitle>
               <DialogDescription>
