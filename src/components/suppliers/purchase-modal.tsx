@@ -367,7 +367,7 @@ export function PurchaseModal({
                                     type="button"
                                     key={`suggestion-${it.id}-${sIdx}`}
                                     id={`suggestion-${it.id}-${sIdx}`}
-                                    className={cn("w-full text-left px-3 py-2 transition-colors", active ? "bg-primary text-white" : "hover:bg-muted")}
+                                    className={cn("w-full text-left px-3 py-2 transition-colors", active ? "bg-primary text-white" : "hover:bg-muted text-foreground")}
                                     onClick={() => {
                                       const next = [...(items ?? [])];
                                       next[idx] = { ...next[idx], productName: s.name };
@@ -410,11 +410,10 @@ export function PurchaseModal({
                           );
                         })()}
                       </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : !useInvoiceItems ? (
               <FormField
                 control={form.control}
