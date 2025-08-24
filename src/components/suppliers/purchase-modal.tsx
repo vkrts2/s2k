@@ -422,7 +422,7 @@ export function PurchaseModal({
                   const lineTotal = purchaseType === PurchaseType.MANUAL ? (q * p) : (q * p * (1 + tr / 100));
                   return (
                   <div key={it.id} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-3">
+                    <div className={purchaseType === PurchaseType.MANUAL ? 'col-span-6' : 'col-span-4'}>
                       <div className="relative">
                         <Input
                           placeholder="Ürün/Hizmet"
