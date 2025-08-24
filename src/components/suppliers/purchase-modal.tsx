@@ -254,7 +254,7 @@ export function PurchaseModal({
   return (
     <>
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[980px]">
+      <DialogContent className="sm:max-w-[860px]">
         <DialogHeader>
           <DialogTitle>
             {'Alış Ekle'}
@@ -320,7 +320,7 @@ export function PurchaseModal({
           </div>
         ) : (
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             {/* Üst bilgi */}
             <div className="space-y-3">
               <FormField
@@ -343,7 +343,7 @@ export function PurchaseModal({
                           setUseInvoiceItems(false);
                         }
                       }}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-11">
                           <SelectValue placeholder="Alış tipi seçin..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -360,7 +360,7 @@ export function PurchaseModal({
               {supplierName && (
                 <div>
                   <Label className="text-sm text-muted-foreground">Tedarikçi</Label>
-                  <Input value={supplierName} readOnly className="opacity-80" />
+                  <Input value={supplierName} readOnly className="opacity-80 h-11" />
                 </div>
               )}
 
@@ -371,28 +371,31 @@ export function PurchaseModal({
                   <FormItem>
                     <FormLabel>Tarih</FormLabel>
                     <FormControl>
-                      <Input
-                        type="text"
-                        placeholder="gg.aa.yyyy"
-                        value={form.watch('dateInput') ?? (field.value ? format(field.value, 'dd.MM.yyyy') : '')}
-                        onChange={e => {
-                          let val = e.target.value.replace(/[^0-9]/g, '');
-                          if (val.length > 8) val = val.slice(0, 8);
-                          if (val.length > 4) val = val.slice(0,2) + '.' + val.slice(2,4) + '.' + val.slice(4);
-                          else if (val.length > 2) val = val.slice(0,2) + '.' + val.slice(2);
-                          form.setValue('dateInput', val);
-                          if (val.length === 10) {
-                            const parsed = parse(val, 'dd.MM.yyyy', new Date());
-                            if (isValid(parsed)) {
-                              field.onChange(parsed);
+                      <div className="relative">
+                        <Input
+                          type="text"
+                          placeholder="gg.aa.yyyy"
+                          value={form.watch('dateInput') ?? (field.value ? format(field.value, 'dd.MM.yyyy') : '')}
+                          onChange={e => {
+                            let val = e.target.value.replace(/[^0-9]/g, '');
+                            if (val.length > 8) val = val.slice(0, 8);
+                            if (val.length > 4) val = val.slice(0,2) + '.' + val.slice(2,4) + '.' + val.slice(4);
+                            else if (val.length > 2) val = val.slice(0,2) + '.' + val.slice(2);
+                            form.setValue('dateInput', val);
+                            if (val.length === 10) {
+                              const parsed = parse(val, 'dd.MM.yyyy', new Date());
+                              if (isValid(parsed)) {
+                                field.onChange(parsed);
+                              }
+                            } else {
+                              field.onChange(undefined);
                             }
-                          } else {
-                            field.onChange(undefined);
-                          }
-                        }}
-                        className="w-full"
-                        maxLength={10}
-                      />
+                          }}
+                          className="w-full pr-9 h-11"
+                          maxLength={10}
+                        />
+                        <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-70" />
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -406,7 +409,7 @@ export function PurchaseModal({
                     <FormLabel>Para Birimi</FormLabel>
                     <FormControl>
                       <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-11">
                           <SelectValue placeholder="Para birimi seçin" />
                         </SelectTrigger>
                         <SelectContent>
@@ -440,12 +443,12 @@ export function PurchaseModal({
                     <div className="col-span-1 text-right">Sil</div>
                   </div>
                 ) : (
-                  // Faturalı: Ürün/Hizmet | Miktar | Birim | Birim Fiyat | KDV | Toplam | Sil
+                  // Faturalı: Ürün/Hizmet | Miktar | Birim | Birim Fiyatı | KDV | Toplam | Sil
                   <div className="grid grid-cols-12 gap-2 text-xs text-foreground font-medium">
                     <div className="col-span-4">Ürün/Hizmet</div>
                     <div className="col-span-2">Miktar</div>
                     <div className="col-span-1">Birim</div>
-                    <div className="col-span-2">Birim Fiyat</div>
+                    <div className="col-span-2">Birim Fiyatı</div>
                     <div className="col-span-1">KDV</div>
                     <div className="col-span-1 text-right">Toplam</div>
                     <div className="col-span-1 text-right">Sil</div>
@@ -497,6 +500,7 @@ export function PurchaseModal({
                               }
                             }
                           }}
+                          className="h-11"
                         />
                         {(() => {
                           const list = getSuggestions(it.productName);
@@ -566,6 +570,7 @@ export function PurchaseModal({
                           next[idx] = { ...next[idx], quantity: val === '' ? undefined : Number(val) } as any;
                           setItems(next);
                         }}
+                        className="h-11"
                       />
                     </div>
                     {purchaseType === PurchaseType.MANUAL ? null : (
@@ -575,7 +580,7 @@ export function PurchaseModal({
                           next[idx] = { ...next[idx], unit: v } as any;
                           setItems(next);
                         }}>
-                          <SelectTrigger><SelectValue placeholder="Birim" /></SelectTrigger>
+                          <SelectTrigger className="h-11"><SelectValue placeholder="Birim" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="kg">kg</SelectItem>
                             <SelectItem value="mt">mt</SelectItem>
@@ -589,7 +594,7 @@ export function PurchaseModal({
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Birim Fiyat"
+                        placeholder="Birim Fiyatı"
                         value={it.unitPrice === undefined ? '' : String(it.unitPrice)}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -597,6 +602,7 @@ export function PurchaseModal({
                           next[idx] = { ...next[idx], unitPrice: val === '' ? undefined : Number(val) } as any;
                           setItems(next);
                         }}
+                        className="h-11"
                       />
                     </div>
                     {purchaseType === PurchaseType.MANUAL ? null : (
@@ -606,7 +612,7 @@ export function PurchaseModal({
                           next[idx] = { ...next[idx], taxRate: Number(v) } as any;
                           setItems(next);
                         }}>
-                          <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="w-24 h-11"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="10">%10</SelectItem>
                             <SelectItem value="20">%20</SelectItem>
@@ -636,7 +642,6 @@ export function PurchaseModal({
                       Genel Toplam: <span className="tabular-nums">{computedTotals.grandTotal.toFixed(2)}</span>
                     </div>
                     <div className="mt-2 flex gap-2">
-                      <Button type="button" variant="outline" onClick={onClose}>İptal</Button>
                       <Button
                         type="submit"
                         disabled={
