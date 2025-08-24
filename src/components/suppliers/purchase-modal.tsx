@@ -211,7 +211,7 @@ export function PurchaseModal({
       if (useInvoiceItems) {
         const desc = Array.isArray(items) && items.length > 0
           ? `${items[0].productName || 'Ürün'}${items.length > 1 ? ` +${items.length - 1} kalem` : ''}`
-          : (data.description || 'Faturalı Alış');
+          : (data.description || 'Faturalı Satış');
         const grand = Number((computedTotals?.grandTotal ?? 0).toFixed(2));
         const submitValues: any = {
           amount: grand > 0 ? String(grand) : (data.amount || ''),
@@ -278,7 +278,7 @@ export function PurchaseModal({
                 onClick={() => {
                   form.setValue('purchaseType', PurchaseType.MANUAL);
                   setUseInvoiceItems(true);
-                  if (items.length === 0) setItems([]);
+                  if (items.length === 0) setItems([{ id: String(Date.now()), productName: '', quantity: undefined, unit: 'kg', unitPrice: undefined, taxRate: 10 }]);
                   setShowTypeSelection(false);
                 }}
               >
@@ -299,7 +299,7 @@ export function PurchaseModal({
                 onClick={() => {
                   form.setValue('purchaseType', PurchaseType.STOCK);
                   setUseInvoiceItems(true);
-                  if (items.length === 0) setItems([]);
+                  if (items.length === 0) setItems([{ id: String(Date.now()), productName: '', quantity: undefined, unit: 'kg', unitPrice: undefined, taxRate: 10 }]);
                   setShowTypeSelection(false);
                 }}
               >
@@ -343,21 +343,21 @@ export function PurchaseModal({
                           field.onChange(val as PurchaseType);
                           if (val === PurchaseType.STOCK && invoiceMode) {
                             setUseInvoiceItems(true);
-                            if (!items || items.length === 0) setItems([]);
+                            if (!items || items.length === 0) setItems([{ id: String(Date.now()), productName: '', quantity: undefined, unit: 'kg', unitPrice: undefined, taxRate: 10 }]);
                           } else if (val === PurchaseType.MANUAL) {
                             // Manuel alışta da kalem editörü açılsın
                             setUseInvoiceItems(true);
-                            if (!items || items.length === 0) setItems([]);
+                            if (!items || items.length === 0) setItems([{ id: String(Date.now()), productName: '', quantity: undefined, unit: 'kg', unitPrice: undefined, taxRate: 10 }]);
                           } else {
                             setUseInvoiceItems(false);
                           }
                         }}>
                           <SelectTrigger className="h-11">
-                            <SelectValue placeholder="Alış tipi seçin..." />
+                            <SelectValue placeholder="Satış tipi seçin..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value={PurchaseType.STOCK}>Faturalı Alış</SelectItem>
-                            <SelectItem value={PurchaseType.MANUAL}>Manuel Alış</SelectItem>
+                            <SelectItem value={PurchaseType.STOCK}>Faturalı Satış</SelectItem>
+                            <SelectItem value={PurchaseType.MANUAL}>Manuel Satış</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
