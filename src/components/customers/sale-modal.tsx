@@ -49,6 +49,14 @@ function LightweightInvoiceForm({
   // Klavye navigasyonu: her kalem için aktif öneri indeksini tut
   const [activeIdxByItem, setActiveIdxByItem] = React.useState<Record<string, number>>({});
 
+  // Aktif öneriyi görünür alana kaydır
+  const scrollActiveIntoView = React.useCallback((itemId: string, idx: number) => {
+    const el = document.getElementById(`suggestion-${itemId}-${idx}`);
+    if (el) {
+      try { el.scrollIntoView({ block: 'nearest' }); } catch {}
+    }
+  }, []);
+
   React.useEffect(() => {
     if (initialDate) {
       const d = initialDate instanceof Date ? initialDate : new Date(initialDate);
@@ -141,10 +149,12 @@ function LightweightInvoiceForm({
 								e.preventDefault();
 								const nextIdx = (current + 1) % list.length;
 								setActiveIdxByItem(prev => ({ ...prev, [it.id]: nextIdx }));
+								setTimeout(() => scrollActiveIntoView(it.id, nextIdx), 0);
 							} else if (e.key === 'ArrowUp') {
 								e.preventDefault();
 								const nextIdx = (current - 1 + list.length) % list.length;
 								setActiveIdxByItem(prev => ({ ...prev, [it.id]: nextIdx }));
+								setTimeout(() => scrollActiveIntoView(it.id, nextIdx), 0);
 							} else if (e.key === 'Enter') {
 								e.preventDefault();
 								const chosen = list[current];
@@ -167,6 +177,7 @@ function LightweightInvoiceForm({
 										<button
 											type="button"
 											key={s.id}
+											id={`suggestion-${it.id}-${sIdx}`}
 											className={`w-full text-left px-3 py-2 transition-colors ${active ? 'bg-primary text-white' : 'hover:bg-muted'}`}
 											onMouseDown={(e) => e.preventDefault()}
 											onClick={() => updateItem(it.id, { productName: s.name })}
