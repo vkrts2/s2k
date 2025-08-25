@@ -81,6 +81,8 @@ export function PurchaseModal({
   // Modal içinde yeni eklenen stok kalemlerini anında önerilerde göstermek için tut
   const [localAddedStockItems, setLocalAddedStockItems] = React.useState<StockItem[]>([]);
   const [showTypeSelection, setShowTypeSelection] = React.useState<boolean>(!initialData);
+  // initialData ile form.reset tamamlanana kadar formu göstermemek için koruma
+  const [prefillReady, setPrefillReady] = React.useState<boolean>(!initialData);
   const [pendingAdd, setPendingAdd] = React.useState<{
     open: boolean;
     name: string;
@@ -127,6 +129,7 @@ export function PurchaseModal({
   // Modal açıldığında: düzenleme ise tür seçimini gösterme
   React.useEffect(() => {
     if (isOpen) setShowTypeSelection(!initialData);
+    if (!isOpen) setPrefillReady(!initialData);
   }, [isOpen, initialData]);
 
   const purchaseType = useWatch({ control: form.control, name: 'purchaseType' });
@@ -153,6 +156,7 @@ export function PurchaseModal({
       nextDefaults.date = d;
       nextDefaults.dateInput = format(d, 'dd.MM.yyyy');
       form.reset(nextDefaults);
+      setPrefillReady(true);
 
       // Düzenlemede tür seçimi kapalı
       setShowTypeSelection(false);
@@ -303,7 +307,10 @@ export function PurchaseModal({
           </DialogDescription>
         </DialogHeader>
         {/* Tür Seçimi Ekranı */}
-        {showTypeSelection ? (
+        {/* Edit modunda prefill henüz hazır değilse basit bir yükleniyor alanı göster */}
+        {(initialData && !prefillReady) ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">Yükleniyor...</div>
+        ) : showTypeSelection ? (
           <div className="space-y-4">
             <div className="space-y-1">
               <div className="text-xl font-semibold">Satış Türü Seçin</div>
