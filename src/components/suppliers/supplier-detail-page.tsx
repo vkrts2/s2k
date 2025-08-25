@@ -441,7 +441,10 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           date: formatISO(values.date as Date) || "",
           currency: values.currency as Currency,
           stockItemId: values.purchaseType === PurchaseType.STOCK ? (values.stockItemId === '' || values.stockItemId === undefined ? undefined : values.stockItemId) : undefined,
-          manualProductName: values.purchaseType === PurchaseType.MANUAL ? values.manualProductName : undefined,
+          // Keep manualProductName also for STOCK when no stockItemId (free text item)
+          manualProductName: values.purchaseType === PurchaseType.MANUAL
+            ? values.manualProductName
+            : ((values.stockItemId === '' || values.stockItemId === undefined) ? (values.manualProductName || undefined) : undefined),
           purchaseType: values.purchaseType,
           description: values.description,
           quantityPurchased: quantityPurchased,
@@ -476,7 +479,11 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
           purchaseType: values.purchaseType,
         };
         if (values.purchaseType === PurchaseType.STOCK) {
-          purchaseData.stockItemId = values.stockItemId;
+          purchaseData.stockItemId = values.stockItemId || undefined;
+          // If user entered free text without selecting stock, persist manualProductName
+          if (!purchaseData.stockItemId && values.manualProductName) {
+            purchaseData.manualProductName = values.manualProductName;
+          }
         } else if (values.purchaseType === PurchaseType.MANUAL) {
           purchaseData.manualProductName = values.manualProductName;
         }

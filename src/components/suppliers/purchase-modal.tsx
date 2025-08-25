@@ -178,8 +178,13 @@ export function PurchaseModal({
         if (initialData.purchaseType === PurchaseType.MANUAL) {
           productName = (initialData.manualProductName as any) || '';
         } else {
+          // STOCK: önce manualProductName (serbest isim) varsa onu kullan, yoksa stok adı
+          const manualName = (initialData.manualProductName as any) || '';
           const named = availableStockItems.find(s => s.id === (initialData.stockItemId as any))?.name;
-          productName = named || '';
+          productName = manualName || named || '';
+        }
+        if (!productName && (initialData as any)?.description) {
+          productName = String((initialData as any).description);
         }
 
         const defaultUnit = initialData.purchaseType === PurchaseType.MANUAL ? 'adet' : 'kg';
@@ -271,10 +276,8 @@ export function PurchaseModal({
           description: data.description && data.description.trim() !== '' ? data.description : desc,
           quantityPurchased: q,
           unitPrice: u,
-          // For MANUAL purchases, keep manualProductName in sync with first item's name to satisfy schema
-          manualProductName: (data.purchaseType === PurchaseType.MANUAL)
-            ? (first?.productName || data.manualProductName || '')
-            : undefined,
+          // Keep manualProductName synced with first item's name for both MANUAL and STOCK (when no stockItemId)
+          manualProductName: (first?.productName || data.manualProductName || ''),
         };
         await onSubmit({ ...data, ...submitValues });
       } else {
