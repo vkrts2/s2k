@@ -437,28 +437,29 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       if (editingPurchase) {
         const updatedPurchase: Purchase = {
           ...editingPurchase,
-          amount: amount,
+          amount,
           date: formatISO(values.date as Date) || "",
           currency: values.currency as Currency,
           stockItemId: values.purchaseType === PurchaseType.STOCK ? (values.stockItemId === '' || values.stockItemId === undefined ? undefined : values.stockItemId) : undefined,
-          // Keep manualProductName also for STOCK when no stockItemId (free text item)
           manualProductName: values.purchaseType === PurchaseType.MANUAL
             ? values.manualProductName
             : ((values.stockItemId === '' || values.stockItemId === undefined) ? (values.manualProductName || undefined) : undefined),
           purchaseType: values.purchaseType,
           description: values.description,
-          quantityPurchased: quantityPurchased,
-          unitPrice: unitPrice,
+          quantityPurchased,
+          unitPrice,
           updatedAt: new Date().toISOString(),
         };
-        // --- undefined alanları sil (tip hatası olmadan) ---
+        // Persist invoice items snapshot if provided from modal
+        const inv = (values as any).invoiceItems;
+        if (Array.isArray(inv)) {
+          (updatedPurchase as any).invoiceItems = inv;
+        }
+        // remove undefined keys
         const updatedAny: any = { ...updatedPurchase };
-        Object.keys(updatedAny).forEach((key) => {
-          if (updatedAny[key] === undefined) {
-            delete updatedAny[key];
-          }
+        Object.keys(updatedAny).forEach(key => {
+          if (updatedAny[key] === undefined) delete updatedAny[key];
         });
-        // ---
         await storageUpdatePurchase(user.uid, updatedAny);
         setPurchases(prev => prev.map(p => p.id === updatedAny.id ? updatedAny : p));
         toast({
@@ -468,7 +469,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       } else {
         const purchaseData: any = {
           supplierId: supplier.id,
-          amount: amount,
+          amount,
           date: formatISO(values.date as Date) || "",
           currency: values.currency as Currency,
           transactionType: 'purchase',
@@ -480,29 +481,23 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
         };
         if (values.purchaseType === PurchaseType.STOCK) {
           purchaseData.stockItemId = values.stockItemId || undefined;
-          // If user entered free text without selecting stock, persist manualProductName
           if (!purchaseData.stockItemId && values.manualProductName) {
             purchaseData.manualProductName = values.manualProductName;
           }
         } else if (values.purchaseType === PurchaseType.MANUAL) {
           purchaseData.manualProductName = values.manualProductName;
         }
-        if (values.description) {
-          purchaseData.description = values.description;
+        if (values.description) purchaseData.description = values.description;
+        if (quantityPurchased) purchaseData.quantityPurchased = quantityPurchased;
+        if (unitPrice) purchaseData.unitPrice = unitPrice;
+        // Persist invoice items snapshot if provided from modal
+        const invAdd = (values as any).invoiceItems;
+        if (Array.isArray(invAdd)) {
+          purchaseData.invoiceItems = invAdd;
         }
-        if (quantityPurchased) {
-          purchaseData.quantityPurchased = quantityPurchased;
-        }
-        if (unitPrice) {
-          purchaseData.unitPrice = unitPrice;
-        }
-        // --- undefined alanları sil ---
         Object.keys(purchaseData).forEach(key => {
-          if (purchaseData[key] === undefined) {
-            delete purchaseData[key];
-          }
+          if (purchaseData[key] === undefined) delete purchaseData[key];
         });
-        // ---
         const newPurchase = await addPurchase(user.uid, purchaseData);
         setPurchases(prev => [...prev, { ...newPurchase, id: newPurchase.id || Math.random().toString() }]);
         toast({

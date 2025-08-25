@@ -161,35 +161,48 @@ export function PurchaseModal({
       // Düzenlemede tür seçimi kapalı
       setShowTypeSelection(false);
 
-      // Düzenlemede faturalı görünüm isteniyor ise tek kalemlik başlangıç verisi üret
+      // Düzenlemede faturalı görünüm isteniyor ise kalemleri yükle
       const useInv = !!(invoiceMode);
       setUseInvoiceItems(useInv);
       if (useInv) {
-        const qRaw = typeof initialData.quantityPurchased === 'string'
-          ? parseFloat(initialData.quantityPurchased as string)
-          : (initialData.quantityPurchased as any as number);
-        const uRaw = typeof initialData.unitPrice === 'string'
-          ? parseFloat(initialData.unitPrice as string)
-          : (initialData.unitPrice as any as number);
-        const q = Number.isFinite(qRaw) ? (qRaw as number) : undefined;
-        const u = Number.isFinite(uRaw) ? (uRaw as number) : undefined;
-
-        let productName = '';
-        if (initialData.purchaseType === PurchaseType.MANUAL) {
-          productName = (initialData.manualProductName as any) || '';
+        const incomingItems = (initialData as any)?.invoiceItems as InvoiceItem[] | undefined;
+        if (Array.isArray(incomingItems) && incomingItems.length > 0) {
+          // Mevcut kayıttan tüm kalemleri getir
+          setItems(incomingItems.map((it, idx) => ({
+            id: String(Date.now()) + '_' + idx,
+            productName: it.productName,
+            quantity: it.quantity,
+            unit: it.unit,
+            unitPrice: it.unitPrice,
+            taxRate: it.taxRate,
+          })));
         } else {
-          // STOCK: önce manualProductName (serbest isim) varsa onu kullan, yoksa stok adı
-          const manualName = (initialData.manualProductName as any) || '';
-          const named = availableStockItems.find(s => s.id === (initialData.stockItemId as any))?.name;
-          productName = manualName || named || '';
-        }
-        if (!productName && (initialData as any)?.description) {
-          productName = String((initialData as any).description);
-        }
+          const qRaw = typeof initialData.quantityPurchased === 'string'
+            ? parseFloat(initialData.quantityPurchased as string)
+            : (initialData.quantityPurchased as any as number);
+          const uRaw = typeof initialData.unitPrice === 'string'
+            ? parseFloat(initialData.unitPrice as string)
+            : (initialData.unitPrice as any as number);
+          const q = Number.isFinite(qRaw) ? (qRaw as number) : undefined;
+          const u = Number.isFinite(uRaw) ? (uRaw as number) : undefined;
 
-        const defaultUnit = initialData.purchaseType === PurchaseType.MANUAL ? 'adet' : 'kg';
-        const defaultTax = initialData.purchaseType === PurchaseType.MANUAL ? undefined : 10;
-        setItems([{ id: String(Date.now()), productName, quantity: q, unit: defaultUnit, unitPrice: u, taxRate: defaultTax as any }]);
+          let productName = '';
+          if (initialData.purchaseType === PurchaseType.MANUAL) {
+            productName = (initialData.manualProductName as any) || '';
+          } else {
+            // STOCK: önce manualProductName (serbest isim) varsa onu kullan, yoksa stok adı
+            const manualName = (initialData.manualProductName as any) || '';
+            const named = availableStockItems.find(s => s.id === (initialData.stockItemId as any))?.name;
+            productName = manualName || named || '';
+          }
+          if (!productName && (initialData as any)?.description) {
+            productName = String((initialData as any).description);
+          }
+
+          const defaultUnit = initialData.purchaseType === PurchaseType.MANUAL ? 'adet' : 'kg';
+          const defaultTax = initialData.purchaseType === PurchaseType.MANUAL ? undefined : 10;
+          setItems([{ id: String(Date.now()), productName, quantity: q, unit: defaultUnit, unitPrice: u, taxRate: defaultTax as any }]);
+        }
       } else {
         setItems([]);
       }
@@ -300,6 +313,14 @@ export function PurchaseModal({
           stockItemId: normalizedStockItemId,
           manualProductName: normalizedManualName || '',
           purchaseType: normalizedStockItemId ? PurchaseType.STOCK : PurchaseType.MANUAL,
+          // Persist full items snapshot so future edits restore all lines
+          invoiceItems: (items || []).map(it => ({
+            productName: it.productName,
+            quantity: it.quantity,
+            unit: it.unit,
+            unitPrice: it.unitPrice,
+            taxRate: it.taxRate,
+          })),
         };
         await onSubmit({ ...data, ...submitValues });
       } else {
