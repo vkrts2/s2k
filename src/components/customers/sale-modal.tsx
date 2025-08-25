@@ -512,7 +512,7 @@ export function SaleModal({
 
   if (showTypeSelection) {
     return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Satış Türü Seçin</DialogTitle>
@@ -549,7 +549,7 @@ export function SaleModal({
   if (invoiceType === InvoiceType.INVOICE) {
     return (
       <>
-        <Dialog open={isOpen} onOpenChange={onClose}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
           <DialogContent className="sm:max-w-[980px] max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingSale ? 'Faturalı Satış Düzenle' : 'Faturalı Satış'}</DialogTitle>
@@ -635,7 +635,7 @@ export function SaleModal({
 
   return (
     <>
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-[860px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>

@@ -124,7 +124,7 @@ export function PurchaseModal({
     },
   });
 
-  // Modal açıldığında varsayılan olarak tür seçimi gösterilsin
+  // Modal açıldığında: düzenleme ise tür seçimini gösterme
   React.useEffect(() => {
     if (isOpen) setShowTypeSelection(!initialData);
   }, [isOpen, initialData]);
@@ -147,14 +147,39 @@ export function PurchaseModal({
 
   React.useEffect(() => {
     if (initialData) {
-      form.reset({
-        ...initialData,
-      });
-      setUseInvoiceItems(invoiceMode ?? false);
-      setItems(invoiceMode ? [] : []);
+      // dateInput'i türet
+      const d = initialData.date instanceof Date ? initialData.date : (initialData.date ? new Date(initialData.date as any) : new Date());
+      const nextDefaults: any = { ...initialData };
+      nextDefaults.date = d;
+      nextDefaults.dateInput = format(d, 'dd.MM.yyyy');
+      form.reset(nextDefaults);
+
+      // Düzenlemede tür seçimi kapalı
+      setShowTypeSelection(false);
+
+      // Düzenlemede faturalı görünüm isteniyor ise tek kalemlik başlangıç verisi üret
+      const useInv = !!(invoiceMode);
+      setUseInvoiceItems(useInv);
+      if (useInv) {
+        const q = typeof initialData.quantityPurchased === 'string' ? parseFloat(initialData.quantityPurchased) : (initialData.quantityPurchased as any as number) || 1;
+        const u = typeof initialData.unitPrice === 'string' ? parseFloat(initialData.unitPrice) : (initialData.unitPrice as any as number) || 0;
+        let productName = '';
+        if (initialData.purchaseType === PurchaseType.MANUAL) {
+          productName = (initialData.manualProductName as any) || (initialData.description as any) || 'Ürün';
+        } else {
+          const named = availableStockItems.find(s => s.id === (initialData.stockItemId as any))?.name;
+          productName = named || (initialData.description as any) || 'Ürün';
+        }
+        const defaultUnit = initialData.purchaseType === PurchaseType.MANUAL ? 'adet' : 'kg';
+        const defaultTax = initialData.purchaseType === PurchaseType.MANUAL ? undefined : 10;
+        setItems([{ id: String(Date.now()), productName, quantity: Number.isFinite(q) ? q : 1, unit: defaultUnit, unitPrice: Number.isFinite(u) ? u : 0, taxRate: defaultTax as any }]);
+      } else {
+        setItems([]);
+      }
+
       setCreatedNames([]);
     }
-  }, [initialData]);
+  }, [initialData, invoiceMode, availableStockItems]);
 
   // Faturalı mod aktifken ve kalem listesi boşken otomatik bir boş kalem ekle
   React.useEffect(() => {
