@@ -271,13 +271,35 @@ export function PurchaseModal({
         const first = items?.[0];
         const q = (first?.quantity !== undefined && first?.quantity !== null) ? String(first?.quantity) : (data.quantityPurchased || '');
         const u = (first?.unitPrice !== undefined && first?.unitPrice !== null) ? String(first?.unitPrice) : (data.unitPrice || '');
+
+        // Normalize stock vs manual by matching first item's name to stock list
+        let normalizedStockItemId: string | undefined = undefined;
+        let normalizedManualName: string | undefined = undefined;
+        const firstName = (first?.productName || '').trim();
+        if (firstName) {
+          const match = availableStockItems.find(s => s.name.trim().toLowerCase() === firstName.toLowerCase());
+          if (match) {
+            normalizedStockItemId = match.id;
+            normalizedManualName = undefined;
+          } else {
+            normalizedStockItemId = undefined;
+            normalizedManualName = firstName;
+          }
+        } else {
+          // fall back to existing values
+          normalizedStockItemId = (data as any).stockItemId as any;
+          normalizedManualName = data.manualProductName || undefined;
+        }
+
         const submitValues: any = {
           amount: grand > 0 ? String(grand) : (data.amount || ''),
           description: data.description && data.description.trim() !== '' ? data.description : desc,
           quantityPurchased: q,
           unitPrice: u,
-          // Keep manualProductName synced with first item's name for both MANUAL and STOCK (when no stockItemId)
-          manualProductName: (first?.productName || data.manualProductName || ''),
+          // Send normalized identifiers so parent persists correctly
+          stockItemId: normalizedStockItemId,
+          manualProductName: normalizedManualName || '',
+          purchaseType: normalizedStockItemId ? PurchaseType.STOCK : PurchaseType.MANUAL,
         };
         await onSubmit({ ...data, ...submitValues });
       } else {
