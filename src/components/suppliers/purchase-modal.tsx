@@ -78,6 +78,8 @@ export function PurchaseModal({
   const [useInvoiceItems, setUseInvoiceItems] = React.useState<boolean>(invoiceMode ?? false);
   type InvoiceItem = { id: string; productName: string; quantity?: number; unit?: string; unitPrice?: number; taxRate?: number };
   const [items, setItems] = React.useState<InvoiceItem[]>(invoiceMode ? [] : []);
+  // Modal içinde yeni eklenen stok kalemlerini anında önerilerde göstermek için tut
+  const [localAddedStockItems, setLocalAddedStockItems] = React.useState<StockItem[]>([]);
   const [showTypeSelection, setShowTypeSelection] = React.useState<boolean>(!initialData);
   const [pendingAdd, setPendingAdd] = React.useState<{
     open: boolean;
@@ -240,11 +242,13 @@ export function PurchaseModal({
     (q: string) => {
       const query = (q || '').toLowerCase().trim();
       if (!query) return [] as StockItem[];
-      return availableStockItems
+      // Prop ile gelen + bu modal içinde eklenen stokları birleştir
+      const merged = [...availableStockItems, ...localAddedStockItems];
+      return merged
         .filter((s) => s.name.toLowerCase().includes(query))
         .slice(0, 8);
     },
-    [availableStockItems]
+    [availableStockItems, localAddedStockItems]
   );
 
   const addCurrentAsStock = async (name: string) => {
@@ -260,7 +264,7 @@ export function PurchaseModal({
 
   return (
     <>
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
@@ -569,6 +573,7 @@ export function PurchaseModal({
                                             next[idx] = { ...next[idx], productName: created.name };
                                             setItems(next);
                                             setCreatedNames((prev) => prev.includes(created.name) ? prev : [...prev, created.name]);
+                                            setLocalAddedStockItems((prev) => prev.find(x => x.id === created.id) ? prev : [...prev, created]);
                                           }
                                         }
                                       });
@@ -586,7 +591,7 @@ export function PurchaseModal({
                     <div className="col-span-2">
                       <Input
                         type="number"
-                        step="1"
+                        step="any"
                         placeholder="Miktar"
                         value={it.quantity === undefined ? '' : String(it.quantity)}
                         onChange={(e) => {
@@ -618,7 +623,7 @@ export function PurchaseModal({
                     <div className={purchaseType === PurchaseType.MANUAL ? 'col-span-2' : 'col-span-2'}>
                       <Input
                         type="number"
-                        step="0.01"
+                        step="any"
                         placeholder="Birim Fiyatı"
                         value={it.unitPrice === undefined ? '' : String(it.unitPrice)}
                         onChange={(e) => {
@@ -820,7 +825,7 @@ export function PurchaseModal({
                 <FormItem>
                   <FormLabel>Miktar</FormLabel>
                   <FormControl>
-                    <Input type="number" step="1" {...field} />
+                    <Input type="number" step="any" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -834,7 +839,7 @@ export function PurchaseModal({
                 <FormItem>
                   <FormLabel>Birim Fiyat</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" {...field} />
+                    <Input type="number" step="any" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -847,7 +852,7 @@ export function PurchaseModal({
                 <FormItem>
                   <FormLabel>Tutar</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" {...field} />
+                    <Input type="number" step="any" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

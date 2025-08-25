@@ -350,7 +350,7 @@ export function CustomerDetailPageClient({
                             <SelectItem value="asc">Eskiden Yeniye</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button onClick={() => handleSaleFormOpen()}><PlusCircle className="mr-2 h-4 w-4"/> Satış Ekle</Button>
+                    <Button onClick={() => handleSaleFormOpen()}><PlusCircle className="mr-2 h-4 w-4"/> Satın Alım Ekle</Button>
                     <Button onClick={() => handlePaymentFormOpen()}><PlusCircle className="mr-2 h-4 w-4"/> Ödeme Ekle</Button>
                 </div>
               </div>
