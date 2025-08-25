@@ -222,10 +222,13 @@ export function PurchaseModal({
 
   React.useEffect(() => {
     if (useInvoiceItems) {
-      // amount alanını grand total ile senkronize et
-      const val = computedTotals.grandTotal.toFixed(2);
-      if (form.getValues('amount') !== val) {
-        form.setValue('amount', val);
+      // amount alanını grand total > 0 ise senkronize et
+      const grand = Number(computedTotals.grandTotal || 0);
+      if (grand > 0) {
+        const val = grand.toFixed(2);
+        if (form.getValues('amount') !== val) {
+          form.setValue('amount', val);
+        }
       }
     }
   }, [computedTotals, useInvoiceItems]);
