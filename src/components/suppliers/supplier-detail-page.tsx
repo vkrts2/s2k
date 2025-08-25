@@ -418,6 +418,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
       unitPrice: purchase.unitPrice?.toString() || '',
       purchaseType: purchase.purchaseType ?? PurchaseType.STOCK,
       manualProductName: purchase.manualProductName || '',
+      invoiceItems: (purchase as any).invoiceItems || [],
     });
     setShowPurchaseModal(true);
   }, []);

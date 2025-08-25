@@ -135,6 +135,8 @@ export interface PurchaseFormValues {
   description?: string;
   purchaseType: PurchaseType;
   manualProductName?: string;
+  // Faturalı/kalemli alışlar için kalem listesi (UI ve persistence için)
+  invoiceItems?: PurchaseInvoiceItem[];
 }
 
 export type PaymentFormValues = {
@@ -239,6 +241,8 @@ export interface Purchase extends Transaction {
   unitPrice?: number | null;
   purchaseType?: PurchaseType;
   manualProductName?: string;
+  // Faturalı/kalemli alışlar için kalem listesi
+  invoiceItems?: PurchaseInvoiceItem[];
 }
 
 export interface PaymentToSupplier {
@@ -347,6 +351,15 @@ export interface QuotationItem {
   total: number;
   taxRate: number; // KDV oranı (ör: 10 veya 20)
   unit?: string; // Birim (ör: mt, kg, top)
+}
+
+// Satın alma (alış) kalemi — faturalı/kalemli alış kaydı için
+export interface PurchaseInvoiceItem {
+  productName: string;
+  quantity?: number; // Firestore: undefined yerine null yazılabilir
+  unit?: string; // örn: kg, adet, mt
+  unitPrice?: number;
+  taxRate?: number; // KDV oranı (stok/ürün alışlarında)
 }
 
 export interface Quotation {

@@ -571,12 +571,34 @@ export const getPurchases = async (uid: string, supplierId?: string): Promise<Pu
 
 export const addPurchase = async (uid: string, purchaseData: Omit<Purchase, 'id' | 'transactionType' | 'description'> & {description?: string}): Promise<Purchase> => {
   const now = formatISO(new Date());
-  const newPurchaseData = {
+  // Deep sanitize undefined values (Firestore does not allow undefined)
+  const sanitizeDeep = (obj: any): any => {
+    if (Array.isArray(obj)) {
+      return obj.map((v) => sanitizeDeep(v));
+    } else if (obj && typeof obj === 'object') {
+      const entries = Object.entries(obj)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, sanitizeDeep(v)] as const);
+      return Object.fromEntries(entries);
+    }
+    return obj;
+  };
+
+  const composed: any = {
     ...purchaseData,
     transactionType: 'purchase',
     createdAt: now,
     updatedAt: now,
   };
+  // Specifically sanitize invoiceItems elements
+  if (Array.isArray((composed as any).invoiceItems)) {
+    composed.invoiceItems = (composed as any).invoiceItems.map((it: any) =>
+      sanitizeDeep(it)
+    );
+  }
+  const newPurchaseData = sanitizeDeep(composed);
+
+  console.log('addPurchase -> saving purchase data:', newPurchaseData);
   const docRef = await addDoc(_getUserCollectionRef(uid, "purchases"), newPurchaseData);
   return { ...newPurchaseData, id: docRef.id } as Purchase;
 };
@@ -585,10 +607,26 @@ export const updatePurchase = async (uid: string, updatedPurchaseData: Purchase)
   const now = formatISO(new Date());
   const purchaseDocRef = doc(_getUserCollectionRef(uid, "purchases"), updatedPurchaseData.id);
   const { id, ...restOfUpdatedData } = updatedPurchaseData;
-  const dataForFirestore: any = {
+  const sanitizeDeep = (obj: any): any => {
+    if (Array.isArray(obj)) {
+      return obj.map((v) => sanitizeDeep(v));
+    } else if (obj && typeof obj === 'object') {
+      const entries = Object.entries(obj)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, sanitizeDeep(v)] as const);
+      return Object.fromEntries(entries);
+    }
+    return obj;
+  };
+  const composed: any = {
     ...restOfUpdatedData,
     updatedAt: now,
   };
+  if (Array.isArray((composed as any).invoiceItems)) {
+    composed.invoiceItems = (composed as any).invoiceItems.map((it: any) => sanitizeDeep(it));
+  }
+  const dataForFirestore: any = sanitizeDeep(composed);
+  console.log('updatePurchase -> updating purchase id:', updatedPurchaseData.id, 'with data:', dataForFirestore);
   await updateDoc(purchaseDocRef, dataForFirestore);
   return { ...dataForFirestore, id: updatedPurchaseData.id } as Purchase;
 };
