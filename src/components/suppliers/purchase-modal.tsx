@@ -165,18 +165,26 @@ export function PurchaseModal({
       const useInv = !!(invoiceMode);
       setUseInvoiceItems(useInv);
       if (useInv) {
-        const q = typeof initialData.quantityPurchased === 'string' ? parseFloat(initialData.quantityPurchased) : (initialData.quantityPurchased as any as number) || 1;
-        const u = typeof initialData.unitPrice === 'string' ? parseFloat(initialData.unitPrice) : (initialData.unitPrice as any as number) || 0;
+        const qRaw = typeof initialData.quantityPurchased === 'string'
+          ? parseFloat(initialData.quantityPurchased as string)
+          : (initialData.quantityPurchased as any as number);
+        const uRaw = typeof initialData.unitPrice === 'string'
+          ? parseFloat(initialData.unitPrice as string)
+          : (initialData.unitPrice as any as number);
+        const q = Number.isFinite(qRaw) ? (qRaw as number) : undefined;
+        const u = Number.isFinite(uRaw) ? (uRaw as number) : undefined;
+
         let productName = '';
         if (initialData.purchaseType === PurchaseType.MANUAL) {
-          productName = (initialData.manualProductName as any) || (initialData.description as any) || 'Ürün';
+          productName = (initialData.manualProductName as any) || '';
         } else {
           const named = availableStockItems.find(s => s.id === (initialData.stockItemId as any))?.name;
-          productName = named || (initialData.description as any) || 'Ürün';
+          productName = named || '';
         }
+
         const defaultUnit = initialData.purchaseType === PurchaseType.MANUAL ? 'adet' : 'kg';
         const defaultTax = initialData.purchaseType === PurchaseType.MANUAL ? undefined : 10;
-        setItems([{ id: String(Date.now()), productName, quantity: Number.isFinite(q) ? q : 1, unit: defaultUnit, unitPrice: Number.isFinite(u) ? u : 0, taxRate: defaultTax as any }]);
+        setItems([{ id: String(Date.now()), productName, quantity: q, unit: defaultUnit, unitPrice: u, taxRate: defaultTax as any }]);
       } else {
         setItems([]);
       }
@@ -254,9 +262,19 @@ export function PurchaseModal({
           ? `${items[0].productName || 'Ürün'}${items.length > 1 ? ` +${items.length - 1} kalem` : ''}`
           : (data.description || 'Faturalı Satış');
         const grand = Number((computedTotals?.grandTotal ?? 0).toFixed(2));
+        // Persist first line's quantity and unit price for edit prefill
+        const first = items?.[0];
+        const q = (first?.quantity !== undefined && first?.quantity !== null) ? String(first?.quantity) : (data.quantityPurchased || '');
+        const u = (first?.unitPrice !== undefined && first?.unitPrice !== null) ? String(first?.unitPrice) : (data.unitPrice || '');
         const submitValues: any = {
           amount: grand > 0 ? String(grand) : (data.amount || ''),
           description: data.description && data.description.trim() !== '' ? data.description : desc,
+          quantityPurchased: q,
+          unitPrice: u,
+          // For MANUAL purchases, keep manualProductName in sync with first item's name to satisfy schema
+          manualProductName: (data.purchaseType === PurchaseType.MANUAL)
+            ? (first?.productName || data.manualProductName || '')
+            : undefined,
         };
         await onSubmit({ ...data, ...submitValues });
       } else {
