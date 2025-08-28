@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { StockItem, StockTransaction } from '@/lib/types';
-import { getStockItemById, getSales, getPurchases } from '@/lib/storage';
+import { getStockItemById, getSales, getPurchases, getCustomerById, getSupplierById } from '@/lib/storage';
 import { StockItemDetailPageClient } from '@/components/stock/stock-item-detail-page';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -51,18 +51,46 @@ export default function StockItemPage() {
           // Alım işlemlerini getir
           const purchases = await getPurchases(user.uid);
           const stockPurchases = purchases.filter(purchase => purchase.stockItemId === stockItemId);
+
+          // İsimleri çözümle: müşteri ve tedarikçi adları
+          const customerIds = Array.from(new Set(stockSales.map(s => s.customerId).filter(Boolean)));
+          const supplierIds = Array.from(new Set(stockPurchases.map(p => p.supplierId).filter(Boolean)));
+
+          const customerMap: Record<string, string> = {};
+          const supplierMap: Record<string, string> = {};
+
+          await Promise.all([
+            Promise.all(customerIds.map(async (cid) => {
+              try { const c = await getCustomerById(user.uid, cid); if (c) customerMap[cid] = c.name; } catch {}
+            })),
+            Promise.all(supplierIds.map(async (sid) => {
+              try { const s = await getSupplierById(user.uid, sid); if (s) supplierMap[sid] = s.name; } catch {}
+            })),
+          ]);
           
           // İşlemleri birleştir ve tarihe göre sırala
           const allTransactions: StockTransaction[] = [
             ...stockSales.map(sale => ({
-              ...sale,
+              id: sale.id,
+              date: sale.date,
               transactionType: 'sale' as const,
-              customerName: sale.customerName || 'Bilinmeyen Müşteri'
+              amount: sale.amount,
+              currency: sale.currency,
+              stockItemId: stockItemId,
+              quantitySold: sale.quantity ?? undefined,
+              unitPrice: sale.unitPrice ?? undefined,
+              customerName: customerMap[sale.customerId] || 'Bilinmeyen Müşteri',
             })),
             ...stockPurchases.map(purchase => ({
-              ...purchase,
+              id: purchase.id,
+              date: purchase.date,
               transactionType: 'purchase' as const,
-              supplierName: purchase.supplierName || 'Bilinmeyen Tedarikçi'
+              amount: purchase.amount,
+              currency: purchase.currency,
+              stockItemId: stockItemId,
+              quantityPurchased: purchase.quantityPurchased ?? undefined,
+              unitPrice: purchase.unitPrice ?? undefined,
+              supplierName: supplierMap[purchase.supplierId] || 'Bilinmeyen Tedarikçi',
             }))
           ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
           

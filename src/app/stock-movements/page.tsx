@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { getPurchases, getSales, getStockItems } from "@/lib/storage";
 import type { Purchase, Sale, StockItem } from "@/lib/types";
+import Link from 'next/link';
 
 interface StockMovement {
   id: string;
@@ -349,7 +350,15 @@ export default function StockMovementsPage() {
                 stockMovements.map((movement) => (
                   <TableRow key={movement.id}>
                     <TableCell>{format(movement.date.toDate(), 'dd MMMM yyyy HH:mm', { locale: tr })}</TableCell>
-                    <TableCell>{movement.productName}</TableCell>
+                    <TableCell>
+                      {movement.productId ? (
+                        <Link href={`/stock/${movement.productId}`} className="hover:underline text-primary">
+                          {movement.productName}
+                        </Link>
+                      ) : (
+                        movement.productName
+                      )}
+                    </TableCell>
                     <TableCell>{movement.type === 'Giriş' ? <ArrowUpCircle className="h-4 w-4 text-green-500 inline-block mr-1" /> : <ArrowDownCircle className="h-4 w-4 text-red-500 inline-block mr-1" />} {movement.type}</TableCell>
                     <TableCell className="text-right">{movement.quantity}</TableCell>
                     <TableCell>{movement.description}</TableCell>
@@ -382,7 +391,15 @@ export default function StockMovementsPage() {
               ) : (
                 purchasedNotSold.map(item => (
                   <TableRow key={item.stockItemId}>
-                    <TableCell>{item.productName}</TableCell>
+                    <TableCell>
+                      {item.stockItemId ? (
+                        <Link href={`/stock/${item.stockItemId}`} className="hover:underline text-primary">
+                          {item.productName}
+                        </Link>
+                      ) : (
+                        item.productName
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">{item.totalPurchased}</TableCell>
                     <TableCell>{item.lastPurchaseDate ? format(parseISO(item.lastPurchaseDate), 'dd MMMM yyyy', { locale: tr }) : '-'}</TableCell>
                   </TableRow>
