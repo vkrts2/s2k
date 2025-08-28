@@ -277,6 +277,17 @@ const handleSaveMarginTarget = async () => {
   const marginDiff = marginActualThisMonth - marginTargetThisMonth;
   const marginDiffPct = marginTargetThisMonth ? (marginDiff / marginTargetThisMonth) * 100 : 0;
 
+  // Debug: Bu ayın ham toplamları (filtreye bağımlı değil)
+  const debugSalesThisMonth = salesByMonthAll[currentMonthKey] || 0;
+  const debugPurchasesThisMonth = purchasesByMonthAll[currentMonthKey] || 0;
+  const debugComputedMargin = debugSalesThisMonth - Math.min(debugPurchasesThisMonth, debugSalesThisMonth);
+  console.log('[BI][Kâr Marjı Debug]', {
+    currentMonthKey,
+    debugSalesThisMonth,
+    debugPurchasesThisMonth,
+    debugComputedMargin,
+  });
+
   const handleSaveTarget = async () => {
     try {
       if (!user) return;
