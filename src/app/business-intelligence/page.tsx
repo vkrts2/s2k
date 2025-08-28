@@ -304,11 +304,17 @@ const handleSaveMarginTarget = async () => {
           const qty = it.quantity;
           const up = it.unitPrice;
           if (sid && qty!=null && up!=null) {
-            const avg = avgCostMap[sid] ?? 0;
-            knownCOGS += (Number(qty)||0) * avg;
-            knownMargin += (Number(up)||0 - avg) * (Number(qty)||0);
-            matchedItemCount += 1;
-            matchedSalesAmountApprox += (Number(qty)||0) * (Number(up)||0);
+            const hasAvg = Object.prototype.hasOwnProperty.call(avgCostMap, sid) && Number.isFinite(avgCostMap[sid]);
+            if (hasAvg) {
+              const avg = Number(avgCostMap[sid]) || 0;
+              knownCOGS += (Number(qty)||0) * avg;
+              knownMargin += (Number(up)||0 - avg) * (Number(qty)||0);
+              matchedItemCount += 1;
+              matchedSalesAmountApprox += (Number(qty)||0) * (Number(up)||0);
+            } else {
+              // Bu ürün için henüz alış yok → kâr hesaplamasını fallback'e bırak
+              unknownSales += Number(it.total ?? (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)) || 0;
+            }
           } else {
             // kalemsiz/eksik
             unknownSales += Number(it.total ?? (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)) || 0;
@@ -318,11 +324,17 @@ const handleSaveMarginTarget = async () => {
         const sid = s.stockItemId as string;
         const qty = Number(s.quantity)||0;
         const up = Number(s.unitPrice)||0;
-        const avg = avgCostMap[sid] ?? 0;
-        knownCOGS += qty * avg;
-        knownMargin += (up - avg) * qty;
-        matchedItemCount += 1;
-        matchedSalesAmountApprox += qty * up;
+        const hasAvg = Object.prototype.hasOwnProperty.call(avgCostMap, sid) && Number.isFinite(avgCostMap[sid]);
+        if (hasAvg) {
+          const avg = Number(avgCostMap[sid]) || 0;
+          knownCOGS += qty * avg;
+          knownMargin += (up - avg) * qty;
+          matchedItemCount += 1;
+          matchedSalesAmountApprox += qty * up;
+        } else {
+          // Ürünün maliyeti yok → satış tutarını fallback'e aktar
+          unknownSales += qty * up;
+        }
       } else {
         unknownSales += Number(s.amount)||0;
       }
