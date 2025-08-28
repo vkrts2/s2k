@@ -168,9 +168,11 @@ const handleSaveMarginTarget = async () => {
     d.setMonth(d.getMonth() - (11-i));
     return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}`;
   });
-  // Aktif/önceki ay anahtarları (erken tanımla ki aşağıdaki hesaplarda kullanılabilsin)
-  const currentMonthKey = (()=>{ const d=new Date(); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`; })();
-  const prevMonthKey = (()=>{ const d=new Date(); d.setMonth(d.getMonth()-1); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`; })();
+  // Aktif/önceki ay anahtarları (tek kaynaklı üretim: getMonthKey)
+  const nowForKeys = new Date();
+  const currentMonthKey = `${nowForKeys.getFullYear()}-${(nowForKeys.getMonth()+1).toString().padStart(2,'0')}`;
+  const prevForKeys = new Date(nowForKeys.getFullYear(), nowForKeys.getMonth()-1, 1);
+  const prevMonthKey = `${prevForKeys.getFullYear()}-${(prevForKeys.getMonth()+1).toString().padStart(2,'0')}`;
   // Trend grafiklerinde filtreli veriyi koruyoruz
   const salesByMonthFiltered: { [key: string]: number } = {};
   filteredSales.forEach((sale: Sale) => {
@@ -366,9 +368,63 @@ const handleSaveMarginTarget = async () => {
     }
     return { date: mk, margin: totalMargin };
   });
-  const marginByCustomer: {name:string, margin:number}[] = Object.entries(salesByCustomer)
-    .map(([cid, sTotal]) => ({ name: customers.find(c=>c.id===cid)?.name || 'Bilinmeyen', margin: sTotal - (totalPurchases * (sTotal/(totalSales||1))) }))
-    .sort((a,b)=>b.margin-a.margin).slice(0,5);
+  // Bu ay için müşteri bazlı marjı, aynı ürün bazlı mantıkla hesapla
+  const avgCostMapCurrent = avgCostByItemAtMonth[currentMonthKey] || {};
+  const startCur = new Date(Number(currentMonthKey.split('-')[0]), Number(currentMonthKey.split('-')[1]) - 1, 1).getTime();
+  const endCur = ((): number => { const [y,m]=currentMonthKey.split('-').map(Number); return new Date(y, m, 0, 23,59,59,999).getTime(); })();
+  const knownMarginByCustomer: Record<string, number> = {};
+  const unknownSalesByCustomer: Record<string, number> = {};
+  let knownCOGSTotalThisMonth = 0;
+  let unknownSalesTotalThisMonth = 0;
+  sales.forEach((s: Sale) => {
+    const t = new Date(s.date).getTime();
+    if (t < startCur || t > endCur) return;
+    const cid = s.customerId;
+    if (Array.isArray(s.items) && s.items.length>0) {
+      s.items.forEach((it) => {
+        const sid = s.stockItemId || it.stockItemId || (it.productName ? stockByName[it.productName.toLowerCase?.() || ''] : undefined);
+        const qty = it.quantity;
+        const up = it.unitPrice;
+        if (sid && qty!=null && up!=null && Object.prototype.hasOwnProperty.call(avgCostMapCurrent, sid) && Number.isFinite(avgCostMapCurrent[sid])) {
+          const avg = Number(avgCostMapCurrent[sid]) || 0;
+          knownCOGSTotalThisMonth += (Number(qty)||0) * avg;
+          knownMarginByCustomer[cid] = (knownMarginByCustomer[cid]||0) + ((Number(up)||0 - avg) * (Number(qty)||0));
+        } else {
+          const lineTotal = Number(it.total ?? (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)) || 0;
+          unknownSalesByCustomer[cid] = (unknownSalesByCustomer[cid]||0) + lineTotal;
+          unknownSalesTotalThisMonth += lineTotal;
+        }
+      });
+    } else if (s.stockItemId && s.quantity!=null && s.unitPrice!=null) {
+      const sid = s.stockItemId as string;
+      const qty = Number(s.quantity)||0;
+      const up = Number(s.unitPrice)||0;
+      if (Object.prototype.hasOwnProperty.call(avgCostMapCurrent, sid) && Number.isFinite(avgCostMapCurrent[sid])) {
+        const avg = Number(avgCostMapCurrent[sid]) || 0;
+        knownCOGSTotalThisMonth += qty * avg;
+        knownMarginByCustomer[cid] = (knownMarginByCustomer[cid]||0) + ((up - avg) * qty);
+      } else {
+        const total = qty * up;
+        unknownSalesByCustomer[cid] = (unknownSalesByCustomer[cid]||0) + total;
+        unknownSalesTotalThisMonth += total;
+      }
+    } else {
+      const amt = Number(s.amount)||0;
+      unknownSalesByCustomer[cid] = (unknownSalesByCustomer[cid]||0) + amt;
+      unknownSalesTotalThisMonth += amt;
+    }
+  });
+  const purchasesThisMonthForSplit = purchasesByMonthAll[currentMonthKey] || 0;
+  const remainingPurchasesForSplit = Math.max(0, purchasesThisMonthForSplit - knownCOGSTotalThisMonth);
+  const fallbackCOGSForSplit = Math.min(remainingPurchasesForSplit, unknownSalesTotalThisMonth);
+  const marginByCustomer: {name:string, margin:number}[] = Object.keys({ ...knownMarginByCustomer, ...unknownSalesByCustomer }).map(cid => {
+    const unknownForCid = unknownSalesByCustomer[cid] || 0;
+    const share = unknownSalesTotalThisMonth > 0 ? (unknownForCid / unknownSalesTotalThisMonth) : 0;
+    const fallbackCOGSForCid = fallbackCOGSForSplit * share;
+    const fallbackMarginForCid = unknownForCid - fallbackCOGSForCid;
+    const totalMarginCid = (knownMarginByCustomer[cid] || 0) + fallbackMarginForCid;
+    return { name: customers.find(c=>c.id===cid)?.name || 'Bilinmeyen', margin: totalMarginCid };
+  }).sort((a,b)=>b.margin-a.margin).slice(0,5);
 
   // Müşteri satış listeleri (DSO hesaplaması için)
   const salesByCustomerList: Record<string, Sale[]> = {};
