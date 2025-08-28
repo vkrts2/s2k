@@ -9,7 +9,7 @@ import {
   updateStockItem as storageUpdateStockItem,
   deleteStockItem as storageDeleteStockItem,
 } from "@/lib/storage";
-import { getPurchases, getSupplierById } from "@/lib/storage";
+import { getPurchases, getSupplierById, getSales, getCustomerById, updatePurchase, updateSale } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Package } from "lucide-react";
 import {
@@ -37,6 +37,15 @@ import Link from 'next/link';
 import BackToHomeButton from '@/components/common/back-to-home-button';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { format, parseISO } from 'date-fns';
 import { tr } from 'date-fns/locale';
 
@@ -48,6 +57,21 @@ export default function StockPage() {
   const [editingStockItem, setEditingStockItem] = useState<StockItem | undefined>(undefined);
   const [deletingStockItemId, setDeletingStockItemId] = useState<string | null>(null);
   const [unlinkedPurchases, setUnlinkedPurchases] = useState<any[]>([]);
+  const [unlinkedSales, setUnlinkedSales] = useState<any[]>([]);
+
+  // Bağlama modalı state (tekil veya toplu)
+  const [bindOpen, setBindOpen] = useState(false);
+  const [bindRecords, setBindRecords] = useState<Array<{ type: 'purchase' | 'sale'; raw: any }>>([]);
+  const [bindMode, setBindMode] = useState<'existing' | 'new'>('existing');
+  const [selectedStockItemId, setSelectedStockItemId] = useState<string | undefined>(undefined);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemUnit, setNewItemUnit] = useState("");
+  const [newItemDesc, setNewItemDesc] = useState("");
+  const [bindSubmitting, setBindSubmitting] = useState(false);
+
+  // Toplu seçim state
+  const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<Set<string>>(new Set());
+  const [selectedSaleIds, setSelectedSaleIds] = useState<Set<string>>(new Set());
 
   const { toast } = useToast();
 
@@ -65,9 +89,10 @@ export default function StockPage() {
     
     setIsLoading(true);
     try {
-      const [loadedItems, purchases] = await Promise.all([
+      const [loadedItems, purchases, sales] = await Promise.all([
         getStockItems(user.uid),
         getPurchases(user.uid),
+        getSales(user.uid),
       ]);
       setStockItems(loadedItems);
 
@@ -88,8 +113,28 @@ export default function StockPage() {
         quantity: p.quantityPurchased ?? (Array.isArray(p.invoiceItems) ? (p.invoiceItems.reduce((acc, it) => acc + (it.quantity || 0), 0)) : undefined),
         amount: p.amount,
         currency: p.currency,
+        raw: p,
       }));
       setUnlinkedPurchases(normalized);
+
+      // Stoğa bağlanmamış satışları bul (stockItemId yok veya null)
+      const rawUnlinkedSales = sales.filter(s => !s.stockItemId);
+      const customerIds = Array.from(new Set(rawUnlinkedSales.map(s => s.customerId).filter(Boolean)));
+      const customerMap: Record<string, string> = {};
+      await Promise.all(customerIds.map(async (cid) => {
+        try { const c = await getCustomerById(user.uid, cid); if (c) customerMap[cid] = c.name; } catch {}
+      }));
+      const normalizedSales = rawUnlinkedSales.map(s => ({
+        id: s.id,
+        date: s.date,
+        customerName: customerMap[s.customerId] || 'Bilinmeyen Müşteri',
+        productName: s.description || 'İsimsiz Ürün',
+        quantity: s.quantity ?? (Array.isArray(s.items) ? (s.items.reduce((acc, it) => acc + (it.quantity || 0), 0)) : undefined),
+        amount: s.subtotal ?? s.amount,
+        currency: s.currency,
+        raw: s,
+      }));
+      setUnlinkedSales(normalizedSales);
     } catch (error) {
       console.error("Stok kalemleri yüklenirken hata oluştu:", error);
       toast({
@@ -99,10 +144,104 @@ export default function StockPage() {
       });
       setStockItems([]);
       setUnlinkedPurchases([]);
+      setUnlinkedSales([]);
     } finally {
       setIsLoading(false);
     }
   }, [user, toast, authLoading]);
+
+  const openBindModal = useCallback((record: { type: 'purchase' | 'sale'; raw: any }) => {
+    setBindRecords([record]);
+    setBindMode('existing');
+    setSelectedStockItemId(undefined);
+    setNewItemName("");
+    setNewItemUnit("");
+    setNewItemDesc("");
+    setBindOpen(true);
+  }, []);
+
+  const openBulkBindModal = useCallback(() => {
+    const records: Array<{ type: 'purchase' | 'sale'; raw: any }> = [];
+    unlinkedPurchases.forEach(p => { if (selectedPurchaseIds.has(p.id)) records.push({ type: 'purchase', raw: p.raw }); });
+    unlinkedSales.forEach(s => { if (selectedSaleIds.has(s.id)) records.push({ type: 'sale', raw: s.raw }); });
+    if (records.length === 0) return;
+    setBindRecords(records);
+    setBindMode('existing');
+    setSelectedStockItemId(undefined);
+    setNewItemName("");
+    setNewItemUnit("");
+    setNewItemDesc("");
+    setBindOpen(true);
+  }, [unlinkedPurchases, unlinkedSales, selectedPurchaseIds, selectedSaleIds]);
+
+  const togglePurchaseSelection = useCallback((id: string) => {
+    setSelectedPurchaseIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSaleSelection = useCallback((id: string) => {
+    setSelectedSaleIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleBind = useCallback(async () => {
+    if (!user || bindRecords.length === 0) return;
+    try {
+      setBindSubmitting(true);
+      let stockItemIdToUse: string | undefined = selectedStockItemId;
+      if (bindMode === 'new') {
+        if (!newItemName.trim()) {
+          toast({ title: 'Eksik Bilgi', description: 'Yeni stok kalemi için ad gereklidir.', variant: 'destructive' });
+          setBindSubmitting(false);
+          return;
+        }
+        const created = await storageAddStockItem(user.uid, {
+          name: newItemName.trim(),
+          description: newItemDesc || undefined,
+          unit: newItemUnit || undefined,
+          currentStock: 0,
+          salePrice: undefined as any,
+        } as any);
+        stockItemIdToUse = created.id;
+      }
+      if (!stockItemIdToUse) {
+        toast({ title: 'Seçim Gerekli', description: 'Bir stok kalemi seçin veya yeni oluşturun.', variant: 'destructive' });
+        setBindSubmitting(false);
+        return;
+      }
+      let success = 0;
+      for (const rec of bindRecords) {
+        try {
+          if (rec.type === 'purchase') {
+            await updatePurchase(user.uid, { ...rec.raw, stockItemId: stockItemIdToUse });
+          } else {
+            await updateSale(user.uid, { ...rec.raw, stockItemId: stockItemIdToUse });
+          }
+          success++;
+        } catch (e) {
+          console.error('Single bind failed for', rec, e);
+        }
+      }
+
+      toast({ title: 'Bağlama Tamamlandı', description: `${success}/${bindRecords.length} kayıt bağlandı.` });
+      setBindOpen(false);
+      setBindRecords([]);
+      setSelectedPurchaseIds(new Set());
+      setSelectedSaleIds(new Set());
+      await loadItems();
+    } catch (e) {
+      console.error('handleBind error', e);
+      toast({ title: 'Hata', description: 'Bağlama sırasında bir sorun oluştu.', variant: 'destructive' });
+    } finally {
+      setBindSubmitting(false);
+    }
+  }, [user, bindRecords, bindMode, newItemName, newItemDesc, newItemUnit, selectedStockItemId, toast, loadItems]);
 
   useEffect(() => {
     document.title = "Stok Yönetimi | ERMAY";
@@ -265,31 +404,45 @@ export default function StockPage() {
           <CardTitle>Stoğa Eklenmemiş Alışlar</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="flex items-center justify-between pb-3">
+            <div className="text-sm text-muted-foreground">Seçili: {selectedPurchaseIds.size}</div>
+            <div>
+              <Button size="sm" onClick={openBulkBindModal} disabled={selectedPurchaseIds.size === 0}>Seçilenleri Stoğa Bağla</Button>
+            </div>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[1%]"></TableHead>
                 <TableHead>Tarih</TableHead>
                 <TableHead>Ürün</TableHead>
                 <TableHead>Tedarikçi</TableHead>
                 <TableHead className="text-right">Miktar</TableHead>
                 <TableHead className="text-right">Tutar</TableHead>
                 <TableHead>Para Birimi</TableHead>
+                <TableHead className="w-[1%]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {unlinkedPurchases.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">Kayıt bulunamadı.</TableCell>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">Kayıt bulunamadı.</TableCell>
                 </TableRow>
               ) : (
                 unlinkedPurchases.map((p) => (
                   <TableRow key={p.id}>
+                    <TableCell>
+                      <input type="checkbox" checked={selectedPurchaseIds.has(p.id)} onChange={() => togglePurchaseSelection(p.id)} />
+                    </TableCell>
                     <TableCell>{format(parseISO(p.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
                     <TableCell className="font-medium">{p.productName}</TableCell>
                     <TableCell>{p.supplierName}</TableCell>
                     <TableCell className="text-right">{p.quantity ?? '-'}</TableCell>
                     <TableCell className="text-right">{p.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell>{p.currency}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="secondary" onClick={() => openBindModal({ type: 'purchase', raw: p.raw })}>Stoğa Bağla</Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -297,6 +450,116 @@ export default function StockPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Stoğa Eklenmemiş Satışlar */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Stoğa Eklenmemiş Satışlar</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between pb-3">
+            <div className="text-sm text-muted-foreground">Seçili: {selectedSaleIds.size}</div>
+            <div>
+              <Button size="sm" onClick={openBulkBindModal} disabled={selectedSaleIds.size === 0}>Seçilenleri Stoğa Bağla</Button>
+            </div>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[1%]"></TableHead>
+                <TableHead>Tarih</TableHead>
+                <TableHead>Ürün</TableHead>
+                <TableHead>Müşteri</TableHead>
+                <TableHead className="text-right">Miktar</TableHead>
+                <TableHead className="text-right">Tutar</TableHead>
+                <TableHead>Para Birimi</TableHead>
+                <TableHead className="w-[1%]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {unlinkedSales.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">Kayıt bulunamadı.</TableCell>
+                </TableRow>
+              ) : (
+                unlinkedSales.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell>
+                      <input type="checkbox" checked={selectedSaleIds.has(s.id)} onChange={() => toggleSaleSelection(s.id)} />
+                    </TableCell>
+                    <TableCell>{format(parseISO(s.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
+                    <TableCell className="font-medium">{s.productName}</TableCell>
+                    <TableCell>{s.customerName}</TableCell>
+                    <TableCell className="text-right">{s.quantity ?? '-'}</TableCell>
+                    <TableCell className="text-right">{s.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell>{s.currency}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="secondary" onClick={() => openBindModal({ type: 'sale', raw: s.raw })}>Stoğa Bağla</Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Stoğa Bağla Modal */}
+      <Dialog open={bindOpen} onOpenChange={setBindOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Stoğa Bağla</DialogTitle>
+            <DialogDescription>
+              Kaydı mevcut bir stok kalemine bağlayın veya yeni bir stok kalemi oluşturun.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div>
+              <Label className="mb-2 block">Bağlama Şekli</Label>
+              <div className="flex gap-2">
+                <Button type="button" variant={bindMode === 'existing' ? 'default' : 'outline'} size="sm" onClick={() => setBindMode('existing')}>Mevcut Kalem</Button>
+                <Button type="button" variant={bindMode === 'new' ? 'default' : 'outline'} size="sm" onClick={() => setBindMode('new')}>Yeni Kalem</Button>
+              </div>
+            </div>
+
+            {bindMode === 'existing' ? (
+              <div>
+                <Label className="mb-2 block">Stok Kalemi Seç</Label>
+                <Select value={selectedStockItemId} onValueChange={(v) => setSelectedStockItemId(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seçiniz" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stockItems.map((si) => (
+                      <SelectItem key={si.id} value={si.id}>{si.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <Label>Ad</Label>
+                  <Input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} placeholder="Örn: 200 gr Keçe" />
+                </div>
+                <div>
+                  <Label>Birim</Label>
+                  <Input value={newItemUnit} onChange={(e) => setNewItemUnit(e.target.value)} placeholder="adet, kg, mt..." />
+                </div>
+                <div>
+                  <Label>Açıklama</Label>
+                  <Input value={newItemDesc} onChange={(e) => setNewItemDesc(e.target.value)} placeholder="Opsiyonel" />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setBindOpen(false)}>Vazgeç</Button>
+              <Button type="button" onClick={handleBind} disabled={bindSubmitting}>{bindSubmitting ? 'Bağlanıyor...' : 'Bağla'}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );
