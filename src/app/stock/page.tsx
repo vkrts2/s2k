@@ -173,9 +173,14 @@ export default function StockPage() {
           <Package className="mr-3 h-8 w-8 text-primary" />
           Stok Kalemleri
         </h1>
-        <Button onClick={openAddModal}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Yeni Ürün Ekle
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="secondary">
+            <Link href="/stock-movements">Stok Hareketleri</Link>
+          </Button>
+          <Button onClick={openAddModal}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Yeni Ürün Ekle
+          </Button>
+        </div>
       </div>
 
       <Dialog open={showFormModal} onOpenChange={(isOpen) => {

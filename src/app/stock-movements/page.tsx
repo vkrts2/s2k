@@ -11,9 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { PlusCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { getPurchases, getSales, getStockItems } from "@/lib/storage";
+import type { Purchase, Sale, StockItem } from "@/lib/types";
 
 interface StockMovement {
   id: string;
@@ -45,11 +48,85 @@ export default function StockMovementsPage() {
     description: '',
   });
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Purchased but never sold list state
+  const [purchasedNotSold, setPurchasedNotSold] = useState<{
+    stockItemId: string;
+    productName: string;
+    totalPurchased: number;
+    lastPurchaseDate: string | null;
+  }[]>([]);
 
   useEffect(() => {
     fetchStockMovements();
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    // Compute purchased but never sold after auth available
+    if (!user) return;
+    (async () => {
+      try {
+        const [purchases, sales, stockItems] = await Promise.all([
+          getPurchases(user.uid),
+          getSales(user.uid),
+          getStockItems(user.uid),
+        ]);
+
+        // Build maps for quantities
+        const nameById: Record<string, string> = Object.fromEntries(
+          (stockItems as StockItem[]).map(si => [si.id, si.name])
+        );
+
+        const purchasedQtyById: Record<string, { qty: number; lastDate: string | null }> = {};
+        (purchases as Purchase[]).forEach(p => {
+          const sid = p.stockItemId;
+          const qty = p.quantityPurchased ?? null;
+          if (!sid || !qty || qty <= 0) return;
+          const d = p.date;
+          if (!purchasedQtyById[sid]) {
+            purchasedQtyById[sid] = { qty: 0, lastDate: null };
+          }
+          purchasedQtyById[sid].qty += qty;
+          // Track last purchase date (max)
+          try {
+            const prev = purchasedQtyById[sid].lastDate;
+            if (!prev || (new Date(d).getTime() > new Date(prev).getTime())) {
+              purchasedQtyById[sid].lastDate = d;
+            }
+          } catch {}
+        });
+
+        const soldQtyById: Record<string, number> = {};
+        (sales as Sale[]).forEach(s => {
+          const sid = s.stockItemId ?? null;
+          const qty = s.quantity ?? null;
+          if (!sid || !qty || qty <= 0) return;
+          soldQtyById[sid] = (soldQtyById[sid] || 0) + qty;
+        });
+
+        const result = Object.entries(purchasedQtyById)
+          .filter(([sid, v]) => v.qty > 0 && (!soldQtyById[sid] || soldQtyById[sid] === 0))
+          .map(([sid, v]) => ({
+            stockItemId: sid,
+            productName: nameById[sid] || 'Bilinmeyen Ürün',
+            totalPurchased: v.qty,
+            lastPurchaseDate: v.lastDate ?? null,
+          }))
+          // sort by last purchase desc
+          .sort((a, b) => {
+            const da = a.lastPurchaseDate ? new Date(a.lastPurchaseDate).getTime() : 0;
+            const db = b.lastPurchaseDate ? new Date(b.lastPurchaseDate).getTime() : 0;
+            return db - da;
+          });
+
+        setPurchasedNotSold(result);
+      } catch (e) {
+        console.error('Satın alınıp satılmamış ürünler hesaplanırken hata:', e);
+      }
+    })();
+  }, [user]);
 
   const fetchStockMovements = async () => {
     setLoading(true);
@@ -283,6 +360,38 @@ export default function StockMovementsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Satın Alınmış Ama Satılmamış Ürünler</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ürün</TableHead>
+                <TableHead className="text-right">Alınan Toplam Miktar</TableHead>
+                <TableHead>Son Alış Tarihi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {purchasedNotSold.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center">Kayıt bulunamadı.</TableCell>
+                </TableRow>
+              ) : (
+                purchasedNotSold.map(item => (
+                  <TableRow key={item.stockItemId}>
+                    <TableCell>{item.productName}</TableCell>
+                    <TableCell className="text-right">{item.totalPurchased}</TableCell>
+                    <TableCell>{item.lastPurchaseDate ? format(parseISO(item.lastPurchaseDate), 'dd MMMM yyyy', { locale: tr }) : '-'}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
-} 
+}
