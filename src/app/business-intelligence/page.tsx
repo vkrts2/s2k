@@ -156,26 +156,40 @@ const handleSaveMarginTarget = async () => {
     }));
 
   // Satış/Alış trendi için aylık agregasyonlar ve son 12 ay listesi
-  const salesByMonth: { [key: string]: number } = {};
-  filteredSales.forEach((sale: Sale) => {
+  // Not: Genel hedef/gerçekleşen kartları filtrelerden bağımsız olmalı → All dizileri
+  const salesByMonthAll: { [key: string]: number } = {};
+  sales.forEach((sale: Sale) => {
     const date = new Date(sale.date);
     const key = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}`;
-    salesByMonth[key] = (salesByMonth[key] || 0) + (sale.amount || 0);
+    salesByMonthAll[key] = (salesByMonthAll[key] || 0) + (sale.amount || 0);
   });
   const last12Months = Array.from({length: 12}, (_, i) => {
     const d = new Date();
     d.setMonth(d.getMonth() - (11-i));
     return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}`;
   });
-  const salesTrend = last12Months.map(month => ({ date: month, amount: salesByMonth[month] || 0 }));
+  // Trend grafiklerinde filtreli veriyi koruyoruz
+  const salesByMonthFiltered: { [key: string]: number } = {};
+  filteredSales.forEach((sale: Sale) => {
+    const date = new Date(sale.date);
+    const key = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}`;
+    salesByMonthFiltered[key] = (salesByMonthFiltered[key] || 0) + (sale.amount || 0);
+  });
+  const salesTrend = last12Months.map(month => ({ date: month, amount: salesByMonthFiltered[month] || 0 }));
 
-  const purchasesByMonth: { [key: string]: number } = {};
+  const purchasesByMonthAll: { [key: string]: number } = {};
+  purchases.forEach((purchase: Purchase) => {
+    const date = new Date(purchase.date);
+    const key = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}`;
+    purchasesByMonthAll[key] = (purchasesByMonthAll[key] || 0) + (purchase.amount || 0);
+  });
+  const purchasesByMonthFiltered: { [key: string]: number } = {};
   filteredPurchases.forEach((purchase: Purchase) => {
     const date = new Date(purchase.date);
     const key = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}`;
-    purchasesByMonth[key] = (purchasesByMonth[key] || 0) + (purchase.amount || 0);
+    purchasesByMonthFiltered[key] = (purchasesByMonthFiltered[key] || 0) + (purchase.amount || 0);
   });
-  const purchasesTrend = last12Months.map(month => ({ date: month, amount: purchasesByMonth[month] || 0 }));
+  const purchasesTrend = last12Months.map(month => ({ date: month, amount: purchasesByMonthFiltered[month] || 0 }));
 
   // Ödemeler bazlı nakit akışı agregasyonu (aylık)
   const paymentsByMonth: { [key: string]: number } = {};
@@ -231,8 +245,8 @@ const handleSaveMarginTarget = async () => {
   // Kâr Marjı Analizi (yaklaşık): Aylık satış - alış
   // Marj: aynı ay içi COGS'i satış tutarıyla sınırlayarak negatif patlamayı önle
   const marginByMonth: {date:string, margin:number}[] = last12Months.map(m => {
-    const s = salesByMonth[m] || 0;
-    const cogsApprox = Math.min(purchasesByMonth[m] || 0, s);
+    const s = salesByMonthAll[m] || 0;
+    const cogsApprox = Math.min(purchasesByMonthAll[m] || 0, s);
     return { date: m, margin: s - cogsApprox };
   });
   const marginByCustomer: {name:string, margin:number}[] = Object.entries(salesByCustomer)
@@ -248,8 +262,9 @@ const handleSaveMarginTarget = async () => {
   // Hedef vs Gerçekleşen: hedef = geçen ay satışları
   const currentMonthKey = (()=>{ const d=new Date(); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`; })();
   const prevMonthKey = (()=>{ const d=new Date(); d.setMonth(d.getMonth()-1); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`; })();
-  const actualThisMonth = salesByMonth[currentMonthKey] || 0;
-  const targetAuto = salesByMonth[prevMonthKey] || 0;
+  // Ciro hedef/gerçekleşen kartı: filtrelerden bağımsız tam veri
+  const actualThisMonth = salesByMonthAll[currentMonthKey] || 0;
+  const targetAuto = salesByMonthAll[prevMonthKey] || 0;
   const targetThisMonth = targetManual ?? targetAuto;
   const salesDiff = actualThisMonth - targetThisMonth;
   const salesDiffPct = targetThisMonth ? (salesDiff / targetThisMonth) * 100 : 0;
@@ -303,8 +318,8 @@ const handleSaveMarginTarget = async () => {
       const totalS = sList.reduce((a,b)=>a+b.amt,0) + filteredSales.filter(s=> s.customerId===cid).reduce((a,b)=>a+(b.amount||0),0);
       const totalP = (paymentsByCustomerList[cid]||[]).reduce((a,b)=>a+(b.amount||0),0);
       const ar = Math.max(0, totalS - totalP);
-      const monthsWithSales = Math.max(1, last12Months.filter(m => (salesByMonth[m]||0)>0).length);
-      const monthlyCreditSales = (last12Months.reduce((a,m)=>a+(salesByMonth[m]||0),0)) / monthsWithSales;
+      const monthsWithSales = Math.max(1, last12Months.filter(m => (salesByMonthFiltered[m]||0)>0).length);
+      const monthlyCreditSales = (last12Months.reduce((a,m)=>a+(salesByMonthFiltered[m]||0),0)) / monthsWithSales;
       dso = monthlyCreditSales>0 ? (ar / monthlyCreditSales) * 30 : 0;
     }
     dsoList.push({ name: customers.find(c=>c.id===cid)?.name || 'Bilinmeyen', dso: Number(dso.toFixed(1)) });

@@ -435,6 +435,7 @@ export default function DashboardPage() {
           <TabsTrigger value="overview">Genel Bakış</TabsTrigger>
           <TabsTrigger value="analytics">Analitik</TabsTrigger>
           <TabsTrigger value="reports">Raporlar</TabsTrigger>
+          <TabsTrigger value="cash">Kasa</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -556,6 +557,59 @@ export default function DashboardPage() {
                     <Line type="monotone" dataKey="sales" stroke="#8884d8" activeDot={{ r: 8 }} name="Satışlar" />
                   </LineChart>
                 </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        <TabsContent value="cash" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-7">
+              <CardHeader>
+                <div className="flex items-center justify-between w-full">
+                  <CardTitle className="flex items-center gap-2"><CircleDollarSign className="h-5 w-5" /> Kasa Özeti</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Toplam Nakit</p>
+                    <p className="text-2xl font-bold">₺0</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Bugünkü Giriş</p>
+                    <p className="text-2xl font-bold text-green-600">₺0</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Bugünkü Çıkış</p>
+                    <p className="text-2xl font-bold text-red-600">₺0</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-7">
+              <CardHeader>
+                <CardTitle>Kasa Hareketleri</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tarih</TableHead>
+                        <TableHead>Tür</TableHead>
+                        <TableHead>Açıklama</TableHead>
+                        <TableHead className="text-right">Tutar</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">Henüz hareket yok.</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
