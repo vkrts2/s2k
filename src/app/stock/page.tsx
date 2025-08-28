@@ -243,6 +243,13 @@ export default function StockPage() {
     }
   }, [user, bindRecords, bindMode, newItemName, newItemDesc, newItemUnit, selectedStockItemId, toast, loadItems]);
 
+  // '+N kalem' içerenleri ayırmak için regex ve türev listeler
+  const extraRegex = useMemo(() => /\+\s*\d+\s*kalem/i, []);
+  const purchasesExtra = useMemo(() => unlinkedPurchases.filter(p => extraRegex.test((p.productName || "").toString())), [unlinkedPurchases, extraRegex]);
+  const purchasesNormal = useMemo(() => unlinkedPurchases.filter(p => !extraRegex.test((p.productName || "").toString())), [unlinkedPurchases, extraRegex]);
+  const salesExtra = useMemo(() => unlinkedSales.filter(s => extraRegex.test((s.productName || "").toString())), [unlinkedSales, extraRegex]);
+  const salesNormal = useMemo(() => unlinkedSales.filter(s => !extraRegex.test((s.productName || "").toString())), [unlinkedSales, extraRegex]);
+
   useEffect(() => {
     document.title = "Stok Yönetimi | ERMAY";
     console.log("StockPage useEffect - authLoading:", authLoading, "User:", user ? user.uid : "null");
@@ -411,6 +418,7 @@ export default function StockPage() {
               <Button size="sm" onClick={openBulkBindModal} disabled={selectedPurchaseIds.size === 0}>Seçilenleri Stoğa Bağla</Button>
             </div>
           </div>
+          <div className="pb-2 font-medium">+N kalem içerenler</div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -425,12 +433,51 @@ export default function StockPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {unlinkedPurchases.length === 0 ? (
+              {purchasesExtra.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">Kayıt bulunamadı.</TableCell>
                 </TableRow>
               ) : (
-                unlinkedPurchases.map((p) => (
+                purchasesExtra.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell>
+                      <input type="checkbox" checked={selectedPurchaseIds.has(p.id)} onChange={() => togglePurchaseSelection(p.id)} />
+                    </TableCell>
+                    <TableCell>{format(parseISO(p.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
+                    <TableCell className="font-medium">{p.productName}</TableCell>
+                    <TableCell>{p.supplierName}</TableCell>
+                    <TableCell className="text-right">{p.quantity ?? '-'}</TableCell>
+                    <TableCell className="text-right">{p.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell>{p.currency}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="secondary" onClick={() => openBindModal({ type: 'purchase', raw: p.raw })}>Stoğa Bağla</Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          <div className="pt-6 pb-2 font-medium">Diğerleri</div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[1%]"></TableHead>
+                <TableHead>Tarih</TableHead>
+                <TableHead>Ürün</TableHead>
+                <TableHead>Tedarikçi</TableHead>
+                <TableHead className="text-right">Miktar</TableHead>
+                <TableHead className="text-right">Tutar</TableHead>
+                <TableHead>Para Birimi</TableHead>
+                <TableHead className="w-[1%]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {purchasesNormal.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">Kayıt bulunamadı.</TableCell>
+                </TableRow>
+              ) : (
+                purchasesNormal.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>
                       <input type="checkbox" checked={selectedPurchaseIds.has(p.id)} onChange={() => togglePurchaseSelection(p.id)} />
@@ -465,6 +512,7 @@ export default function StockPage() {
               <Button size="sm" onClick={openBulkBindModal} disabled={selectedSaleIds.size === 0}>Seçilenleri Stoğa Bağla</Button>
             </div>
           </div>
+          <div className="pb-2 font-medium">+N kalem içerenler</div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -479,12 +527,51 @@ export default function StockPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {unlinkedSales.length === 0 ? (
+              {salesExtra.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">Kayıt bulunamadı.</TableCell>
                 </TableRow>
               ) : (
-                unlinkedSales.map((s) => (
+                salesExtra.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell>
+                      <input type="checkbox" checked={selectedSaleIds.has(s.id)} onChange={() => toggleSaleSelection(s.id)} />
+                    </TableCell>
+                    <TableCell>{format(parseISO(s.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
+                    <TableCell className="font-medium">{s.productName}</TableCell>
+                    <TableCell>{s.customerName}</TableCell>
+                    <TableCell className="text-right">{s.quantity ?? '-'}</TableCell>
+                    <TableCell className="text-right">{s.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell>{s.currency}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="secondary" onClick={() => openBindModal({ type: 'sale', raw: s.raw })}>Stoğa Bağla</Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          <div className="pt-6 pb-2 font-medium">Diğerleri</div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[1%]"></TableHead>
+                <TableHead>Tarih</TableHead>
+                <TableHead>Ürün</TableHead>
+                <TableHead>Müşteri</TableHead>
+                <TableHead className="text-right">Miktar</TableHead>
+                <TableHead className="text-right">Tutar</TableHead>
+                <TableHead>Para Birimi</TableHead>
+                <TableHead className="w-[1%]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {salesNormal.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">Kayıt bulunamadı.</TableCell>
+                </TableRow>
+              ) : (
+                salesNormal.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell>
                       <input type="checkbox" checked={selectedSaleIds.has(s.id)} onChange={() => toggleSaleSelection(s.id)} />
