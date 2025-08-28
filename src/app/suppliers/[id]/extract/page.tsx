@@ -94,7 +94,9 @@ export default function ExtractPage({ params }: ExtractPageProps) {
   }, [user, supplierId, router]);
 
   const unifiedTransactions = useMemo(() => {
-    const transactions: UnifiedTransaction[] = [...purchases, ...payments];
+    const purchaseTx: UnifiedTransaction[] = purchases.map(p => ({ ...p, transactionType: 'purchase' as const }));
+    const paymentTx: UnifiedTransaction[] = payments.map(p => ({ ...p, transactionType: 'paymentToSupplier' as const }));
+    const transactions: UnifiedTransaction[] = [...purchaseTx, ...paymentTx];
     return transactions.sort((a, b) => {
       const dateA = parseISO(a.date);
       const dateB = parseISO(b.date);
@@ -111,7 +113,8 @@ export default function ExtractPage({ params }: ExtractPageProps) {
   }, [payments]);
 
   const balance = useMemo(() => {
-    return totalPayments - totalPurchases;
+    // For suppliers, balance = total purchases - total payments
+    return totalPurchases - totalPayments;
   }, [totalPurchases, totalPayments]);
 
   if (loading) {
@@ -239,7 +242,8 @@ export default function ExtractPage({ params }: ExtractPageProps) {
                 (() => {
                   let runningTotal = 0;
                   return unifiedTransactions.map((item) => {
-                    runningTotal += item.amount;
+                    // Purchases increase what you owe; payments decrease it
+                    runningTotal += item.transactionType === 'purchase' ? item.amount : -item.amount;
                     return (
                       <TableRow key={`${item.transactionType}-${item.id}`}>
                         <TableCell className="print:text-black">{safeFormatDate(item.date, 'dd.MM.yyyy')}</TableCell>

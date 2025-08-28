@@ -102,18 +102,29 @@ export function StatementView({ entity, transactions, balances, entityType }: St
     }
 
     transactions.forEach(transaction => {
-      if (transaction.currency && typeof transaction.amount === 'number') {
-        if (transaction.transactionType === 'sale') {
-          newBalances[transaction.currency] = (newBalances[transaction.currency] || 0) + transaction.amount;
-        } else if (transaction.transactionType === 'payment') {
-          newBalances[transaction.currency] = (newBalances[transaction.currency] || 0) - transaction.amount;
+      const cur = (transaction as any).currency as Currency | undefined;
+      const amt = typeof (transaction as any).amount === 'number' ? (transaction as any).amount as number : 0;
+      if (!cur || isNaN(amt)) return;
+      if (entityType === 'customer') {
+        const tType = (transaction as any).transactionType as string;
+        if (tType === 'sale') {
+          newBalances[cur] = (newBalances[cur] || 0) + amt;
+        } else if (tType === 'payment') {
+          newBalances[cur] = (newBalances[cur] || 0) - amt;
+        }
+      } else {
+        // supplier: purchases increase debt, payments to supplier decrease debt
+        const tType = (transaction as any).transactionType as string;
+        if (tType === 'purchase') {
+          newBalances[cur] = (newBalances[cur] || 0) + amt;
+        } else if (tType === 'paymentToSupplier') {
+          newBalances[cur] = (newBalances[cur] || 0) - amt;
         }
       }
     });
 
-    // console.log("Calculated balances:", newBalances);
     return newBalances;
-  }, [transactions]);
+  }, [transactions, entityType]);
 
   const handlePrint = () => {
     window.print();
@@ -181,11 +192,12 @@ export function StatementView({ entity, transactions, balances, entityType }: St
     }
   };
 
-  const getTransactionTypeLabel = (type: UnifiedTransaction['transactionType']) => {
+  const getTransactionTypeLabel = (type: any) => {
     if (entityType === 'customer') {
       return type === 'sale' ? 'Satış' : 'Ödeme';
     } else {
-      return type === 'sale' ? 'Satış' : 'Ödeme';
+      // supplier
+      return type === 'purchase' ? 'Satın Alma' : 'Ödeme';
     }
   };
 
@@ -202,10 +214,23 @@ export function StatementView({ entity, transactions, balances, entityType }: St
     return Array.from(currenciesFromTransactions) as Currency[];
   }, [transactions, calculatedBalances]);
 
-  const calculateTotalForCurrency = (type: 'sale' | 'payment', currency: Currency): number => {
-    return transactions
-      .filter(t => t.transactionType === type && t.currency === currency)
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
+  const calculateTotalForCurrency = (currency: Currency): { inc: number; dec: number } => {
+    // inc: increases balance (sales for customers, purchases for suppliers)
+    // dec: decreases balance (payments)
+    return transactions.reduce((acc, t) => {
+      const cur = (t as any).currency as Currency | undefined;
+      if (cur !== currency) return acc;
+      const amt = Number((t as any).amount || 0);
+      const tType = (t as any).transactionType as string;
+      if (entityType === 'customer') {
+        if (tType === 'sale') acc.inc += amt;
+        else if (tType === 'payment') acc.dec += amt;
+      } else {
+        if (tType === 'purchase') acc.inc += amt;
+        else if (tType === 'paymentToSupplier') acc.dec += amt;
+      }
+      return acc;
+    }, { inc: 0, dec: 0 });
   };
 
   return (
@@ -297,14 +322,9 @@ export function StatementView({ entity, transactions, balances, entityType }: St
       <section className="mb-8 print:mb-4 print:break-inside-avoid">
         <h2 className="text-xl print:text-lg font-semibold mb-3">Bakiye Özeti</h2>
         {allCurrencies.map(currency => {
-          const totalSalesOrPurchases = entityType === 'customer' 
-            ? calculateTotalForCurrency('sale', currency)
-            : calculateTotalForCurrency('sale', currency);
-          
-          const totalPaymentsReceivedOrMade = entityType === 'customer'
-            ? calculateTotalForCurrency('payment', currency)
-            : calculateTotalForCurrency('payment', currency);
-            
+          const { inc, dec } = calculateTotalForCurrency(currency);
+          const totalSalesOrPurchases = inc;
+          const totalPaymentsReceivedOrMade = dec;
           const netBalance = calculatedBalances[currency] || 0;
           
           if (totalSalesOrPurchases === 0 && totalPaymentsReceivedOrMade === 0 && netBalance === 0) {
