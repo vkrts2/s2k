@@ -1233,7 +1233,7 @@ export function SupplierDetailPageClient({ supplier: initialSupplier, initialPur
                       <SelectItem value="asc">Eskiden Yeniye</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button onClick={() => handleOpenAddPurchaseModal()}><PlusCircle className="mr-2 h-4 w-4"/> Satış Ekle</Button>
+                  <Button onClick={() => handleOpenAddPurchaseModal()}><PlusCircle className="mr-2 h-4 w-4"/> Satın Alım Ekle</Button>
                   <Button onClick={() => handleOpenAddPaymentToSupplierModal()}><PlusCircle className="mr-2 h-4 w-4"/> Ödeme Ekle</Button>
                 </div>
               </div>

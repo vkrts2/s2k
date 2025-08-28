@@ -168,6 +168,9 @@ const handleSaveMarginTarget = async () => {
     d.setMonth(d.getMonth() - (11-i));
     return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}`;
   });
+  // Aktif/önceki ay anahtarları (erken tanımla ki aşağıdaki hesaplarda kullanılabilsin)
+  const currentMonthKey = (()=>{ const d=new Date(); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`; })();
+  const prevMonthKey = (()=>{ const d=new Date(); d.setMonth(d.getMonth()-1); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`; })();
   // Trend grafiklerinde filtreli veriyi koruyoruz
   const salesByMonthFiltered: { [key: string]: number } = {};
   filteredSales.forEach((sale: Sale) => {
@@ -362,8 +365,7 @@ const handleSaveMarginTarget = async () => {
   // Churn (kayıp) kartı kaldırıldı – hesaplama yapılmıyor
 
   // Hedef vs Gerçekleşen: hedef = geçen ay satışları
-  const currentMonthKey = (()=>{ const d=new Date(); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`; })();
-  const prevMonthKey = (()=>{ const d=new Date(); d.setMonth(d.getMonth()-1); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`; })();
+  // currentMonthKey ve prevMonthKey yukarıda tanımlandı
   // Ciro hedef/gerçekleşen kartı: filtrelerden bağımsız tam veri
   const actualThisMonth = salesByMonthAll[currentMonthKey] || 0;
   const targetAuto = salesByMonthAll[prevMonthKey] || 0;
