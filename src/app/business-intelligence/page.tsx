@@ -249,19 +249,32 @@ const handleSaveMarginTarget = async () => {
 
   // 1) Her ay sonu itibarıyla, ürün bazında ortalama maliyet (kümülatif)
   const avgCostByItemAtMonth: Record<string, Record<string, number>> = {}; // monthKey -> stockItemId -> avgCost
+  const stockByName = Object.fromEntries((stockItems || []).map(si => [si.name?.toLowerCase?.() || '', si.id]));
   last12Months.forEach((mk) => {
     const end = monthEnd(mk).getTime();
     const byItem: Record<string, {qty:number; cost:number}> = {};
     purchases.forEach((p: Purchase) => {
       const t = new Date(p.date).getTime();
       if (t > end) return;
-      const sid = p.stockItemId || (p.invoiceItems && p.invoiceItems.length===1 ? (p as any).invoiceItems[0].stockItemId : undefined);
-      const qty = p.quantityPurchased ?? (p.invoiceItems && p.invoiceItems[0]?.quantity) ?? null;
-      const up = p.unitPrice ?? (p.invoiceItems && p.invoiceItems[0]?.unitPrice) ?? null;
-      if (!sid || qty==null || up==null) return;
-      byItem[sid] = byItem[sid] || { qty:0, cost:0 };
-      byItem[sid].qty += Number(qty)||0;
-      byItem[sid].cost += (Number(qty)||0) * (Number(up)||0);
+      if (Array.isArray(p.invoiceItems) && p.invoiceItems.length>0) {
+        p.invoiceItems.forEach((it) => {
+          const sid = p.stockItemId || (it as any).stockItemId || (it.productName ? stockByName[it.productName.toLowerCase?.() || ''] : undefined);
+          const qty = it.quantity;
+          const up = it.unitPrice;
+          if (!sid || qty==null || up==null) return;
+          byItem[sid] = byItem[sid] || { qty:0, cost:0 };
+          byItem[sid].qty += Number(qty)||0;
+          byItem[sid].cost += (Number(qty)||0) * (Number(up)||0);
+        });
+      } else {
+        const sid = p.stockItemId;
+        const qty = p.quantityPurchased;
+        const up = p.unitPrice;
+        if (!sid || qty==null || up==null) return;
+        byItem[sid] = byItem[sid] || { qty:0, cost:0 };
+        byItem[sid].qty += Number(qty)||0;
+        byItem[sid].cost += (Number(qty)||0) * (Number(up)||0);
+      }
     });
     avgCostByItemAtMonth[mk] = Object.fromEntries(Object.entries(byItem).map(([sid, agg]) => [sid, agg.qty>0 ? agg.cost/agg.qty : 0]));
   });
@@ -276,19 +289,23 @@ const handleSaveMarginTarget = async () => {
     let knownMargin = 0; // bilinen kalemlerden hesaplanan marj
     let unknownSales = 0; // kalemsiz/eksik verili satışların toplam tutarı
 
+    let matchedItemCount = 0;
+    let matchedSalesAmountApprox = 0;
     sales.forEach((s: Sale) => {
       const t = new Date(s.date).getTime();
       if (t < start || t > end) return;
       // Kalemli satışlar öncelikli
       if (Array.isArray(s.items) && s.items.length>0) {
         s.items.forEach((it) => {
-          const sid = s.stockItemId || it.stockItemId || undefined;
+          const sid = s.stockItemId || it.stockItemId || (it.productName ? stockByName[it.productName.toLowerCase?.() || ''] : undefined);
           const qty = it.quantity;
           const up = it.unitPrice;
           if (sid && qty!=null && up!=null) {
             const avg = avgCostMap[sid] ?? 0;
             knownCOGS += (Number(qty)||0) * avg;
             knownMargin += (Number(up)||0 - avg) * (Number(qty)||0);
+            matchedItemCount += 1;
+            matchedSalesAmountApprox += (Number(qty)||0) * (Number(up)||0);
           } else {
             // kalemsiz/eksik
             unknownSales += Number(it.total ?? (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)) || 0;
@@ -301,6 +318,8 @@ const handleSaveMarginTarget = async () => {
         const avg = avgCostMap[sid] ?? 0;
         knownCOGS += qty * avg;
         knownMargin += (up - avg) * qty;
+        matchedItemCount += 1;
+        matchedSalesAmountApprox += qty * up;
       } else {
         unknownSales += Number(s.amount)||0;
       }
@@ -313,6 +332,23 @@ const handleSaveMarginTarget = async () => {
     const fallbackMargin = unknownSales - fallbackCOGS;
 
     const totalMargin = knownMargin + fallbackMargin;
+
+    // Sadece aktif ay için detaylı debug log yaz
+    if (mk === currentMonthKey) {
+      console.log('[BI][Margin Debug Detail]', {
+        monthKey: mk,
+        matchedItemCount,
+        matchedSalesAmountApprox,
+        knownCOGS,
+        knownMargin,
+        unknownSales,
+        purchasesThisMonth,
+        remainingPurchasesForFallback,
+        fallbackCOGS,
+        fallbackMargin,
+        totalMargin,
+      });
+    }
     return { date: mk, margin: totalMargin };
   });
   const marginByCustomer: {name:string, margin:number}[] = Object.entries(salesByCustomer)
