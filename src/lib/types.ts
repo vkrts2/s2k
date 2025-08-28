@@ -360,6 +360,8 @@ export interface PurchaseInvoiceItem {
   unit?: string; // örn: kg, adet, mt
   unitPrice?: number;
   taxRate?: number; // KDV oranı (stok/ürün alışlarında)
+  // Stoğa bağlama için opsiyonel alan
+  stockItemId?: string;
 }
 
 export interface Quotation {

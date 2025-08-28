@@ -61,7 +61,7 @@ export default function StockPage() {
 
   // Bağlama modalı state (tekil veya toplu)
   const [bindOpen, setBindOpen] = useState(false);
-  const [bindRecords, setBindRecords] = useState<Array<{ type: 'purchase' | 'sale'; raw: any }>>([]);
+  const [bindRecords, setBindRecords] = useState<Array<{ type: 'purchase' | 'sale' | 'purchaseItem' | 'saleItem'; raw: any; itemIndex?: number }>>([]);
   const [bindMode, setBindMode] = useState<'existing' | 'new'>('existing');
   const [selectedStockItemId, setSelectedStockItemId] = useState<string | undefined>(undefined);
   const [newItemName, setNewItemName] = useState("");
@@ -72,6 +72,10 @@ export default function StockPage() {
   // Toplu seçim state
   const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<Set<string>>(new Set());
   const [selectedSaleIds, setSelectedSaleIds] = useState<Set<string>>(new Set());
+
+  // '+N kalem' detaylarını aç/kapat
+  const [expandedPurchases, setExpandedPurchases] = useState<Set<string>>(new Set());
+  const [expandedSales, setExpandedSales] = useState<Set<string>>(new Set());
 
   const { toast } = useToast();
 
@@ -150,7 +154,7 @@ export default function StockPage() {
     }
   }, [user, toast, authLoading]);
 
-  const openBindModal = useCallback((record: { type: 'purchase' | 'sale'; raw: any }) => {
+  const openBindModal = useCallback((record: { type: 'purchase' | 'sale' | 'purchaseItem' | 'saleItem'; raw: any; itemIndex?: number }) => {
     setBindRecords([record]);
     setBindMode('existing');
     setSelectedStockItemId(undefined);
@@ -220,8 +224,24 @@ export default function StockPage() {
         try {
           if (rec.type === 'purchase') {
             await updatePurchase(user.uid, { ...rec.raw, stockItemId: stockItemIdToUse });
-          } else {
+          } else if (rec.type === 'sale') {
             await updateSale(user.uid, { ...rec.raw, stockItemId: stockItemIdToUse });
+          } else if (rec.type === 'purchaseItem') {
+            const parent = { ...rec.raw };
+            const idx = rec.itemIndex as number;
+            const items = Array.isArray(parent.invoiceItems) ? [...parent.invoiceItems] : [];
+            if (items[idx]) {
+              items[idx] = { ...items[idx], stockItemId: stockItemIdToUse };
+            }
+            await updatePurchase(user.uid, { ...parent, invoiceItems: items });
+          } else if (rec.type === 'saleItem') {
+            const parent = { ...rec.raw };
+            const idx = rec.itemIndex as number;
+            const items = Array.isArray(parent.items) ? [...parent.items] : [];
+            if (items[idx]) {
+              items[idx] = { ...items[idx], stockItemId: stockItemIdToUse };
+            }
+            await updateSale(user.uid, { ...parent, items });
           }
           success++;
         } catch (e) {
@@ -249,6 +269,22 @@ export default function StockPage() {
   const purchasesNormal = useMemo(() => unlinkedPurchases.filter(p => !extraRegex.test((p.productName || "").toString())), [unlinkedPurchases, extraRegex]);
   const salesExtra = useMemo(() => unlinkedSales.filter(s => extraRegex.test((s.productName || "").toString())), [unlinkedSales, extraRegex]);
   const salesNormal = useMemo(() => unlinkedSales.filter(s => !extraRegex.test((s.productName || "").toString())), [unlinkedSales, extraRegex]);
+
+  const togglePurchaseExpand = useCallback((id: string) => {
+    setExpandedPurchases(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }, []);
+
+  const toggleSaleExpand = useCallback((id: string) => {
+    setExpandedSales(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }, []);
 
   useEffect(() => {
     document.title = "Stok Yönetimi | ERMAY";
@@ -439,12 +475,16 @@ export default function StockPage() {
                 </TableRow>
               ) : (
                 purchasesExtra.map((p) => (
+                  <>
                   <TableRow key={p.id}>
                     <TableCell>
                       <input type="checkbox" checked={selectedPurchaseIds.has(p.id)} onChange={() => togglePurchaseSelection(p.id)} />
                     </TableCell>
                     <TableCell>{format(parseISO(p.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
-                    <TableCell className="font-medium">{p.productName}</TableCell>
+                    <TableCell className="font-medium flex items-center gap-2">
+                      <button className="text-xs px-2 py-0.5 rounded bg-muted" onClick={() => togglePurchaseExpand(p.id)}>{expandedPurchases.has(p.id) ? '−' : '+'}</button>
+                      <span>{p.productName}</span>
+                    </TableCell>
                     <TableCell>{p.supplierName}</TableCell>
                     <TableCell className="text-right">{p.quantity ?? '-'}</TableCell>
                     <TableCell className="text-right">{p.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</TableCell>
@@ -453,6 +493,33 @@ export default function StockPage() {
                       <Button size="sm" variant="secondary" onClick={() => openBindModal({ type: 'purchase', raw: p.raw })}>Stoğa Bağla</Button>
                     </TableCell>
                   </TableRow>
+                  {expandedPurchases.has(p.id) && (
+                    <TableRow>
+                      <TableCell colSpan={8}>
+                        <div className="rounded-md border p-3 bg-background/50">
+                          <div className="text-sm font-medium mb-2">Fatura Kalemleri</div>
+                          <div className="space-y-2">
+                            {(p.raw?.invoiceItems || []).map((it: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between gap-3 text-sm">
+                                <div className="flex-1">
+                                  <div className="font-medium">{it.productName}</div>
+                                  <div className="text-muted-foreground">{it.quantity ?? '-'} {it.unit || ''} · Birim: {it.unitPrice ?? '-'}</div>
+                                </div>
+                                <div className="shrink-0">
+                                  {it.stockItemId ? (
+                                    <span className="text-emerald-500 text-xs">Stoğa Bağlı</span>
+                                  ) : (
+                                    <Button size="sm" onClick={() => openBindModal({ type: 'purchaseItem', raw: p.raw, itemIndex: idx })}>Kalemi Stoğa Bağla</Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  </>
                 ))
               )}
             </TableBody>
@@ -572,12 +639,16 @@ export default function StockPage() {
                 </TableRow>
               ) : (
                 salesNormal.map((s) => (
+                  <>
                   <TableRow key={s.id}>
                     <TableCell>
                       <input type="checkbox" checked={selectedSaleIds.has(s.id)} onChange={() => toggleSaleSelection(s.id)} />
                     </TableCell>
                     <TableCell>{format(parseISO(s.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
-                    <TableCell className="font-medium">{s.productName}</TableCell>
+                    <TableCell className="font-medium flex items-center gap-2">
+                      <button className="text-xs px-2 py-0.5 rounded bg-muted" onClick={() => toggleSaleExpand(s.id)}>{expandedSales.has(s.id) ? '−' : '+'}</button>
+                      <span>{s.productName}</span>
+                    </TableCell>
                     <TableCell>{s.customerName}</TableCell>
                     <TableCell className="text-right">{s.quantity ?? '-'}</TableCell>
                     <TableCell className="text-right">{s.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</TableCell>
@@ -586,6 +657,33 @@ export default function StockPage() {
                       <Button size="sm" variant="secondary" onClick={() => openBindModal({ type: 'sale', raw: s.raw })}>Stoğa Bağla</Button>
                     </TableCell>
                   </TableRow>
+                  {expandedSales.has(s.id) && (
+                    <TableRow>
+                      <TableCell colSpan={8}>
+                        <div className="rounded-md border p-3 bg-background/50">
+                          <div className="text-sm font-medium mb-2">Satış Kalemleri</div>
+                          <div className="space-y-2">
+                            {(s.raw?.items || []).map((it: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between gap-3 text-sm">
+                                <div className="flex-1">
+                                  <div className="font-medium">{it.productName}</div>
+                                  <div className="text-muted-foreground">{it.quantity ?? '-'} {it.unit || ''} · Birim: {it.unitPrice ?? '-'}</div>
+                                </div>
+                                <div className="shrink-0">
+                                  {it.stockItemId ? (
+                                    <span className="text-emerald-500 text-xs">Stoğa Bağlı</span>
+                                  ) : (
+                                    <Button size="sm" onClick={() => openBindModal({ type: 'saleItem', raw: s.raw, itemIndex: idx })}>Kalemi Stoğa Bağla</Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  </>
                 ))
               )}
             </TableBody>
