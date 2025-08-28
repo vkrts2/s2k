@@ -600,12 +600,16 @@ export default function StockPage() {
                 </TableRow>
               ) : (
                 salesExtra.map((s) => (
+                  <>
                   <TableRow key={s.id}>
                     <TableCell>
                       <input type="checkbox" checked={selectedSaleIds.has(s.id)} onChange={() => toggleSaleSelection(s.id)} />
                     </TableCell>
                     <TableCell>{format(parseISO(s.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
-                    <TableCell className="font-medium">{s.productName}</TableCell>
+                    <TableCell className="font-medium flex items-center gap-2">
+                      <button className="text-xs px-2 py-0.5 rounded bg-muted" onClick={() => toggleSaleExpand(s.id)}>{expandedSales.has(s.id) ? '−' : '+'}</button>
+                      <span>{s.productName}</span>
+                    </TableCell>
                     <TableCell>{s.customerName}</TableCell>
                     <TableCell className="text-right">{s.quantity ?? '-'}</TableCell>
                     <TableCell className="text-right">{s.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</TableCell>
@@ -614,6 +618,33 @@ export default function StockPage() {
                       <Button size="sm" variant="secondary" onClick={() => openBindModal({ type: 'sale', raw: s.raw })}>Stoğa Bağla</Button>
                     </TableCell>
                   </TableRow>
+                  {expandedSales.has(s.id) && (
+                    <TableRow>
+                      <TableCell colSpan={8}>
+                        <div className="rounded-md border p-3 bg-background/50">
+                          <div className="text-sm font-medium mb-2">Satış Kalemleri</div>
+                          <div className="space-y-2">
+                            {(s.raw?.items || []).map((it: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between gap-3 text-sm">
+                                <div className="flex-1">
+                                  <div className="font-medium">{it.productName}</div>
+                                  <div className="text-muted-foreground">{it.quantity ?? '-'} {it.unit || ''} · Birim: {it.unitPrice ?? '-'}</div>
+                                </div>
+                                <div className="shrink-0">
+                                  {it.stockItemId ? (
+                                    <span className="text-emerald-500 text-xs">Stoğa Bağlı</span>
+                                  ) : (
+                                    <Button size="sm" onClick={() => openBindModal({ type: 'saleItem', raw: s.raw, itemIndex: idx })}>Kalemi Stoğa Bağla</Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  </>
                 ))
               )}
             </TableBody>
