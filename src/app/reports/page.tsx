@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Sale, Payment, Purchase, PaymentToSupplier } from '@/lib/types';
+import { Sale, Payment, Purchase, PaymentToSupplier, StockItem } from '@/lib/types';
 import { format, getMonth, getYear, startOfMonth, endOfMonth } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +46,7 @@ const ReportsPage = () => {
     let payments: Payment[] = [];
     let purchases: Purchase[] = [];
     let paymentsToSuppliers: PaymentToSupplier[] = [];
+    let stockItems: StockItem[] = [];
 
     const fetchData = () => {
       // Calculate total receivables
@@ -83,6 +84,10 @@ const ReportsPage = () => {
       purchases = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Purchase));
       fetchData();
     });
+    const unsubscribeStock = onSnapshot(collection(db, `users/${user.uid}/stockItems`), (snapshot: QuerySnapshot<DocumentData>) => {
+      stockItems = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as StockItem));
+      fetchData();
+    });
     unsubscribePaymentsToSuppliers = onSnapshot(collection(db, `users/${user.uid}/paymentsToSuppliers`), (snapshot: QuerySnapshot<DocumentData>) => {
       paymentsToSuppliers = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as PaymentToSupplier));
       fetchData();
@@ -91,6 +96,7 @@ const ReportsPage = () => {
       if (unsubscribeSales) unsubscribeSales();
       if (unsubscribePayments) unsubscribePayments();
       if (unsubscribePurchases) unsubscribePurchases();
+      if (unsubscribeStock) unsubscribeStock();
       if (unsubscribePaymentsToSuppliers) unsubscribePaymentsToSuppliers();
     };
   }, [user, authLoading]);
@@ -102,8 +108,13 @@ const ReportsPage = () => {
     let unsubscribePurchases: (() => void) | null = null;
     let sales: Sale[] = [];
     let purchases: Purchase[] = [];
+    let stockItems: StockItem[] = [];
     const calculateMonthlyData = () => {
       const data: MonthlyData[] = [];
+      // Yardımcılar: ay anahtarı ve ay sonu
+      const getMonthKey = (d: Date) => `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
+      const monthEnd = (key:string) => { const [y, m] = key.split('-').map(Number); return new Date(y, m, 0, 23,59,59,999); };
+      const stockByName = Object.fromEntries((stockItems || []).map(si => [si.name?.toLowerCase?.() || '', si.id]));
       for (let i = 0; i < 12; i++) {
         const monthName = format(new Date(selectedYear, i), 'MMMM', { locale: tr });
         const monthlySales = sales
@@ -118,11 +129,88 @@ const ReportsPage = () => {
             return getYear(purchaseDate) === selectedYear && getMonth(purchaseDate) === i;
           })
           .reduce((acc, purchase) => acc + purchase.amount, 0);
+        // BI ile aynı ürün-bazlı marj hesabı
+        const mk = `${selectedYear}-${(i+1).toString().padStart(2,'0')}`;
+        const end = monthEnd(mk).getTime();
+        const start = new Date(selectedYear, i, 1).getTime();
+
+        // Ay sonu itibarıyla ürün bazında ortalama maliyet (kümülatif)
+        const byItem: Record<string, {qty:number; cost:number}> = {};
+        purchases.forEach((p: Purchase) => {
+          const t = new Date(p.date).getTime();
+          if (t > end) return;
+          if (Array.isArray(p.invoiceItems) && p.invoiceItems.length>0) {
+            p.invoiceItems.forEach((it: any) => {
+              const sid = p.stockItemId || it.stockItemId || (it.productName ? stockByName[it.productName.toLowerCase?.() || ''] : undefined);
+              const qty = it.quantity;
+              const up = it.unitPrice;
+              if (!sid || qty==null || up==null) return;
+              (byItem[sid] ||= { qty:0, cost:0 });
+              byItem[sid].qty += Number(qty)||0;
+              byItem[sid].cost += (Number(qty)||0) * (Number(up)||0);
+            });
+          } else {
+            const sid = p.stockItemId;
+            const qty = (p as any).quantityPurchased;
+            const up = p.unitPrice;
+            if (!sid || qty==null || up==null) return;
+            (byItem[sid] ||= { qty:0, cost:0 });
+            byItem[sid].qty += Number(qty)||0;
+            byItem[sid].cost += (Number(qty)||0) * (Number(up)||0);
+          }
+        });
+        const avgCostMap: Record<string, number> = Object.fromEntries(Object.entries(byItem).map(([sid, agg]) => [sid, (agg as any).qty>0 ? (agg as any).cost/(agg as any).qty : 0]));
+
+        let knownCOGS = 0;
+        let knownMargin = 0;
+        let unknownSales = 0;
+        sales.forEach((s: Sale) => {
+          const t = new Date(s.date).getTime();
+          if (t < start || t > end) return;
+          if (Array.isArray(s.items) && s.items.length>0) {
+            s.items.forEach((it: any) => {
+              const sid = s.stockItemId || it.stockItemId || (it.productName ? stockByName[it.productName.toLowerCase?.() || ''] : undefined);
+              const qty = it.quantity;
+              const up = it.unitPrice;
+              if (sid && qty!=null && up!=null) {
+                const hasAvg = Object.prototype.hasOwnProperty.call(avgCostMap, sid) && Number.isFinite(avgCostMap[sid]);
+                if (hasAvg) {
+                  const avg = Number(avgCostMap[sid]) || 0;
+                  knownCOGS += (Number(qty)||0) * avg;
+                  knownMargin += (Number(up)||0 - avg) * (Number(qty)||0);
+                } else {
+                  unknownSales += Number(it.total ?? (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)) || 0;
+                }
+              } else {
+                unknownSales += Number(it.total ?? (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)) || 0;
+              }
+            });
+          } else if (s.stockItemId && (s as any).quantity!=null && s.unitPrice!=null) {
+            const sid = s.stockItemId as string;
+            const qty = Number((s as any).quantity)||0;
+            const up = Number(s.unitPrice)||0;
+            const hasAvg = Object.prototype.hasOwnProperty.call(avgCostMap, sid) && Number.isFinite(avgCostMap[sid]);
+            if (hasAvg) {
+              const avg = Number(avgCostMap[sid]) || 0;
+              knownCOGS += qty * avg;
+              knownMargin += (up - avg) * qty;
+            } else {
+              unknownSales += qty * up;
+            }
+          } else {
+            unknownSales += Number((s as any).amount)||0;
+          }
+        });
+        const remainingPurchasesForFallback = Math.max(0, monthlyPurchases - knownCOGS);
+        const fallbackCOGS = Math.min(remainingPurchasesForFallback, unknownSales);
+        const fallbackMargin = unknownSales - fallbackCOGS;
+        const totalMargin = knownMargin + fallbackMargin;
+
         data.push({
           month: monthName,
           sales: monthlySales,
           purchases: monthlyPurchases,
-          profit: monthlySales - monthlyPurchases,
+          profit: totalMargin,
         });
       }
       setMonthlyData(data);
@@ -135,9 +223,14 @@ const ReportsPage = () => {
       purchases = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Purchase));
       calculateMonthlyData();
     });
+    const unsubscribeStock2 = onSnapshot(collection(db, `users/${user.uid}/stockItems`), (snapshot: QuerySnapshot<DocumentData>) => {
+      stockItems = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as StockItem));
+      calculateMonthlyData();
+    });
     return () => {
       if (unsubscribeSales) unsubscribeSales();
       if (unsubscribePurchases) unsubscribePurchases();
+      if (unsubscribeStock2) unsubscribeStock2();
     };
   }, [user, authLoading, selectedYear]);
 
