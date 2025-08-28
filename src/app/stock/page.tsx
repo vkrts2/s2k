@@ -400,8 +400,9 @@ export default function StockPage() {
 
       {/* Stoğa Eklenmemiş Alışlar */}
       <Card className="shadow-sm">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>Stoğa Eklenmemiş Alışlar</CardTitle>
+          <Button size="sm" variant="outline" onClick={loadItems} disabled={isLoading}>Yenile</Button>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between pb-3">
@@ -453,8 +454,9 @@ export default function StockPage() {
 
       {/* Stoğa Eklenmemiş Satışlar */}
       <Card className="shadow-sm">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>Stoğa Eklenmemiş Satışlar</CardTitle>
+          <Button size="sm" variant="outline" onClick={loadItems} disabled={isLoading}>Yenile</Button>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between pb-3">
