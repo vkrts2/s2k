@@ -550,7 +550,11 @@ export default function StockPage() {
                       <input type="checkbox" checked={selectedPurchaseIds.has(p.id)} onChange={() => togglePurchaseSelection(p.id)} />
                     </TableCell>
                     <TableCell>{format(parseISO(p.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
-                    <TableCell className="font-medium">{p.productName}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/purchases/${p.raw?.id || p.id}`} className="hover:underline">
+                        {p.productName}
+                      </Link>
+                    </TableCell>
                     <TableCell>{p.supplierName}</TableCell>
                     <TableCell className="text-right">{p.quantity ?? '-'}</TableCell>
                     <TableCell className="text-right">{p.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</TableCell>
@@ -678,7 +682,9 @@ export default function StockPage() {
                     <TableCell>{format(parseISO(s.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
                     <TableCell className="font-medium flex items-center gap-2">
                       <button className="text-xs px-2 py-0.5 rounded bg-muted" onClick={() => toggleSaleExpand(s.id)}>{expandedSales.has(s.id) ? '−' : '+'}</button>
-                      <span>{s.productName}</span>
+                      <Link href={`/invoices/${s.raw?.id || s.id}`} className="hover:underline">
+                        {s.productName}
+                      </Link>
                     </TableCell>
                     <TableCell>{s.customerName}</TableCell>
                     <TableCell className="text-right">{s.quantity ?? '-'}</TableCell>
