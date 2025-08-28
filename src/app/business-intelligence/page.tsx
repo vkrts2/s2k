@@ -196,6 +196,47 @@ const handleSaveMarginTarget = async () => {
   });
   const purchasesTrend = last12Months.map(month => ({ date: month, amount: purchasesByMonthFiltered[month] || 0 }));
 
+  // Bu ay için eksik birim fiyat / miktar içeren satış satırları (uyarı listesi)
+  const invalidSalesLinesThisMonth: Array<{date:string; customer:string; product:string; quantity:any; unitPrice:any; total:number}> = [];
+  (sales || []).forEach((s: Sale) => {
+    const t = new Date(s.date).getTime();
+    const [y, m] = currentMonthKey.split('-').map(Number);
+    const start = new Date(y, m - 1, 1).getTime();
+    const end = new Date(y, m, 0, 23,59,59,999).getTime();
+    if (t < start || t > end) return;
+    const customerName = customers.find(c=>c.id===s.customerId)?.name || 'Bilinmeyen';
+    if (Array.isArray(s.items) && s.items.length>0){
+      s.items.forEach((it:any) => {
+        const hasQty = it.quantity!=null && it.quantity!=='';
+        const hasUP = it.unitPrice!=null && it.unitPrice!=='';
+        if (!hasQty || !hasUP){
+          invalidSalesLinesThisMonth.push({
+            date: s.date,
+            customer: customerName,
+            product: it.productName || s.description || '—',
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            total: Number(it.total ?? ((it.quantity && it.unitPrice) ? it.quantity*it.unitPrice : 0)) || 0,
+          });
+        }
+      });
+    } else {
+      const hasQty = (s as any).quantity!=null && (s as any).quantity!=='';
+      const hasUP = (s as any).unitPrice!=null && (s as any).unitPrice!=='';
+      if (!hasQty || !hasUP){
+        invalidSalesLinesThisMonth.push({
+          date: s.date,
+          customer: customerName,
+          product: (s as any).description || '—',
+          quantity: (s as any).quantity,
+          unitPrice: (s as any).unitPrice,
+          total: Number((s as any).amount)||0,
+        });
+      }
+    }
+  });
+  const invalidSalesCount = invalidSalesLinesThisMonth.length;
+
   // Ödemeler bazlı nakit akışı agregasyonu (aylık)
   const paymentsByMonth: { [key: string]: number } = {};
   payments.forEach((p) => {
@@ -648,18 +689,54 @@ const handleSaveMarginTarget = async () => {
 
           {/* KPI Kartları */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Toplam Satış</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">₺{totalSales.toLocaleString()}</div></CardContent></Card>
-            <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Toplam Alış</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">₺{totalPurchases.toLocaleString()}</div></CardContent></Card>
-            <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Müşteri Sayısı</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{customerCount}</div></CardContent></Card>
-            <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tedarikçi Sayısı</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{supplierCount}</div></CardContent></Card>
-            <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Ortalama Satış</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">₺{avgSale.toLocaleString(undefined, {maximumFractionDigits:2})}</div></CardContent></Card>
-            <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Ortalama Alış</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">₺{avgPurchase.toLocaleString(undefined, {maximumFractionDigits:2})}</div></CardContent></Card>
-            <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Brüt Kâr</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">₺{profit.toLocaleString()}</div></CardContent></Card>
-            <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">En Çok Satış Yapılan Müşteri</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{topCustomers[0]?.name || '-'}</div></CardContent></Card>
-            <Card> <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">En Çok Alış Yapılan Tedarikçi</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{topSuppliers[0]?.name || '-'}</div></CardContent></Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Toplam Satış</CardTitle>
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">₺{totalSales.toLocaleString()}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Toplam Alış</CardTitle>
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">₺{totalPurchases.toLocaleString()}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Müşteri Sayısı</CardTitle>
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">{customerCount}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Tedarikçi Sayısı</CardTitle>
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">{supplierCount}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Ortalama Satış</CardTitle>
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">₺{avgSale.toLocaleString(undefined, {maximumFractionDigits:2})}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Ortalama Alış</CardTitle>
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">₺{avgPurchase.toLocaleString(undefined, {maximumFractionDigits:2})}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Eksik Birim/Adet Satır</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${invalidSalesCount>0? 'text-red-600':'text-green-600'}`}>{invalidSalesCount}</div>
+                <div className="text-xs text-muted-foreground">Bu ay birim fiyat veya miktarı eksik olan satış satırı</div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Grafikler */}
+          {/* Trend ve listeler */}
           <div className="grid gap-6 md:grid-cols-2 mt-6">
             <div><h3 className="font-semibold mb-2">Satış Trendi (Son 12 Ay)</h3><LineChartComponent data={salesTrend} valueFormatter={fmtCurrency} /></div>
             <div><h3 className="font-semibold mb-2">Alış Trendi (Son 12 Ay)</h3><LineChartComponent data={purchasesTrend} valueFormatter={fmtCurrency} /></div>
