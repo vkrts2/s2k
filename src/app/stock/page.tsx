@@ -9,6 +9,7 @@ import {
   updateStockItem as storageUpdateStockItem,
   deleteStockItem as storageDeleteStockItem,
 } from "@/lib/storage";
+import { getPurchases, getSupplierById } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Package } from "lucide-react";
 import {
@@ -34,8 +35,10 @@ import { StockForm } from "@/components/stock/stock-form";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from 'next/link';
 import BackToHomeButton from '@/components/common/back-to-home-button';
-import { CardContent } from "@/components/ui/card";
-import { Table } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { format, parseISO } from 'date-fns';
+import { tr } from 'date-fns/locale';
 
 export default function StockPage() {
   const { user, loading: authLoading } = useAuth();
@@ -44,6 +47,7 @@ export default function StockPage() {
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingStockItem, setEditingStockItem] = useState<StockItem | undefined>(undefined);
   const [deletingStockItemId, setDeletingStockItemId] = useState<string | null>(null);
+  const [unlinkedPurchases, setUnlinkedPurchases] = useState<any[]>([]);
 
   const { toast } = useToast();
 
@@ -61,8 +65,31 @@ export default function StockPage() {
     
     setIsLoading(true);
     try {
-      const loadedItems = await getStockItems(user.uid);
+      const [loadedItems, purchases] = await Promise.all([
+        getStockItems(user.uid),
+        getPurchases(user.uid),
+      ]);
       setStockItems(loadedItems);
+
+      // Stoğa bağlanmamış alışları bul (stockItemId yok veya null)
+      const rawUnlinked = purchases.filter(p => !p.stockItemId);
+      // Tedarikçi isimlerini çözümle
+      const supplierIds = Array.from(new Set(rawUnlinked.map(p => p.supplierId).filter(Boolean)));
+      const supplierMap: Record<string, string> = {};
+      await Promise.all(supplierIds.map(async (sid) => {
+        try { const s = await getSupplierById(user.uid, sid); if (s) supplierMap[sid] = s.name; } catch {}
+      }));
+
+      const normalized = rawUnlinked.map(p => ({
+        id: p.id,
+        date: p.date,
+        supplierName: supplierMap[p.supplierId] || 'Bilinmeyen Tedarikçi',
+        productName: p.manualProductName || p.description || 'İsimsiz Ürün',
+        quantity: p.quantityPurchased ?? (Array.isArray(p.invoiceItems) ? (p.invoiceItems.reduce((acc, it) => acc + (it.quantity || 0), 0)) : undefined),
+        amount: p.amount,
+        currency: p.currency,
+      }));
+      setUnlinkedPurchases(normalized);
     } catch (error) {
       console.error("Stok kalemleri yüklenirken hata oluştu:", error);
       toast({
@@ -71,6 +98,7 @@ export default function StockPage() {
         variant: "destructive",
       });
       setStockItems([]);
+      setUnlinkedPurchases([]);
     } finally {
       setIsLoading(false);
     }
@@ -230,6 +258,45 @@ export default function StockPage() {
           </Table>
         </div>
       </CardContent>
+
+      {/* Stoğa Eklenmemiş Alışlar */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Stoğa Eklenmemiş Alışlar</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tarih</TableHead>
+                <TableHead>Ürün</TableHead>
+                <TableHead>Tedarikçi</TableHead>
+                <TableHead className="text-right">Miktar</TableHead>
+                <TableHead className="text-right">Tutar</TableHead>
+                <TableHead>Para Birimi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {unlinkedPurchases.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">Kayıt bulunamadı.</TableCell>
+                </TableRow>
+              ) : (
+                unlinkedPurchases.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell>{format(parseISO(p.date), 'dd MMMM yyyy', { locale: tr })}</TableCell>
+                    <TableCell className="font-medium">{p.productName}</TableCell>
+                    <TableCell>{p.supplierName}</TableCell>
+                    <TableCell className="text-right">{p.quantity ?? '-'}</TableCell>
+                    <TableCell className="text-right">{p.amount?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell>{p.currency}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
       </div>
     </div>
   );
