@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: NextRequest) {
@@ -9,6 +10,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Geçersiz istek: 'prompt' gerekli." }, { status: 400 });
     }
 
+    // Geçici debug: env var görünüyor mu?
+    // Not: Üretimde kaldırılacak.
+    console.log("[chat api] GOOGLE_API_KEY exists:", Boolean(process.env.GOOGLE_API_KEY));
     const apiKey = process.env.GOOGLE_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "Sunucu yapılandırma hatası: GOOGLE_API_KEY tanımlı değil." }, { status: 500 });
