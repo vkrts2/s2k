@@ -490,6 +490,19 @@ export default function DashboardPage() {
                 </p>
               </CardContent>
             </Card>
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Chat Bot</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Sorularınızı sorun; Gemini destekli asistan yanıtlasın.
+                </p>
+                <Link href="/chat">
+                  <Button variant="default">Chat Bot'u Aç</Button>
+                </Link>
+              </CardContent>
+            </Card>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {statistics.map((stat, index) => (
