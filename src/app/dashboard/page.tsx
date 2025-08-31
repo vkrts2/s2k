@@ -20,6 +20,7 @@ import { collection, query, where, getDocs, orderBy, limit, doc } from "firebase
 import { db } from "@/lib/firebase";
 import { format, parseISO } from "date-fns";
 import { tr } from "date-fns/locale";
+import ChatWidget from "@/components/ChatWidget";
 import {
   LineChart,
   Line,
@@ -557,6 +558,16 @@ export default function DashboardPage() {
                     <Line type="monotone" dataKey="sales" stroke="#8884d8" activeDot={{ r: 8 }} name="Satışlar" />
                   </LineChart>
                 </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-7">
+              <CardHeader>
+                <CardTitle>Chat Bot</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChatWidget />
               </CardContent>
             </Card>
           </div>
