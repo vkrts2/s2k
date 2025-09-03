@@ -44,18 +44,6 @@ const navItems = [
     icon: <ReceiptText className="h-8 w-8 mb-2 text-primary" />,
   },
   {
-    href: '/reports',
-    label: 'Raporlar',
-    description: 'Finansal özetlerinizi görüntüleyin.',
-    icon: <AreaChart className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
-    href: '/business-intelligence',
-    label: 'İş Zekası',
-    description: 'Dashboard widgetları ve KPI takibi.',
-    icon: <Brain className="h-8 w-8 mb-2 text-primary" />,
-  },
-  {
     href: '/chat',
     label: 'Chat Bot',
     description: 'Gemini destekli asistan ile sohbet edin.',

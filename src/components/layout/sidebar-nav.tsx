@@ -10,7 +10,6 @@ import {
   ClipboardList,
   FileText,
   LineChart,
-  Brain,
   Calculator,
   Package,
   DollarSign,
@@ -74,17 +73,7 @@ export function SidebarNav() {
         <FileText className="h-4 w-4" />
         Fiyat Teklifleri
       </Link>
-      <Link
-        href="/business-intelligence"
-        className={cn(
-          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-          pathname === "/business-intelligence" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-        )}
-      >
-        <Brain className="h-4 w-4" />
-        İş Zekası
-      </Link>
-      
+
       <Link
         href="/calculator"
         className={cn(
