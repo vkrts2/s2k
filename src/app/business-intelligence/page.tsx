@@ -693,6 +693,36 @@ const handleSaveMarginTarget = async () => {
       costByProduct[k] = curr;
     }
   });
+  // Fallback maliyet havuzu: seçili tarih aralığındaki alışları aynı anahtar ile grupla
+  const purchasePoolByKey: { [key: string]: number } = {};
+  purchases
+    .filter(p => {
+      if (!dateRange) return true;
+      const d = new Date(p.date);
+      return d >= new Date(dateRange.start) && d <= new Date(dateRange.end);
+    })
+    .forEach(p => {
+      if (Array.isArray((p as any).invoiceItems) && (p as any).invoiceItems.length > 0) {
+        (p as any).invoiceItems.forEach((it: any) => {
+          const k = normalizeProductKey((p as any).stockItemId || it.stockItemId, it.productName || (p as any).description || (p as any).manualProductName);
+          const lineTotal = Number(it.total ?? ((it.quantity ?? 0) * (it.unitPrice ?? 0))) || 0;
+          purchasePoolByKey[k] = (purchasePoolByKey[k] || 0) + lineTotal;
+        });
+      } else {
+        const k = normalizeProductKey((p as any).stockItemId, (p as any).description || (p as any).manualProductName);
+        purchasePoolByKey[k] = (purchasePoolByKey[k] || 0) + (p.amount || 0);
+      }
+    });
+  // Satışa dayalı COGS 0 kalan ürünler için, alış havuzundan maliyeti doldur
+  Object.keys(salesByProduct).forEach(k => {
+    const current = costByProduct[k]?.total || 0;
+    if (current > 0) return;
+    const pool = purchasePoolByKey[k] || 0;
+    if (pool > 0) {
+      const name = salesByProduct[k]?.name || displayNameFromKey(k);
+      costByProduct[k] = { name, total: pool };
+    }
+  });
   const allKeys = new Set<string>([...Object.keys(salesByProduct), ...Object.keys(costByProduct)]);
   const productProfitability: Array<{ name: string; sales: number; cost: number; profit: number }> = Array.from(allKeys).map(k => {
     const s = salesByProduct[k]?.total || 0;
