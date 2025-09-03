@@ -78,7 +78,21 @@ export function TaskModal({
               type="text"
               placeholder="gg.aa.yyyy"
               value={formValues.dueDate ? format(formValues.dueDate, "PPP", { locale: tr }) : ""}
-              onChange={(e) => setFormValues({ ...formValues, dueDate: e.target.value ? new Date(e.target.value) : undefined })}
+              onChange={(e) => {
+                try {
+                  const dateValue = e.target.value;
+                  if (dateValue) {
+                    const newDate = new Date(dateValue);
+                    if (!isNaN(newDate.getTime())) {
+                      setFormValues({ ...formValues, dueDate: newDate });
+                    }
+                  } else {
+                    setFormValues({ ...formValues, dueDate: undefined });
+                  }
+                } catch (error) {
+                  console.error('Invalid date value:', e.target.value);
+                }
+              }}
                 />
           </div>
           <div className="flex justify-end">

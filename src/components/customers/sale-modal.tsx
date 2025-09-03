@@ -111,7 +111,21 @@ function LightweightInvoiceForm({
       </div>
       <div className="grid gap-2">
         <Label>Tarih</Label>
-        <Input type="date" value={date.toISOString().slice(0,10)} onChange={e => setDate(new Date(e.target.value))} className="w-48" />
+        <Input 
+          type="date" 
+          value={date.toISOString().slice(0,10)} 
+          onChange={e => {
+            try {
+              const newDate = new Date(e.target.value);
+              if (!isNaN(newDate.getTime())) {
+                setDate(newDate);
+              }
+            } catch (error) {
+              console.error('Invalid date value:', e.target.value);
+            }
+          }} 
+          className="w-48" 
+        />
       </div>
       <div className="grid gap-2">
         <Label>Para Birimi</Label>

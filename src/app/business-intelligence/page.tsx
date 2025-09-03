@@ -569,13 +569,33 @@ const handleSaveMarginTarget = async () => {
 
   // En çok satılan ürünler (ID öncelikli)
   const stockIndex: Record<string, string> = Object.fromEntries(stockItems.map(si => [si.id, si.name]));
-  const salesByProduct: {[key: string]: {name:string; total:number}} = {};
+  // Not: Daha önce yukarıda avgCost hesapları için oluşturduğumuz stockByName mevcuttur.
+  // Aynı normalizasyonu ürün kârlılık bölümünde de kullanacağız.
+  const normalizeProductKey = (stockItemId?: string | null, nameLike?: string | null) => {
+    if (stockItemId) return `id:${stockItemId}`;
+    const keyName = (nameLike || '').toString().trim().toLowerCase();
+    if (!keyName) return 'name:diğer';
+    const sid = (stockByName as Record<string,string>)[keyName];
+    return sid ? `id:${sid}` : `name:${keyName}`;
+  };
+
+  const displayNameFromKey = (k: string) => {
+    if (k.startsWith('id:')) {
+      const sid = k.slice(3);
+      return stockIndex[sid] || sid;
+    }
+    // name:xxx
+    const nm = k.slice(5);
+    return nm || 'Diğer';
+  };
+
+  const salesByProduct: { [key: string]: { name: string; total: number } } = {};
   filteredSales.forEach(sale => {
-    const key = sale.stockItemId || sale.description || 'Diğer';
-    const name = sale.stockItemId ? (stockIndex[sale.stockItemId] || sale.description || sale.stockItemId) : (sale.description || 'Diğer');
-    const curr = salesByProduct[key] || { name, total: 0 };
+    const k = normalizeProductKey((sale as any).stockItemId, (sale as any).description);
+    const name = displayNameFromKey(k);
+    const curr = salesByProduct[k] || { name, total: 0 };
     curr.total += (sale.amount || 0);
-    salesByProduct[key] = curr;
+    salesByProduct[k] = curr;
   });
   const topProducts = Object.values(salesByProduct)
     .sort((a, b) => b.total - a.total)
@@ -583,21 +603,21 @@ const handleSaveMarginTarget = async () => {
     .map((item) => ({ name: item.name, total: item.total }));
 
   // Ürün Kârlılık: ID öncelikli eşleme (stok), yoksa açıklama/manuel adı
-  const costByProduct: {[key: string]: {name:string; total:number}} = {};
+  const costByProduct: { [key: string]: { name: string; total: number } } = {};
   filteredPurchases.forEach(p => {
-    const key = p.stockItemId || p.description || p.manualProductName || 'Diğer';
-    const name = p.stockItemId ? (stockIndex[p.stockItemId] || p.description || key) : (p.description || p.manualProductName || 'Diğer');
-    const curr = costByProduct[key] || { name, total: 0 };
+    const k = normalizeProductKey((p as any).stockItemId, (p as any).description || (p as any).manualProductName);
+    const name = displayNameFromKey(k);
+    const curr = costByProduct[k] || { name, total: 0 };
     curr.total += (p.amount || 0);
-    costByProduct[key] = curr;
+    costByProduct[k] = curr;
   });
   const allKeys = new Set<string>([...Object.keys(salesByProduct), ...Object.keys(costByProduct)]);
-  const productProfitability: Array<{name:string; sales:number; cost:number; profit:number}> = Array.from(allKeys).map(key => {
-    const s = salesByProduct[key]?.total || 0;
-    const c = costByProduct[key]?.total || 0;
-    const name = salesByProduct[key]?.name || costByProduct[key]?.name || key;
+  const productProfitability: Array<{ name: string; sales: number; cost: number; profit: number }> = Array.from(allKeys).map(k => {
+    const s = salesByProduct[k]?.total || 0;
+    const c = costByProduct[k]?.total || 0;
+    const name = salesByProduct[k]?.name || costByProduct[k]?.name || displayNameFromKey(k);
     return { name, sales: s, cost: c, profit: s - c };
-  }).sort((a,b)=> b.profit - a.profit).slice(0, 10);
+  }).sort((a, b) => b.profit - a.profit).slice(0, 10);
 
   // Müşteri segmentasyonu kaldırıldı
 

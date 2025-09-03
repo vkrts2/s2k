@@ -58,7 +58,19 @@ export function ContactHistoryModal({
               type="text"
               placeholder="gg.aa.yyyy"
               value={formValues.date ? format(formValues.date, "PPP") : ''}
-              onChange={(e) => setFormValues({ ...formValues, date: new Date(e.target.value) })}
+              onChange={(e) => {
+                try {
+                  const dateValue = e.target.value;
+                  if (dateValue) {
+                    const newDate = new Date(dateValue);
+                    if (!isNaN(newDate.getTime())) {
+                      setFormValues({ ...formValues, date: newDate });
+                    }
+                  }
+                } catch (error) {
+                  console.error('Invalid date value:', e.target.value);
+                }
+              }}
               className="col-span-3"
             />
           </div>
