@@ -293,9 +293,32 @@ const handleSaveMarginTarget = async () => {
   const monthEnd = (key:string) => { const [y, m] = key.split('-').map(Number); return new Date(y, m, 0, 23,59,59,999); };
   const getMonthKey = (d: Date) => `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
 
+  // Ürün adı normalizasyonu ve isimden stok ID çözümleme (eşleşmeyi güçlendirmek için)
+  const normalizeName = (s: string | null | undefined): string => {
+    const raw = (s ?? '').toString().toLowerCase();
+    // Unicode normalizasyonu + harf/rakam dışını boşluk yap + fazlalık boşlukları sadeleştir
+    return raw
+      .normalize('NFKD')
+      .replace(/[^\p{Letter}\p{Number}]+/gu, ' ')
+      .trim()
+      .replace(/\s+/g, ' ');
+  };
+  const stockByNameRaw: Record<string, string> = Object.fromEntries(
+    (stockItems || []).map(si => [ (si.name ?? '').toString().toLowerCase(), si.id ])
+  );
+  const stockByNameNorm: Record<string, string> = Object.fromEntries(
+    (stockItems || []).map(si => [ normalizeName(si.name ?? ''), si.id ])
+  );
+  const resolveNameToId = (nameLike?: string | null): string | undefined => {
+    if (!nameLike) return undefined;
+    const raw = (nameLike || '').toString().toLowerCase();
+    if (stockByNameRaw[raw]) return stockByNameRaw[raw];
+    const norm = normalizeName(nameLike);
+    return stockByNameNorm[norm];
+  };
+
   // 1) Her ay sonu itibarıyla, ürün bazında ortalama maliyet (kümülatif)
   const avgCostByItemAtMonth: Record<string, Record<string, number>> = {}; // monthKey -> stockItemId -> avgCost
-  const stockByName = Object.fromEntries((stockItems || []).map(si => [si.name?.toLowerCase?.() || '', si.id]));
   last12Months.forEach((mk) => {
     const end = monthEnd(mk).getTime();
     const byItem: Record<string, {qty:number; cost:number}> = {};
@@ -304,7 +327,7 @@ const handleSaveMarginTarget = async () => {
       if (t > end) return;
       if (Array.isArray(p.invoiceItems) && p.invoiceItems.length>0) {
         p.invoiceItems.forEach((it) => {
-          const sid = p.stockItemId || (it as any).stockItemId || (it.productName ? stockByName[it.productName.toLowerCase?.() || ''] : undefined);
+          const sid = p.stockItemId || (it as any).stockItemId || resolveNameToId((it as any).productName);
           const qty = it.quantity;
           const up = it.unitPrice;
           if (!sid || qty==null || up==null) return;
@@ -343,7 +366,7 @@ const handleSaveMarginTarget = async () => {
       // Kalemli satışlar öncelikli
       if (Array.isArray(s.items) && s.items.length>0) {
         s.items.forEach((it) => {
-          const sid = s.stockItemId || it.stockItemId || (it.productName ? stockByName[it.productName.toLowerCase?.() || ''] : undefined);
+          const sid = s.stockItemId || it.stockItemId || resolveNameToId((it as any).productName);
           const qty = it.quantity;
           const up = it.unitPrice;
           if (sid && qty!=null && up!=null) {
@@ -423,7 +446,7 @@ const handleSaveMarginTarget = async () => {
     const cid = s.customerId;
     if (Array.isArray(s.items) && s.items.length>0) {
       s.items.forEach((it) => {
-        const sid = s.stockItemId || it.stockItemId || (it.productName ? stockByName[it.productName.toLowerCase?.() || ''] : undefined);
+        const sid = s.stockItemId || it.stockItemId || resolveNameToId((it as any).productName);
         const qty = it.quantity;
         const up = it.unitPrice;
         if (sid && qty!=null && up!=null && Object.prototype.hasOwnProperty.call(avgCostMapCurrent, sid) && Number.isFinite(avgCostMapCurrent[sid])) {
@@ -575,8 +598,8 @@ const handleSaveMarginTarget = async () => {
     if (stockItemId) return `id:${stockItemId}`;
     const keyName = (nameLike || '').toString().trim().toLowerCase();
     if (!keyName) return 'name:diğer';
-    const sid = (stockByName as Record<string,string>)[keyName];
-    return sid ? `id:${sid}` : `name:${keyName}`;
+    const sid = resolveNameToId(keyName);
+    return sid ? `id:${sid}` : `name:${normalizeName(keyName)}`;
   };
 
   const displayNameFromKey = (k: string) => {
@@ -603,13 +626,30 @@ const handleSaveMarginTarget = async () => {
     .map((item) => ({ name: item.name, total: item.total }));
 
   // Ürün Kârlılık: ID öncelikli eşleme (stok), yoksa açıklama/manuel adı
+  // Kârlılık için maliyetleri tedarikçi filtresinden bağımsız, sadece tarih aralığına göre dahil et
+  const purchasesForProfit = purchases.filter(p => {
+    if (!dateRange) return true;
+    const d = new Date(p.date);
+    return d >= new Date(dateRange.start) && d <= new Date(dateRange.end);
+  });
   const costByProduct: { [key: string]: { name: string; total: number } } = {};
-  filteredPurchases.forEach(p => {
-    const k = normalizeProductKey((p as any).stockItemId, (p as any).description || (p as any).manualProductName);
-    const name = displayNameFromKey(k);
-    const curr = costByProduct[k] || { name, total: 0 };
-    curr.total += (p.amount || 0);
-    costByProduct[k] = curr;
+  purchasesForProfit.forEach(p => {
+    if (Array.isArray((p as any).invoiceItems) && (p as any).invoiceItems.length > 0) {
+      (p as any).invoiceItems.forEach((it: any) => {
+        const k = normalizeProductKey((p as any).stockItemId || it.stockItemId, it.productName || (p as any).description || (p as any).manualProductName);
+        const name = displayNameFromKey(k);
+        const curr = costByProduct[k] || { name, total: 0 };
+        const lineTotal = Number(it.total ?? ((it.quantity ?? 0) * (it.unitPrice ?? 0))) || 0;
+        curr.total += lineTotal;
+        costByProduct[k] = curr;
+      });
+    } else {
+      const k = normalizeProductKey((p as any).stockItemId, (p as any).description || (p as any).manualProductName);
+      const name = displayNameFromKey(k);
+      const curr = costByProduct[k] || { name, total: 0 };
+      curr.total += (p.amount || 0);
+      costByProduct[k] = curr;
+    }
   });
   const allKeys = new Set<string>([...Object.keys(salesByProduct), ...Object.keys(costByProduct)]);
   const productProfitability: Array<{ name: string; sales: number; cost: number; profit: number }> = Array.from(allKeys).map(k => {
