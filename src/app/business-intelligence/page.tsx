@@ -173,8 +173,9 @@ const handleSaveMarginTarget = async () => {
     const v = Number(m[1].replace(',', '.'));
     return isFinite(v) && v>0 ? v : null;
   };
-  const detectUnit = (explicitUnit?: string|null, productName?: string): 'MT'|'RULO'|'ADET'|'OTHER' => {
+  const detectUnit = (explicitUnit?: string|null, productName?: string): 'KG'|'MT'|'RULO'|'ADET'|'OTHER' => {
     const u = (explicitUnit || '').toString().trim().toUpperCase();
+    if (u === 'KG' || u === 'KGS' || u === 'KG.' || u === 'KILOGRAM') return 'KG';
     if (u === 'MT' || u === 'M' || u === 'METRE') return 'MT';
     if (u === 'RULO' || u === 'ROLL' || u === 'TOP') return 'RULO';
     if (u === 'ADET' || u === 'PCS' || u === 'PCE') return 'ADET';
@@ -185,17 +186,23 @@ const handleSaveMarginTarget = async () => {
   };
   const toBaseQtyAndPrice = (qty: number, unitPrice?: number, unit?: string|null, productName?: string) => {
     const u = detectUnit(unit, productName);
-    if (u === 'MT' || u === 'OTHER') {
+    if (u === 'KG') {
       return { qtyBase: qty, unitPriceBase: unitPrice };
     }
-    const rollLen = extractRollLengthMT(productName || '') || null;
-    if ((u === 'RULO' || u === 'ADET') && rollLen) {
-      const factor = rollLen; // 1 Rulo/ADET = rollLen MT
-      const qtyBase = qty * factor;
-      const unitPriceBase = unitPrice != null ? (unitPrice / factor) : undefined;
+    if (u === 'MT') {
+      const factorKG = 1000; // 1 MT = 1000 KG
+      const qtyBase = qty * factorKG;
+      const unitPriceBase = unitPrice != null ? (unitPrice / factorKG) : undefined;
       return { qtyBase, unitPriceBase };
     }
-    // Dönüşüm yapılamadı -> olduğu gibi bırak
+    const rollLenMT = extractRollLengthMT(productName || '') || null;
+    if ((u === 'RULO' || u === 'ADET') && rollLenMT) {
+      const factorKG = rollLenMT * 1000; // rollLen (MT) -> KG
+      const qtyBase = qty * factorKG;
+      const unitPriceBase = unitPrice != null ? (unitPrice / factorKG) : undefined;
+      return { qtyBase, unitPriceBase };
+    }
+    // OTHER veya çözülemeyen durumlar: olduğu gibi bırak (KG varsayılır)
     return { qtyBase: qty, unitPriceBase: unitPrice };
   };
 
