@@ -144,6 +144,25 @@ const handleSaveMarginTarget = async () => {
     toast({ title: 'Hata', description: 'Kâr marjı hedefi kaydedilemedi.', variant: 'destructive' });
   }
 };
+  // Yardımcı: isim bazlı fuzzy avg maliyet bulucu
+  const findAvgByFuzzyName = (avgMap: Record<string, number>, normName?: string): number => {
+    if (!normName) return 0;
+    let bestKey = '';
+    let bestLen = 0;
+    const target = normName;
+    for (const k of Object.keys(avgMap)) {
+      if (!k.startsWith('name:')) continue;
+      const cand = k.slice(5);
+      if (!cand) continue;
+      const contains = target.includes(cand) || cand.includes(target);
+      if (contains) {
+        const score = Math.min(target.length, cand.length);
+        if (score > bestLen) { bestLen = score; bestKey = k; }
+      }
+    }
+    return bestKey ? Number(avgMap[bestKey] || 0) : 0;
+  };
+
   filteredSales.forEach(sale => {
     salesByCustomer[sale.customerId] = (salesByCustomer[sale.customerId] || 0) + (sale.amount || 0);
   });
@@ -669,10 +688,13 @@ const handleSaveMarginTarget = async () => {
         const curr = costByProduct[k] || { name, total: 0 };
         const lineTotal = Number(it.total ?? ((it.quantity ?? 0) * (it.unitPrice ?? 0))) || 0;
         const qty = it.quantity != null ? Number(it.quantity) : (it.unitPrice != null && Number(it.unitPrice) !== 0 ? (lineTotal / Number(it.unitPrice)) : 0);
-        const nameKey = it.productName ? `name:${normalizeName(it.productName)}` : undefined;
-        const avg = (sidRaw && Number.isFinite(avgMap[sidRaw]) ? Number(avgMap[sidRaw])
-                    : (sidRaw && Number.isFinite(avgMap[`id:${sidRaw}`]) ? Number(avgMap[`id:${sidRaw}`])
-                    : (nameKey && Number.isFinite(avgMap[nameKey]) ? Number(avgMap[nameKey]) : 0)));
+        const norm = it.productName ? normalizeName(it.productName) : undefined;
+        const nameKey = norm ? `name:${norm}` : undefined;
+        let avg = 0;
+        if (sidRaw && Number.isFinite(avgMap[sidRaw])) avg = Number(avgMap[sidRaw]);
+        else if (sidRaw && Number.isFinite(avgMap[`id:${sidRaw}`])) avg = Number(avgMap[`id:${sidRaw}`]);
+        else if (nameKey && Number.isFinite(avgMap[nameKey])) avg = Number(avgMap[nameKey]);
+        else avg = findAvgByFuzzyName(avgMap, norm);
         curr.total += qty * avg;
         costByProduct[k] = curr;
       });
@@ -685,10 +707,13 @@ const handleSaveMarginTarget = async () => {
       const lineTotal = Number((sale as any).amount ?? 0) || 0;
       const unitPrice = (sale as any).unitPrice != null ? Number((sale as any).unitPrice) : undefined;
       const qty = (sale as any).quantity != null ? Number((sale as any).quantity) : (unitPrice ? (lineTotal / unitPrice) : 0);
-      const nameKey = desc ? `name:${normalizeName(desc)}` : undefined;
-      const avg = (sidRaw && Number.isFinite(avgMap[sidRaw]) ? Number(avgMap[sidRaw])
-                  : (sidRaw && Number.isFinite(avgMap[`id:${sidRaw}`]) ? Number(avgMap[`id:${sidRaw}`])
-                  : (nameKey && Number.isFinite(avgMap[nameKey]) ? Number(avgMap[nameKey]) : 0)));
+      const norm = desc ? normalizeName(desc) : undefined;
+      const nameKey = norm ? `name:${norm}` : undefined;
+      let avg = 0;
+      if (sidRaw && Number.isFinite(avgMap[sidRaw])) avg = Number(avgMap[sidRaw]);
+      else if (sidRaw && Number.isFinite(avgMap[`id:${sidRaw}`])) avg = Number(avgMap[`id:${sidRaw}`]);
+      else if (nameKey && Number.isFinite(avgMap[nameKey])) avg = Number(avgMap[nameKey]);
+      else avg = findAvgByFuzzyName(avgMap, norm);
       curr.total += qty * avg;
       costByProduct[k] = curr;
     }
