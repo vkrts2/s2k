@@ -675,98 +675,96 @@ const handleSaveMarginTarget = async () => {
     .slice(0, 5)
     .map((item) => ({ name: item.name, total: item.total }));
 
-  // Ürün Kârlılık: satış kalemlerini, ilgili satış ayının ort. maliyeti ile çarparak COGS hesapla
-  const costByProduct: { [key: string]: { name: string; total: number } } = {};
-  filteredSales.forEach(sale => {
-    const saleDate = new Date(sale.date);
-    const mk = getMonthKey(saleDate);
-    const avgMap = avgCostByItemAtMonth[mk] || {};
-    if (Array.isArray((sale as any).items) && (sale as any).items.length > 0) {
-      (sale as any).items.forEach((it: any) => {
-        const sidRaw = (sale as any).stockItemId || it.stockItemId || resolveNameToId(it.productName);
-        const k = normalizeProductKey(sidRaw, it.productName || (sale as any).description);
+  // Kârlılık için: sadece miktarı açık olan satış kalemlerini dikkate al
+  const salesByProductForProfit: { [key: string]: { name: string; total: number } } = {};
+  filteredSales.forEach((sale: any) => {
+    if (Array.isArray(sale.items) && sale.items.length > 0) {
+      sale.items.forEach((it: any) => {
+        if (it.quantity == null) return; // miktar yoksa atla
+        const k = normalizeProductKey(sale.stockItemId || it.stockItemId, it.productName || sale.description);
         const name = displayNameFromKey(k);
-        const curr = costByProduct[k] || { name, total: 0 };
+        const curr = salesByProductForProfit[k] || { name, total: 0 };
         const lineTotal = Number(it.total ?? ((it.quantity ?? 0) * (it.unitPrice ?? 0))) || 0;
-        const qty = it.quantity != null ? Number(it.quantity) : (it.unitPrice != null && Number(it.unitPrice) !== 0 ? (lineTotal / Number(it.unitPrice)) : 0);
-        const norm = it.productName ? normalizeName(it.productName) : undefined;
-        const nameKey = norm ? `name:${norm}` : undefined;
-        let avg = 0;
-        if (sidRaw && Number.isFinite(avgMap[sidRaw])) avg = Number(avgMap[sidRaw]);
-        else if (sidRaw && Number.isFinite(avgMap[`id:${sidRaw}`])) avg = Number(avgMap[`id:${sidRaw}`]);
-        else if (nameKey && Number.isFinite(avgMap[nameKey])) avg = Number(avgMap[nameKey]);
-        else avg = findAvgByFuzzyName(avgMap, norm);
-        curr.total += qty * avg;
-        costByProduct[k] = curr;
-        if (!avg) {
-          zeroCostDiag.push({ key: k, sid: sidRaw, name: norm, month: mk });
-        }
+        curr.total += lineTotal;
+        salesByProductForProfit[k] = curr;
       });
     } else {
-      const desc = (sale as any).description as string | undefined;
-      const sidRaw = (sale as any).stockItemId || resolveNameToId(desc);
-      const k = normalizeProductKey(sidRaw, desc);
+      if ((sale as any).quantity == null) return;
+      const k = normalizeProductKey((sale as any).stockItemId, (sale as any).description);
       const name = displayNameFromKey(k);
-      const curr = costByProduct[k] || { name, total: 0 };
-      const lineTotal = Number((sale as any).amount ?? 0) || 0;
-      const unitPrice = (sale as any).unitPrice != null ? Number((sale as any).unitPrice) : undefined;
-      const qty = (sale as any).quantity != null ? Number((sale as any).quantity) : (unitPrice ? (lineTotal / unitPrice) : 0);
-      const norm = desc ? normalizeName(desc) : undefined;
-      const nameKey = norm ? `name:${norm}` : undefined;
-      let avg = 0;
-      if (sidRaw && Number.isFinite(avgMap[sidRaw])) avg = Number(avgMap[sidRaw]);
-      else if (sidRaw && Number.isFinite(avgMap[`id:${sidRaw}`])) avg = Number(avgMap[`id:${sidRaw}`]);
-      else if (nameKey && Number.isFinite(avgMap[nameKey])) avg = Number(avgMap[nameKey]);
-      else avg = findAvgByFuzzyName(avgMap, norm);
-      curr.total += qty * avg;
-      costByProduct[k] = curr;
-      if (!avg) {
-        zeroCostDiag.push({ key: k, sid: sidRaw, name: norm, month: mk });
-      }
+      const curr = salesByProductForProfit[k] || { name, total: 0 };
+      curr.total += (sale.amount || 0);
+      salesByProductForProfit[k] = curr;
     }
   });
-  // Fallback maliyet havuzu: seçili tarih aralığındaki alışları aynı anahtar ile grupla
-  const purchasePoolByKey: { [key: string]: number } = {};
-  purchases
-    .filter(p => {
-      if (!dateRange) return true;
-      const d = new Date(p.date);
-      return d >= new Date(dateRange.start) && d <= new Date(dateRange.end);
-    })
-    .forEach(p => {
-      if (Array.isArray((p as any).invoiceItems) && (p as any).invoiceItems.length > 0) {
-        (p as any).invoiceItems.forEach((it: any) => {
-          const k = normalizeProductKey((p as any).stockItemId || it.stockItemId, it.productName || (p as any).description || (p as any).manualProductName);
-          const lineTotal = Number(it.total ?? ((it.quantity ?? 0) * (it.unitPrice ?? 0))) || 0;
-          purchasePoolByKey[k] = (purchasePoolByKey[k] || 0) + lineTotal;
-        });
-      } else {
-        const k = normalizeProductKey((p as any).stockItemId, (p as any).description || (p as any).manualProductName);
-        purchasePoolByKey[k] = (purchasePoolByKey[k] || 0) + (p.amount || 0);
-      }
-    });
-  // Satışa dayalı COGS 0 kalan ürünler için, alış havuzundan maliyeti doldur
-  Object.keys(salesByProduct).forEach(k => {
-    const current = costByProduct[k]?.total || 0;
-    if (current > 0) return;
-    const pool = purchasePoolByKey[k] || 0;
-    if (pool > 0) {
-      const name = salesByProduct[k]?.name || displayNameFromKey(k);
-      costByProduct[k] = { name, total: pool };
+
+  // Ürün Kârlılık: hareket bazlı ağırlıklı ortalama (Moving Average) ile COGS
+  type Event = { date: Date; type: 'purchase'|'sale'; key: string; qty: number; unitCost?: number; includeInRange?: boolean };
+  const events: Event[] = [];
+  // Alışları ekle (tüm geçmiş; doğru açılış ortalaması için)
+  purchases.forEach((p: any) => {
+    const d = new Date(p.date);
+    if (Array.isArray(p.invoiceItems) && p.invoiceItems.length>0) {
+      p.invoiceItems.forEach((it: any) => {
+        const k = normalizeProductKey(p.stockItemId || it.stockItemId, it.productName || p.description || p.manualProductName);
+        const qty = Number(it.quantity ?? 0) || 0;
+        const unitCost = Number(it.unitPrice ?? 0) || 0;
+        if (qty>0 && unitCost>=0) events.push({ date: d, type: 'purchase', key: k, qty, unitCost });
+      });
+    } else {
+      const k = normalizeProductKey(p.stockItemId, p.description || p.manualProductName);
+      const qty = Number(p.quantityPurchased ?? 0) || 0;
+      const unitCost = Number(p.unitPrice ?? 0) || 0;
+      if (qty>0 && unitCost>=0) events.push({ date: d, type: 'purchase', key: k, qty, unitCost });
     }
   });
-  if (typeof window !== 'undefined' && zeroCostDiag.length) {
-    const withPool = zeroCostDiag.map(d => ({
-      ...d,
-      pool: purchasePoolByKey[d.key] || 0,
-    }));
-    console.log('[BI][ZeroCost Diagnostics]', withPool);
-  }
-  const allKeys = new Set<string>([...Object.keys(salesByProduct), ...Object.keys(costByProduct)]);
+  // Satışları ekle (tümü; fakat sadece filtre aralığındaki satışlar rapora dahil edilecek)
+  sales.forEach((s: any) => {
+    const d = new Date(s.date);
+    const inRange = !dateRange || (d >= new Date(dateRange.start) && d <= new Date(dateRange.end));
+    if (Array.isArray(s.items) && s.items.length>0) {
+      s.items.forEach((it: any) => {
+        const k = normalizeProductKey(s.stockItemId || it.stockItemId, it.productName || s.description);
+        if (it.quantity == null) return; // miktar yoksa ledger'a alma
+        const q = Number(it.quantity) || 0;
+        if (q>0) events.push({ date: d, type: 'sale', key: k, qty: q, includeInRange: inRange });
+      });
+    } else {
+      if ((s as any).quantity == null) return;
+      const k = normalizeProductKey(s.stockItemId, s.description);
+      const q = Number(s.quantity) || 0;
+      if (q>0) events.push({ date: d, type: 'sale', key: k, qty: q, includeInRange: inRange });
+    }
+  });
+  events.sort((a,b) => a.date.getTime() - b.date.getTime());
+  const state: Record<string,{onHand:number; avg:number; name:string}> = {};
+  const cogsByKey: Record<string, number> = {};
+  events.forEach(ev => {
+    const name = displayNameFromKey(ev.key);
+    state[ev.key] = state[ev.key] || { onHand: 0, avg: 0, name };
+    const st = state[ev.key];
+    if (ev.type === 'purchase') {
+      const totalCost = st.avg * st.onHand + (ev.unitCost || 0) * ev.qty;
+      const newQty = st.onHand + ev.qty;
+      st.avg = newQty > 0 ? (totalCost / newQty) : st.avg;
+      st.onHand = newQty;
+    } else {
+      // sale
+      const cogs = ev.qty * st.avg; // onHand negatif olsa bile mevcut avg ile hesapla
+      if (ev.includeInRange) {
+        cogsByKey[ev.key] = (cogsByKey[ev.key] || 0) + cogs;
+      }
+      st.onHand -= ev.qty;
+    }
+  });
+  const costByProduct: { [key: string]: { name: string; total: number } } = Object.fromEntries(
+    Object.entries(cogsByKey).map(([k, v]) => [k, { name: state[k]?.name || displayNameFromKey(k), total: v }])
+  );
+  const allKeys = new Set<string>([...Object.keys(salesByProductForProfit), ...Object.keys(costByProduct)]);
   const productProfitability: Array<{ name: string; sales: number; cost: number; profit: number }> = Array.from(allKeys).map(k => {
-    const s = salesByProduct[k]?.total || 0;
+    const s = salesByProductForProfit[k]?.total || 0;
     const c = costByProduct[k]?.total || 0;
-    const name = salesByProduct[k]?.name || costByProduct[k]?.name || displayNameFromKey(k);
+    const name = salesByProductForProfit[k]?.name || costByProduct[k]?.name || displayNameFromKey(k);
     return { name, sales: s, cost: c, profit: s - c };
   }).sort((a, b) => b.profit - a.profit).slice(0, 10);
 
