@@ -46,6 +46,19 @@ interface ChartData {
 }
 
 export default function BusinessIntelligencePage() {
+  // BI sayfası devre dışı: kullanıcıyı anasayfaya yönlendir ve kalan kodu çalıştırma
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.location.replace('/');
+    }
+  }, []);
+  return (
+    <div className="p-6">
+      <h1 className="text-xl font-semibold">İş Zekası devre dışı</h1>
+      <p>Bu sayfa kapatıldı.</p>
+    </div>
+  );
+
   const { toast } = useToast();
   const { user } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState('month');

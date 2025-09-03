@@ -75,16 +75,6 @@ export function SidebarNav() {
         Fiyat Teklifleri
       </Link>
       <Link
-        href="/reports"
-        className={cn(
-          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-          pathname === "/reports" ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-        )}
-      >
-        <LineChart className="h-4 w-4" />
-        Raporlar
-      </Link>
-      <Link
         href="/business-intelligence"
         className={cn(
           "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
@@ -94,6 +84,7 @@ export function SidebarNav() {
         <Brain className="h-4 w-4" />
         İş Zekası
       </Link>
+      
       <Link
         href="/calculator"
         className={cn(
