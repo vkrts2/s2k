@@ -163,6 +163,42 @@ const handleSaveMarginTarget = async () => {
     return bestKey ? Number(avgMap[bestKey] || 0) : 0;
   };
 
+  // Birim dönüşüm yardımcıları
+  const extractRollLengthMT = (text?: string): number | null => {
+    if (!text) return null;
+    const t = (''+text).toUpperCase();
+    // Örn: "100 MT", "1500 MT" gibi kalıpları yakala
+    const m = t.match(/(\d+[\.,]?\d*)\s*MT\b/);
+    if (!m) return null;
+    const v = Number(m[1].replace(',', '.'));
+    return isFinite(v) && v>0 ? v : null;
+  };
+  const detectUnit = (explicitUnit?: string|null, productName?: string): 'MT'|'RULO'|'ADET'|'OTHER' => {
+    const u = (explicitUnit || '').toString().trim().toUpperCase();
+    if (u === 'MT' || u === 'M' || u === 'METRE') return 'MT';
+    if (u === 'RULO' || u === 'ROLL' || u === 'TOP') return 'RULO';
+    if (u === 'ADET' || u === 'PCS' || u === 'PCE') return 'ADET';
+    const n = (productName||'').toUpperCase();
+    if (n.includes('RULO') || n.includes('ROLL') || n.includes('TOP')) return 'RULO';
+    if (n.includes(' MT')) return 'MT';
+    return 'OTHER';
+  };
+  const toBaseQtyAndPrice = (qty: number, unitPrice?: number, unit?: string|null, productName?: string) => {
+    const u = detectUnit(unit, productName);
+    if (u === 'MT' || u === 'OTHER') {
+      return { qtyBase: qty, unitPriceBase: unitPrice };
+    }
+    const rollLen = extractRollLengthMT(productName || '') || null;
+    if ((u === 'RULO' || u === 'ADET') && rollLen) {
+      const factor = rollLen; // 1 Rulo/ADET = rollLen MT
+      const qtyBase = qty * factor;
+      const unitPriceBase = unitPrice != null ? (unitPrice / factor) : undefined;
+      return { qtyBase, unitPriceBase };
+    }
+    // Dönüşüm yapılamadı -> olduğu gibi bırak
+    return { qtyBase: qty, unitPriceBase: unitPrice };
+  };
+
   const zeroCostDiag: Array<{key:string; sid?:string; name?:string; month:string; pool?:number}> = [];
   filteredSales.forEach(sale => {
     salesByCustomer[sale.customerId] = (salesByCustomer[sale.customerId] || 0) + (sale.amount || 0);
@@ -331,12 +367,26 @@ const handleSaveMarginTarget = async () => {
   const stockByNameNorm: Record<string, string> = Object.fromEntries(
     (stockItems || []).map(si => [ normalizeName(si.name ?? ''), si.id ])
   );
+  // ID -> İsim sözlüğü (display için)
+  const stockIndex: Record<string, string> = Object.fromEntries(
+    (stockItems || []).map(si => [ si.id, (si.name ?? si.id) as string ])
+  );
   const resolveNameToId = (nameLike?: string | null): string | undefined => {
     if (!nameLike) return undefined;
     const raw = (nameLike || '').toString().toLowerCase();
     if (stockByNameRaw[raw]) return stockByNameRaw[raw];
     const norm = normalizeName(nameLike);
     return stockByNameNorm[norm];
+  };
+
+  // Ürün anahtarı: stok ID varsa ID öncelikli; yoksa isimden ID çöz, o da yoksa normalize isim
+  const normalizeProductKey = (stockItemId?: string | null, productName?: string | null): string => {
+    const sid = (stockItemId || '').toString().trim();
+    if (sid) return `id:${sid}`;
+    const resolved = resolveNameToId(productName || '') || undefined;
+    if (resolved) return `id:${resolved}`;
+    const nm = normalizeName(productName || '') || 'diğer';
+    return `name:${nm}`;
   };
 
   // Eski ay-sonu ortalaması ve fallback temelli marj hesapları kaldırıldı.
@@ -435,18 +485,6 @@ const handleSaveMarginTarget = async () => {
 
   // salesByMonth/last12Months/purchasesByMonth/purchasesTrend yukarıda tanımlandı
 
-  // En çok satılan ürünler (ID öncelikli)
-  const stockIndex: Record<string, string> = Object.fromEntries(stockItems.map(si => [si.id, si.name]));
-  // Not: Daha önce yukarıda avgCost hesapları için oluşturduğumuz stockByName mevcuttur.
-  // Aynı normalizasyonu ürün kârlılık bölümünde de kullanacağız.
-  const normalizeProductKey = (stockItemId?: string | null, nameLike?: string | null) => {
-    if (stockItemId) return `id:${stockItemId}`;
-    const keyName = (nameLike || '').toString().trim().toLowerCase();
-    if (!keyName) return 'name:diğer';
-    const sid = resolveNameToId(keyName);
-    return sid ? `id:${sid}` : `name:${normalizeName(keyName)}`;
-  };
-
   const displayNameFromKey = (k: string) => {
     if (k.startsWith('id:')) {
       const sid = k.slice(3);
@@ -513,15 +551,17 @@ const handleSaveMarginTarget = async () => {
     if (Array.isArray(p.invoiceItems) && p.invoiceItems.length>0) {
       p.invoiceItems.forEach((it: any) => {
         const k = normalizeProductKey(p.stockItemId || it.stockItemId, it.productName || p.description || p.manualProductName);
-        const qty = Number(it.quantity ?? 0) || 0;
-        const unitCost = Number(it.unitPrice ?? 0) || 0;
-        if (qty !== 0) events.push({ date: d, type: 'purchase', key: k, qty, unitCost });
+        const rawQty = Number(it.quantity ?? 0) || 0;
+        const rawUnitCost = Number(it.unitPrice ?? 0) || 0;
+        const { qtyBase, unitPriceBase } = toBaseQtyAndPrice(rawQty, rawUnitCost, it.unit, it.productName || p.description || p.manualProductName);
+        if (qtyBase !== 0) events.push({ date: d, type: 'purchase', key: k, qty: qtyBase, unitCost: unitPriceBase });
       });
     } else {
       const k = normalizeProductKey(p.stockItemId, p.description || p.manualProductName);
-      const qty = Number((p as any).quantityPurchased ?? 0) || 0;
-      const unitCost = Number((p as any).unitPrice ?? 0) || 0;
-      if (qty !== 0) events.push({ date: d, type: 'purchase', key: k, qty, unitCost });
+      const rawQty = Number((p as any).quantityPurchased ?? 0) || 0;
+      const rawUnitCost = Number((p as any).unitPrice ?? 0) || 0;
+      const { qtyBase, unitPriceBase } = toBaseQtyAndPrice(rawQty, rawUnitCost, (p as any).unit, p.description || p.manualProductName);
+      if (qtyBase !== 0) events.push({ date: d, type: 'purchase', key: k, qty: qtyBase, unitCost: unitPriceBase });
     }
   });
   // Satışları ekle (tümü; fakat sadece filtre aralığındaki satışlar rapora dahil edilecek)
@@ -532,16 +572,18 @@ const handleSaveMarginTarget = async () => {
       s.items.forEach((it: any) => {
         const k = normalizeProductKey(s.stockItemId || it.stockItemId, it.productName || s.description);
         if (it.quantity == null || it.unitPrice == null) return; // miktar/UP yoksa ledger'a alma
-        const q = Number(it.quantity) || 0;
-        const up = Number(it.unitPrice) || 0;
-        if (q !== 0) events.push({ date: d, type: 'sale', key: k, qty: q, unitPrice: up, customerId: s.customerId, includeInRange: inRange });
+        const rawQty = Number(it.quantity) || 0;
+        const rawUP = Number(it.unitPrice) || 0;
+        const { qtyBase, unitPriceBase } = toBaseQtyAndPrice(rawQty, rawUP, it.unit, it.productName || s.description);
+        if (qtyBase !== 0) events.push({ date: d, type: 'sale', key: k, qty: qtyBase, unitPrice: unitPriceBase, customerId: s.customerId, includeInRange: inRange });
       });
     } else {
       if ((s as any).quantity == null || (s as any).unitPrice == null) return;
       const k = normalizeProductKey(s.stockItemId, s.description);
-      const q = Number(s.quantity) || 0;
-      const up = Number(s.unitPrice) || 0;
-      if (q !== 0) events.push({ date: d, type: 'sale', key: k, qty: q, unitPrice: up, customerId: s.customerId, includeInRange: inRange });
+      const rawQty = Number(s.quantity) || 0;
+      const rawUP = Number(s.unitPrice) || 0;
+      const { qtyBase, unitPriceBase } = toBaseQtyAndPrice(rawQty, rawUP, (s as any).unit, s.description);
+      if (qtyBase !== 0) events.push({ date: d, type: 'sale', key: k, qty: qtyBase, unitPrice: unitPriceBase, customerId: s.customerId, includeInRange: inRange });
     }
   });
   events.sort((a,b) => a.date.getTime() - b.date.getTime());
