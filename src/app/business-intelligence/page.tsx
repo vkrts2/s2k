@@ -163,6 +163,7 @@ const handleSaveMarginTarget = async () => {
     return bestKey ? Number(avgMap[bestKey] || 0) : 0;
   };
 
+  const zeroCostDiag: Array<{key:string; sid?:string; name?:string; month:string; pool?:number}> = [];
   filteredSales.forEach(sale => {
     salesByCustomer[sale.customerId] = (salesByCustomer[sale.customerId] || 0) + (sale.amount || 0);
   });
@@ -697,6 +698,9 @@ const handleSaveMarginTarget = async () => {
         else avg = findAvgByFuzzyName(avgMap, norm);
         curr.total += qty * avg;
         costByProduct[k] = curr;
+        if (!avg) {
+          zeroCostDiag.push({ key: k, sid: sidRaw, name: norm, month: mk });
+        }
       });
     } else {
       const desc = (sale as any).description as string | undefined;
@@ -716,6 +720,9 @@ const handleSaveMarginTarget = async () => {
       else avg = findAvgByFuzzyName(avgMap, norm);
       curr.total += qty * avg;
       costByProduct[k] = curr;
+      if (!avg) {
+        zeroCostDiag.push({ key: k, sid: sidRaw, name: norm, month: mk });
+      }
     }
   });
   // Fallback maliyet havuzu: seçili tarih aralığındaki alışları aynı anahtar ile grupla
@@ -748,6 +755,13 @@ const handleSaveMarginTarget = async () => {
       costByProduct[k] = { name, total: pool };
     }
   });
+  if (typeof window !== 'undefined' && zeroCostDiag.length) {
+    const withPool = zeroCostDiag.map(d => ({
+      ...d,
+      pool: purchasePoolByKey[d.key] || 0,
+    }));
+    console.log('[BI][ZeroCost Diagnostics]', withPool);
+  }
   const allKeys = new Set<string>([...Object.keys(salesByProduct), ...Object.keys(costByProduct)]);
   const productProfitability: Array<{ name: string; sales: number; cost: number; profit: number }> = Array.from(allKeys).map(k => {
     const s = salesByProduct[k]?.total || 0;
