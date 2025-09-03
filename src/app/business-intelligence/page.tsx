@@ -295,7 +295,10 @@ const handleSaveMarginTarget = async () => {
 
   // Ürün adı normalizasyonu ve isimden stok ID çözümleme (eşleşmeyi güçlendirmek için)
   const normalizeName = (s: string | null | undefined): string => {
-    const raw = (s ?? '').toString().toLowerCase();
+    let raw = (s ?? '').toString().toLowerCase();
+    // Sondaki "+N kalem" veya "kalem" ibarelerini ayıkla
+    raw = raw.replace(/\+\s*\d+\s*kalem\b/gi, '');
+    raw = raw.replace(/\bkalem\b/gi, '');
     // Unicode normalizasyonu + harf/rakam dışını boşluk yap + fazlalık boşlukları sadeleştir
     return raw
       .normalize('NFKD')
@@ -327,13 +330,22 @@ const handleSaveMarginTarget = async () => {
       if (t > end) return;
       if (Array.isArray(p.invoiceItems) && p.invoiceItems.length>0) {
         p.invoiceItems.forEach((it) => {
-          const sid = p.stockItemId || (it as any).stockItemId || resolveNameToId((it as any).productName);
+          const pn = (it as any).productName as string | undefined;
+          const sid = p.stockItemId || (it as any).stockItemId || resolveNameToId(pn);
           const qty = it.quantity;
           const up = it.unitPrice;
           if (!sid || qty==null || up==null) return;
+          // ID anahtarı
           byItem[sid] = byItem[sid] || { qty:0, cost:0 };
           byItem[sid].qty += Number(qty)||0;
           byItem[sid].cost += (Number(qty)||0) * (Number(up)||0);
+          // İsim anahtarı
+          if (pn) {
+            const nameKey = `name:${normalizeName(pn)}`;
+            byItem[nameKey] = byItem[nameKey] || { qty:0, cost:0 };
+            byItem[nameKey].qty += Number(qty)||0;
+            byItem[nameKey].cost += (Number(qty)||0) * (Number(up)||0);
+          }
         });
       } else {
         const sid = p.stockItemId;
@@ -343,6 +355,13 @@ const handleSaveMarginTarget = async () => {
         byItem[sid] = byItem[sid] || { qty:0, cost:0 };
         byItem[sid].qty += Number(qty)||0;
         byItem[sid].cost += (Number(qty)||0) * (Number(up)||0);
+        const pn = (p as any).description || (p as any).manualProductName;
+        if (pn) {
+          const nameKey = `name:${normalizeName(pn)}`;
+          byItem[nameKey] = byItem[nameKey] || { qty:0, cost:0 };
+          byItem[nameKey].qty += Number(qty)||0;
+          byItem[nameKey].cost += (Number(qty)||0) * (Number(up)||0);
+        }
       }
     });
     avgCostByItemAtMonth[mk] = Object.fromEntries(Object.entries(byItem).map(([sid, agg]) => [sid, agg.qty>0 ? agg.cost/agg.qty : 0]));
@@ -614,40 +633,63 @@ const handleSaveMarginTarget = async () => {
 
   const salesByProduct: { [key: string]: { name: string; total: number } } = {};
   filteredSales.forEach(sale => {
-    const k = normalizeProductKey((sale as any).stockItemId, (sale as any).description);
-    const name = displayNameFromKey(k);
-    const curr = salesByProduct[k] || { name, total: 0 };
-    curr.total += (sale.amount || 0);
-    salesByProduct[k] = curr;
+    if (Array.isArray((sale as any).items) && (sale as any).items.length > 0) {
+      (sale as any).items.forEach((it: any) => {
+        const k = normalizeProductKey((sale as any).stockItemId || it.stockItemId, it.productName || (sale as any).description);
+        const name = displayNameFromKey(k);
+        const curr = salesByProduct[k] || { name, total: 0 };
+        const lineTotal = Number(it.total ?? ((it.quantity ?? 0) * (it.unitPrice ?? 0))) || 0;
+        curr.total += lineTotal;
+        salesByProduct[k] = curr;
+      });
+    } else {
+      const k = normalizeProductKey((sale as any).stockItemId, (sale as any).description);
+      const name = displayNameFromKey(k);
+      const curr = salesByProduct[k] || { name, total: 0 };
+      curr.total += (sale.amount || 0);
+      salesByProduct[k] = curr;
+    }
   });
   const topProducts = Object.values(salesByProduct)
     .sort((a, b) => b.total - a.total)
     .slice(0, 5)
     .map((item) => ({ name: item.name, total: item.total }));
 
-  // Ürün Kârlılık: ID öncelikli eşleme (stok), yoksa açıklama/manuel adı
-  // Kârlılık için maliyetleri tedarikçi filtresinden bağımsız, sadece tarih aralığına göre dahil et
-  const purchasesForProfit = purchases.filter(p => {
-    if (!dateRange) return true;
-    const d = new Date(p.date);
-    return d >= new Date(dateRange.start) && d <= new Date(dateRange.end);
-  });
+  // Ürün Kârlılık: satış kalemlerini, ilgili satış ayının ort. maliyeti ile çarparak COGS hesapla
   const costByProduct: { [key: string]: { name: string; total: number } } = {};
-  purchasesForProfit.forEach(p => {
-    if (Array.isArray((p as any).invoiceItems) && (p as any).invoiceItems.length > 0) {
-      (p as any).invoiceItems.forEach((it: any) => {
-        const k = normalizeProductKey((p as any).stockItemId || it.stockItemId, it.productName || (p as any).description || (p as any).manualProductName);
+  filteredSales.forEach(sale => {
+    const saleDate = new Date(sale.date);
+    const mk = getMonthKey(saleDate);
+    const avgMap = avgCostByItemAtMonth[mk] || {};
+    if (Array.isArray((sale as any).items) && (sale as any).items.length > 0) {
+      (sale as any).items.forEach((it: any) => {
+        const sidRaw = (sale as any).stockItemId || it.stockItemId || resolveNameToId(it.productName);
+        const k = normalizeProductKey(sidRaw, it.productName || (sale as any).description);
         const name = displayNameFromKey(k);
         const curr = costByProduct[k] || { name, total: 0 };
         const lineTotal = Number(it.total ?? ((it.quantity ?? 0) * (it.unitPrice ?? 0))) || 0;
-        curr.total += lineTotal;
+        const qty = it.quantity != null ? Number(it.quantity) : (it.unitPrice != null && Number(it.unitPrice) !== 0 ? (lineTotal / Number(it.unitPrice)) : 0);
+        const nameKey = it.productName ? `name:${normalizeName(it.productName)}` : undefined;
+        const avg = (sidRaw && Number.isFinite(avgMap[sidRaw]) ? Number(avgMap[sidRaw])
+                    : (sidRaw && Number.isFinite(avgMap[`id:${sidRaw}`]) ? Number(avgMap[`id:${sidRaw}`])
+                    : (nameKey && Number.isFinite(avgMap[nameKey]) ? Number(avgMap[nameKey]) : 0)));
+        curr.total += qty * avg;
         costByProduct[k] = curr;
       });
     } else {
-      const k = normalizeProductKey((p as any).stockItemId, (p as any).description || (p as any).manualProductName);
+      const desc = (sale as any).description as string | undefined;
+      const sidRaw = (sale as any).stockItemId || resolveNameToId(desc);
+      const k = normalizeProductKey(sidRaw, desc);
       const name = displayNameFromKey(k);
       const curr = costByProduct[k] || { name, total: 0 };
-      curr.total += (p.amount || 0);
+      const lineTotal = Number((sale as any).amount ?? 0) || 0;
+      const unitPrice = (sale as any).unitPrice != null ? Number((sale as any).unitPrice) : undefined;
+      const qty = (sale as any).quantity != null ? Number((sale as any).quantity) : (unitPrice ? (lineTotal / unitPrice) : 0);
+      const nameKey = desc ? `name:${normalizeName(desc)}` : undefined;
+      const avg = (sidRaw && Number.isFinite(avgMap[sidRaw]) ? Number(avgMap[sidRaw])
+                  : (sidRaw && Number.isFinite(avgMap[`id:${sidRaw}`]) ? Number(avgMap[`id:${sidRaw}`])
+                  : (nameKey && Number.isFinite(avgMap[nameKey]) ? Number(avgMap[nameKey]) : 0)));
+      curr.total += qty * avg;
       costByProduct[k] = curr;
     }
   });
@@ -660,6 +702,17 @@ const handleSaveMarginTarget = async () => {
   }).sort((a, b) => b.profit - a.profit).slice(0, 10);
 
   // Müşteri segmentasyonu kaldırıldı
+
+  // DEBUG: Eşleşme durumu – anahtar bazında satış ve maliyetin görülmesi
+  const productMatchDebug = Array.from(allKeys).map(k => ({
+    key: k,
+    name: salesByProduct[k]?.name || costByProduct[k]?.name || displayNameFromKey(k),
+    sales: salesByProduct[k]?.total || 0,
+    cost: costByProduct[k]?.total || 0,
+  })).sort((a,b)=> (b.sales - b.cost) - (a.sales - a.cost)).slice(0, 20);
+  if (typeof window !== 'undefined') {
+    console.log('[BI][Product Match Debug]', productMatchDebug);
+  }
 
   // Son 10 satış/alış
   const lastSales = filteredSales.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
