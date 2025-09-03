@@ -515,13 +515,13 @@ const handleSaveMarginTarget = async () => {
         const k = normalizeProductKey(p.stockItemId || it.stockItemId, it.productName || p.description || p.manualProductName);
         const qty = Number(it.quantity ?? 0) || 0;
         const unitCost = Number(it.unitPrice ?? 0) || 0;
-        if (qty>0 && unitCost>=0) events.push({ date: d, type: 'purchase', key: k, qty, unitCost });
+        if (qty !== 0) events.push({ date: d, type: 'purchase', key: k, qty, unitCost });
       });
     } else {
       const k = normalizeProductKey(p.stockItemId, p.description || p.manualProductName);
-      const qty = Number(p.quantityPurchased ?? 0) || 0;
-      const unitCost = Number(p.unitPrice ?? 0) || 0;
-      if (qty>0 && unitCost>=0) events.push({ date: d, type: 'purchase', key: k, qty, unitCost });
+      const qty = Number((p as any).quantityPurchased ?? 0) || 0;
+      const unitCost = Number((p as any).unitPrice ?? 0) || 0;
+      if (qty !== 0) events.push({ date: d, type: 'purchase', key: k, qty, unitCost });
     }
   });
   // Satışları ekle (tümü; fakat sadece filtre aralığındaki satışlar rapora dahil edilecek)
@@ -534,32 +534,52 @@ const handleSaveMarginTarget = async () => {
         if (it.quantity == null || it.unitPrice == null) return; // miktar/UP yoksa ledger'a alma
         const q = Number(it.quantity) || 0;
         const up = Number(it.unitPrice) || 0;
-        if (q>0) events.push({ date: d, type: 'sale', key: k, qty: q, unitPrice: up, customerId: s.customerId, includeInRange: inRange });
+        if (q !== 0) events.push({ date: d, type: 'sale', key: k, qty: q, unitPrice: up, customerId: s.customerId, includeInRange: inRange });
       });
     } else {
       if ((s as any).quantity == null || (s as any).unitPrice == null) return;
       const k = normalizeProductKey(s.stockItemId, s.description);
       const q = Number(s.quantity) || 0;
       const up = Number(s.unitPrice) || 0;
-      if (q>0) events.push({ date: d, type: 'sale', key: k, qty: q, unitPrice: up, customerId: s.customerId, includeInRange: inRange });
+      if (q !== 0) events.push({ date: d, type: 'sale', key: k, qty: q, unitPrice: up, customerId: s.customerId, includeInRange: inRange });
     }
   });
   events.sort((a,b) => a.date.getTime() - b.date.getTime());
-  const state: Record<string,{onHand:number; avg:number; name:string}> = {};
+  const state: Record<string,{onHand:number; avg:number; name:string; hasPurchase:boolean}> = {};
   const cogsByKey: Record<string, number> = {};
   const marginByMonthAcc: Record<string, number> = {};
   const marginByCustomerAccCurrent: Record<string, number> = {};
+  let uncostedSalesAmount = 0;
+  const uncostedSales: Array<{ name: string; qty: number; amount: number }> = [];
   events.forEach(ev => {
     const name = displayNameFromKey(ev.key);
-    state[ev.key] = state[ev.key] || { onHand: 0, avg: 0, name };
+    state[ev.key] = state[ev.key] || { onHand: 0, avg: 0, name, hasPurchase: false };
     const st = state[ev.key];
     if (ev.type === 'purchase') {
-      const totalCost = st.avg * st.onHand + (ev.unitCost || 0) * ev.qty;
-      const newQty = st.onHand + ev.qty;
-      st.avg = newQty > 0 ? (totalCost / newQty) : st.avg;
-      st.onHand = newQty;
+      if (ev.qty >= 0) {
+        const totalCost = st.avg * st.onHand + (ev.unitCost || 0) * ev.qty;
+        const newQty = st.onHand + ev.qty;
+        st.avg = newQty > 0 ? (totalCost / newQty) : st.avg;
+        st.onHand = newQty;
+        st.hasPurchase = true;
+      } else {
+        // Alış iadesi: stok azalt, ortalama değiştirme
+        st.onHand += ev.qty; // ev.qty negatif
+        // hasPurchase bayrağı değişmez
+      }
     } else {
       // sale
+      // İlk alıştan önceki satış: maliyet bilinmiyor -> marj/COGS dışı tut, raporla
+      const isUncosted = (!st.hasPurchase && (st.avg === 0) && ev.qty > 0);
+      if (isUncosted) {
+        if (ev.includeInRange) {
+          const amt = ev.qty * (ev.unitPrice || 0);
+          uncostedSalesAmount += amt;
+          uncostedSales.push({ name, qty: ev.qty, amount: amt });
+        }
+        st.onHand -= ev.qty; // stok negatife düşebilir; sonraki alışlar avg'ı güncelleyecek
+        return;
+      }
       const cogs = ev.qty * st.avg; // onHand negatif olsa bile mevcut avg ile hesapla
       if (ev.includeInRange) {
         cogsByKey[ev.key] = (cogsByKey[ev.key] || 0) + cogs;
@@ -602,6 +622,9 @@ const handleSaveMarginTarget = async () => {
   }).sort((a, b) => b.profit - a.profit).slice(0, 10);
 
   // Müşteri segmentasyonu kaldırıldı
+
+  // Uncosted (ilk alıştan önceki) satışlar uyarı kartı verisi
+  const uncostedTop = uncostedSales.sort((a,b)=> b.amount - a.amount).slice(0,5);
 
   // DEBUG: Eşleşme durumu – anahtar bazında satış ve maliyetin görülmesi
   const productMatchDebug = Array.from(allKeys).map(k => ({
