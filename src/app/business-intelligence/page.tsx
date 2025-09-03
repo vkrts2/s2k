@@ -308,8 +308,7 @@ const handleSaveMarginTarget = async () => {
     agingDetails.push({ customer: customers.find(c=>c.id===cid)?.name || 'Bilinmeyen', outstanding, days });
   });
 
-  // Kâr Marjı Analizi (ürün bazlı): Her satış satırı için (birim satış - ort. birim maliyet) * miktar
-  // Yeterli veri yoksa geri dönüş: kalan tutar için (satış - min(alış, satış)) yöntemi
+  // Kâr Marjı Analizi ve yardımcılar
   const monthEnd = (key:string) => { const [y, m] = key.split('-').map(Number); return new Date(y, m, 0, 23,59,59,999); };
   const getMonthKey = (d: Date) => `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`;
 
@@ -340,194 +339,7 @@ const handleSaveMarginTarget = async () => {
     return stockByNameNorm[norm];
   };
 
-  // 1) Her ay sonu itibarıyla, ürün bazında ortalama maliyet (kümülatif)
-  const avgCostByItemAtMonth: Record<string, Record<string, number>> = {}; // monthKey -> stockItemId -> avgCost
-  last12Months.forEach((mk) => {
-    const end = monthEnd(mk).getTime();
-    const byItem: Record<string, {qty:number; cost:number}> = {};
-    purchases.forEach((p: Purchase) => {
-      const t = new Date(p.date).getTime();
-      if (t > end) return;
-      if (Array.isArray(p.invoiceItems) && p.invoiceItems.length>0) {
-        p.invoiceItems.forEach((it) => {
-          const pn = (it as any).productName as string | undefined;
-          const sid = p.stockItemId || (it as any).stockItemId || resolveNameToId(pn);
-          const qty = it.quantity;
-          const up = it.unitPrice;
-          if (!sid || qty==null || up==null) return;
-          // ID anahtarı
-          byItem[sid] = byItem[sid] || { qty:0, cost:0 };
-          byItem[sid].qty += Number(qty)||0;
-          byItem[sid].cost += (Number(qty)||0) * (Number(up)||0);
-          // İsim anahtarı
-          if (pn) {
-            const nameKey = `name:${normalizeName(pn)}`;
-            byItem[nameKey] = byItem[nameKey] || { qty:0, cost:0 };
-            byItem[nameKey].qty += Number(qty)||0;
-            byItem[nameKey].cost += (Number(qty)||0) * (Number(up)||0);
-          }
-        });
-      } else {
-        const sid = p.stockItemId;
-        const qty = p.quantityPurchased;
-        const up = p.unitPrice;
-        if (!sid || qty==null || up==null) return;
-        byItem[sid] = byItem[sid] || { qty:0, cost:0 };
-        byItem[sid].qty += Number(qty)||0;
-        byItem[sid].cost += (Number(qty)||0) * (Number(up)||0);
-        const pn = (p as any).description || (p as any).manualProductName;
-        if (pn) {
-          const nameKey = `name:${normalizeName(pn)}`;
-          byItem[nameKey] = byItem[nameKey] || { qty:0, cost:0 };
-          byItem[nameKey].qty += Number(qty)||0;
-          byItem[nameKey].cost += (Number(qty)||0) * (Number(up)||0);
-        }
-      }
-    });
-    avgCostByItemAtMonth[mk] = Object.fromEntries(Object.entries(byItem).map(([sid, agg]) => [sid, agg.qty>0 ? agg.cost/agg.qty : 0]));
-  });
-
-  // 2) Aylık marj: bilinen kalemlerden hesapla, kalanları güvenli fallback ile ekle
-  const marginByMonth: {date:string, margin:number}[] = last12Months.map((mk) => {
-    const end = monthEnd(mk).getTime();
-    const start = new Date(Number(mk.split('-')[0]), Number(mk.split('-')[1]) - 1, 1).getTime();
-    const avgCostMap = avgCostByItemAtMonth[mk] || {};
-
-    let knownCOGS = 0; // bilinen kalemlerden hesaplanan maliyet toplamı
-    let knownMargin = 0; // bilinen kalemlerden hesaplanan marj
-    let unknownSales = 0; // kalemsiz/eksik verili satışların toplam tutarı
-
-    let matchedItemCount = 0;
-    let matchedSalesAmountApprox = 0;
-    sales.forEach((s: Sale) => {
-      const t = new Date(s.date).getTime();
-      if (t < start || t > end) return;
-      // Kalemli satışlar öncelikli
-      if (Array.isArray(s.items) && s.items.length>0) {
-        s.items.forEach((it) => {
-          const sid = s.stockItemId || it.stockItemId || resolveNameToId((it as any).productName);
-          const qty = it.quantity;
-          const up = it.unitPrice;
-          if (sid && qty!=null && up!=null) {
-            const hasAvg = Object.prototype.hasOwnProperty.call(avgCostMap, sid) && Number.isFinite(avgCostMap[sid]);
-            if (hasAvg) {
-              const avg = Number(avgCostMap[sid]) || 0;
-              knownCOGS += (Number(qty)||0) * avg;
-              knownMargin += (Number(up)||0 - avg) * (Number(qty)||0);
-              matchedItemCount += 1;
-              matchedSalesAmountApprox += (Number(qty)||0) * (Number(up)||0);
-            } else {
-              // Bu ürün için henüz alış yok → kâr hesaplamasını fallback'e bırak
-              unknownSales += Number(it.total ?? (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)) || 0;
-            }
-          } else {
-            // kalemsiz/eksik
-            unknownSales += Number(it.total ?? (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)) || 0;
-          }
-        });
-      } else if (s.stockItemId && s.quantity!=null && s.unitPrice!=null) {
-        const sid = s.stockItemId as string;
-        const qty = Number(s.quantity)||0;
-        const up = Number(s.unitPrice)||0;
-        const hasAvg = Object.prototype.hasOwnProperty.call(avgCostMap, sid) && Number.isFinite(avgCostMap[sid]);
-        if (hasAvg) {
-          const avg = Number(avgCostMap[sid]) || 0;
-          knownCOGS += qty * avg;
-          knownMargin += (up - avg) * qty;
-          matchedItemCount += 1;
-          matchedSalesAmountApprox += qty * up;
-        } else {
-          // Ürünün maliyeti yok → satış tutarını fallback'e aktar
-          unknownSales += qty * up;
-        }
-      } else {
-        unknownSales += Number(s.amount)||0;
-      }
-    });
-
-    // Fallback: kalan satışlar için o ayki alışın kalan kısmını COGS say
-    const purchasesThisMonth = purchasesByMonthAll[mk] || 0;
-    const remainingPurchasesForFallback = Math.max(0, purchasesThisMonth - knownCOGS);
-    const fallbackCOGS = Math.min(remainingPurchasesForFallback, unknownSales);
-    const fallbackMargin = unknownSales - fallbackCOGS;
-
-    const totalMargin = knownMargin + fallbackMargin;
-
-    // Sadece aktif ay için detaylı debug log yaz
-    if (mk === currentMonthKey) {
-      console.log('[BI][Margin Debug Detail]', {
-        monthKey: mk,
-        matchedItemCount,
-        matchedSalesAmountApprox,
-        knownCOGS,
-        knownMargin,
-        unknownSales,
-        purchasesThisMonth,
-        remainingPurchasesForFallback,
-        fallbackCOGS,
-        fallbackMargin,
-        totalMargin,
-      });
-    }
-    return { date: mk, margin: totalMargin };
-  });
-  // Bu ay için müşteri bazlı marjı, aynı ürün bazlı mantıkla hesapla
-  const avgCostMapCurrent = avgCostByItemAtMonth[currentMonthKey] || {};
-  const startCur = new Date(Number(currentMonthKey.split('-')[0]), Number(currentMonthKey.split('-')[1]) - 1, 1).getTime();
-  const endCur = ((): number => { const [y,m]=currentMonthKey.split('-').map(Number); return new Date(y, m, 0, 23,59,59,999).getTime(); })();
-  const knownMarginByCustomer: Record<string, number> = {};
-  const unknownSalesByCustomer: Record<string, number> = {};
-  let knownCOGSTotalThisMonth = 0;
-  let unknownSalesTotalThisMonth = 0;
-  sales.forEach((s: Sale) => {
-    const t = new Date(s.date).getTime();
-    if (t < startCur || t > endCur) return;
-    const cid = s.customerId;
-    if (Array.isArray(s.items) && s.items.length>0) {
-      s.items.forEach((it) => {
-        const sid = s.stockItemId || it.stockItemId || resolveNameToId((it as any).productName);
-        const qty = it.quantity;
-        const up = it.unitPrice;
-        if (sid && qty!=null && up!=null && Object.prototype.hasOwnProperty.call(avgCostMapCurrent, sid) && Number.isFinite(avgCostMapCurrent[sid])) {
-          const avg = Number(avgCostMapCurrent[sid]) || 0;
-          knownCOGSTotalThisMonth += (Number(qty)||0) * avg;
-          knownMarginByCustomer[cid] = (knownMarginByCustomer[cid]||0) + ((Number(up)||0 - avg) * (Number(qty)||0));
-        } else {
-          const lineTotal = Number(it.total ?? (it.quantity && it.unitPrice ? it.quantity * it.unitPrice : 0)) || 0;
-          unknownSalesByCustomer[cid] = (unknownSalesByCustomer[cid]||0) + lineTotal;
-          unknownSalesTotalThisMonth += lineTotal;
-        }
-      });
-    } else if (s.stockItemId && s.quantity!=null && s.unitPrice!=null) {
-      const sid = s.stockItemId as string;
-      const qty = Number(s.quantity)||0;
-      const up = Number(s.unitPrice)||0;
-      if (Object.prototype.hasOwnProperty.call(avgCostMapCurrent, sid) && Number.isFinite(avgCostMapCurrent[sid])) {
-        const avg = Number(avgCostMapCurrent[sid]) || 0;
-        knownCOGSTotalThisMonth += qty * avg;
-        knownMarginByCustomer[cid] = (knownMarginByCustomer[cid]||0) + ((up - avg) * qty);
-      } else {
-        const total = qty * up;
-        unknownSalesByCustomer[cid] = (unknownSalesByCustomer[cid]||0) + total;
-        unknownSalesTotalThisMonth += total;
-      }
-    } else {
-      const amt = Number(s.amount)||0;
-      unknownSalesByCustomer[cid] = (unknownSalesByCustomer[cid]||0) + amt;
-      unknownSalesTotalThisMonth += amt;
-    }
-  });
-  const purchasesThisMonthForSplit = purchasesByMonthAll[currentMonthKey] || 0;
-  const remainingPurchasesForSplit = Math.max(0, purchasesThisMonthForSplit - knownCOGSTotalThisMonth);
-  const fallbackCOGSForSplit = Math.min(remainingPurchasesForSplit, unknownSalesTotalThisMonth);
-  const marginByCustomer: {name:string, margin:number}[] = Object.keys({ ...knownMarginByCustomer, ...unknownSalesByCustomer }).map(cid => {
-    const unknownForCid = unknownSalesByCustomer[cid] || 0;
-    const share = unknownSalesTotalThisMonth > 0 ? (unknownForCid / unknownSalesTotalThisMonth) : 0;
-    const fallbackCOGSForCid = fallbackCOGSForSplit * share;
-    const fallbackMarginForCid = unknownForCid - fallbackCOGSForCid;
-    const totalMarginCid = (knownMarginByCustomer[cid] || 0) + fallbackMarginForCid;
-    return { name: customers.find(c=>c.id===cid)?.name || 'Bilinmeyen', margin: totalMarginCid };
-  }).sort((a,b)=>b.margin-a.margin).slice(0,5);
+  // Eski ay-sonu ortalaması ve fallback temelli marj hesapları kaldırıldı.
 
   // Müşteri satış listeleri (DSO hesaplaması için)
   const salesByCustomerList: Record<string, Sale[]> = {};
@@ -544,13 +356,7 @@ const handleSaveMarginTarget = async () => {
   const salesDiff = actualThisMonth - targetThisMonth;
   const salesDiffPct = targetThisMonth ? (salesDiff / targetThisMonth) * 100 : 0;
 
-  // Marj hedef/gerçekleşen hesapları
-  const marginByMonthMap: Record<string, number> = Object.fromEntries((marginByMonth || []).map(m => [m.date, m.margin || 0]));
-  const marginActualThisMonth = marginByMonthMap[currentMonthKey] || 0;
-  const marginTargetAuto = marginByMonthMap[prevMonthKey] || 0;
-  const marginTargetThisMonth = marginTargetManual ?? marginTargetAuto;
-  const marginDiff = marginActualThisMonth - marginTargetThisMonth;
-  const marginDiffPct = marginTargetThisMonth ? (marginDiff / marginTargetThisMonth) * 100 : 0;
+  // Marj hedef/gerçekleşen hesapları ledger'dan sonra tanımlanır
 
   // Debug: Bu ayın ham toplamları (filtreye bağımlı değil)
   const debugSalesThisMonth = salesByMonthAll[currentMonthKey] || 0;
@@ -699,7 +505,7 @@ const handleSaveMarginTarget = async () => {
   });
 
   // Ürün Kârlılık: hareket bazlı ağırlıklı ortalama (Moving Average) ile COGS
-  type Event = { date: Date; type: 'purchase'|'sale'; key: string; qty: number; unitCost?: number; includeInRange?: boolean };
+  type Event = { date: Date; type: 'purchase'|'sale'; key: string; qty: number; unitCost?: number; unitPrice?: number; customerId?: string; includeInRange?: boolean };
   const events: Event[] = [];
   // Alışları ekle (tüm geçmiş; doğru açılış ortalaması için)
   purchases.forEach((p: any) => {
@@ -725,20 +531,24 @@ const handleSaveMarginTarget = async () => {
     if (Array.isArray(s.items) && s.items.length>0) {
       s.items.forEach((it: any) => {
         const k = normalizeProductKey(s.stockItemId || it.stockItemId, it.productName || s.description);
-        if (it.quantity == null) return; // miktar yoksa ledger'a alma
+        if (it.quantity == null || it.unitPrice == null) return; // miktar/UP yoksa ledger'a alma
         const q = Number(it.quantity) || 0;
-        if (q>0) events.push({ date: d, type: 'sale', key: k, qty: q, includeInRange: inRange });
+        const up = Number(it.unitPrice) || 0;
+        if (q>0) events.push({ date: d, type: 'sale', key: k, qty: q, unitPrice: up, customerId: s.customerId, includeInRange: inRange });
       });
     } else {
-      if ((s as any).quantity == null) return;
+      if ((s as any).quantity == null || (s as any).unitPrice == null) return;
       const k = normalizeProductKey(s.stockItemId, s.description);
       const q = Number(s.quantity) || 0;
-      if (q>0) events.push({ date: d, type: 'sale', key: k, qty: q, includeInRange: inRange });
+      const up = Number(s.unitPrice) || 0;
+      if (q>0) events.push({ date: d, type: 'sale', key: k, qty: q, unitPrice: up, customerId: s.customerId, includeInRange: inRange });
     }
   });
   events.sort((a,b) => a.date.getTime() - b.date.getTime());
   const state: Record<string,{onHand:number; avg:number; name:string}> = {};
   const cogsByKey: Record<string, number> = {};
+  const marginByMonthAcc: Record<string, number> = {};
+  const marginByCustomerAccCurrent: Record<string, number> = {};
   events.forEach(ev => {
     const name = displayNameFromKey(ev.key);
     state[ev.key] = state[ev.key] || { onHand: 0, avg: 0, name };
@@ -754,12 +564,35 @@ const handleSaveMarginTarget = async () => {
       if (ev.includeInRange) {
         cogsByKey[ev.key] = (cogsByKey[ev.key] || 0) + cogs;
       }
+      if (ev.unitPrice != null) {
+        const mk = getMonthKey(ev.date);
+        const salesAmt = ev.qty * (ev.unitPrice || 0);
+        const margin = salesAmt - cogs;
+        marginByMonthAcc[mk] = (marginByMonthAcc[mk] || 0) + margin;
+        if (mk === currentMonthKey && ev.customerId) {
+          marginByCustomerAccCurrent[ev.customerId] = (marginByCustomerAccCurrent[ev.customerId] || 0) + margin;
+        }
+      }
       st.onHand -= ev.qty;
     }
   });
   const costByProduct: { [key: string]: { name: string; total: number } } = Object.fromEntries(
     Object.entries(cogsByKey).map(([k, v]) => [k, { name: state[k]?.name || displayNameFromKey(k), total: v }])
   );
+  // Ledger tabanlı aylık ve müşteri marjları
+  const marginByMonth: {date:string, margin:number}[] = last12Months.map((mk) => ({ date: mk, margin: marginByMonthAcc[mk] || 0 }));
+  const marginByCustomer: {name:string, margin:number}[] = Object.entries(marginByCustomerAccCurrent)
+    .map(([cid, m]) => ({ name: customers.find(c=>c.id===cid)?.name || 'Bilinmeyen', margin: m }))
+    .sort((a,b)=> b.margin - a.margin)
+    .slice(0,5);
+
+  // Marj hedef/gerçekleşen KPI'ları (ledger sonrası)
+  const marginByMonthMap: Record<string, number> = Object.fromEntries((marginByMonth || []).map((m: {date:string; margin:number}) => [m.date, m.margin || 0]));
+  const marginActualThisMonth = marginByMonthMap[currentMonthKey] || 0;
+  const marginTargetAuto = marginByMonthMap[prevMonthKey] || 0;
+  const marginTargetThisMonth = marginTargetManual ?? marginTargetAuto;
+  const marginDiff = marginActualThisMonth - marginTargetThisMonth;
+  const marginDiffPct = marginTargetThisMonth ? (marginDiff / marginTargetThisMonth) * 100 : 0;
   const allKeys = new Set<string>([...Object.keys(salesByProductForProfit), ...Object.keys(costByProduct)]);
   const productProfitability: Array<{ name: string; sales: number; cost: number; profit: number }> = Array.from(allKeys).map(k => {
     const s = salesByProductForProfit[k]?.total || 0;
