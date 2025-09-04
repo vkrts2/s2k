@@ -435,6 +435,7 @@ export default function DashboardPage() {
         <TabsList>
           <TabsTrigger value="overview">Genel Bakış</TabsTrigger>
           <TabsTrigger value="analytics">Analitik</TabsTrigger>
+          <TabsTrigger value="reports">Raporlar</TabsTrigger>
           <TabsTrigger value="cash">Kasa</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="space-y-4">
@@ -727,7 +728,115 @@ export default function DashboardPage() {
             </Card>
           </div>
         </TabsContent>
-        
+        <TabsContent value="reports" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-4">
+              <CardHeader>
+                <CardTitle>Yıllık Finansal Performans</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={yearlyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year" />
+                      <YAxis />
+                      <Tooltip
+                        formatter={(value) => `₺${value.toLocaleString()}`}
+                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        wrapperStyle={{ outline: 'none' }}
+                        cursor={{ fill: 'transparent' }}
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="gelir" stroke="#8884d8" name="Gelir" />
+                      <Line type="monotone" dataKey="gider" stroke="#82ca9d" name="Gider" />
+                      <Line type="monotone" dataKey="kar" stroke="#ffc658" name="Kar" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="col-span-3">
+              <CardHeader>
+                <CardTitle>Vergi Özeti</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {taxSummary.map((tax, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium leading-none">{tax.type}</p>
+                      </div>
+                      <div className="text-sm font-medium">₺{tax.amount.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-7">
+              <CardHeader>
+                <CardTitle>Kategori Bazlı Performans</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={categoryPerformance}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="category" />
+                      <YAxis />
+                      <Tooltip
+                        formatter={(value) => `₺${value.toLocaleString()}`}
+                        contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--popover-foreground))', borderRadius: 8 }}
+                        itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                        wrapperStyle={{ outline: 'none' }}
+                        cursor={{ fill: 'transparent' }}
+                      />
+                      <Legend />
+                      <Bar dataKey="satış" fill="#8884d8" name="Satış" />
+                      <Bar dataKey="kar" fill="#82ca9d" name="Kar" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-7">
+              <CardHeader>
+                <CardTitle>Finansal Özet</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">Toplam Gelir</p>
+                    <p className="text-2xl font-bold">₺{yearlyData[3].gelir.toLocaleString()}</p>
+                    <p className="text-xs text-green-500">+{((yearlyData[3].gelir - yearlyData[2].gelir) / yearlyData[2].gelir * 100).toFixed(1)}% geçen yıla göre</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">Toplam Gider</p>
+                    <p className="text-2xl font-bold">₺{yearlyData[3].gider.toLocaleString()}</p>
+                    <p className="text-xs text-red-500">+{((yearlyData[3].gider - yearlyData[2].gider) / yearlyData[2].gider * 100).toFixed(1)}% geçen yıla göre</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">Net Kar</p>
+                    <p className="text-2xl font-bold">₺{yearlyData[3].kar.toLocaleString()}</p>
+                    <p className="text-xs text-green-500">+{((yearlyData[3].kar - yearlyData[2].kar) / yearlyData[2].kar * 100).toFixed(1)}% geçen yıla göre</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">Kar Marjı</p>
+                    <p className="text-2xl font-bold">%{((yearlyData[3].kar / yearlyData[3].gelir) * 100).toFixed(1)}</p>
+                    <p className="text-xs text-green-500">+{(((yearlyData[3].kar / yearlyData[3].gelir) - (yearlyData[2].kar / yearlyData[2].gelir)) * 100).toFixed(1)}% geçen yıla göre</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
       <div className="mt-8">
         <h2 className="text-xl font-bold mb-4">Maliyetler</h2>
