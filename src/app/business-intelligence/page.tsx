@@ -1062,7 +1062,7 @@ const handleSaveMarginTarget = async () => {
                     valueFormatter={(v)=> v.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
                   />
                 </div>
-                <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr>
@@ -1346,7 +1346,7 @@ const handleSaveMarginTarget = async () => {
               <CardTitle>Stok Devir Hızı ve Stokta Kalma (gün)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto max-h-80 overflow-y-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
