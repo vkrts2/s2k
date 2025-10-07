@@ -17,6 +17,7 @@ import { Package, Edit, Trash2 } from "lucide-react";
 import type { StockItem } from "@/lib/types";
 import { format, parseISO } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { Badge } from "@/components/ui/badge";
 
 interface StockListProps {
   items: StockItem[];
@@ -61,13 +62,19 @@ export function StockList({ items, onEdit, onDelete }: StockListProps) {
   return (
     <Card className="shadow-sm">
       <CardHeader>
-        <CardTitle>Ürünler</CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-3">
+            Ürünler
+            <Badge variant="secondary" className="text-xs font-normal">{items.length}</Badge>
+          </CardTitle>
+        </div>
         <CardDescription>Eklenen tüm ürünleriniz burada listelenir.</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[56px]">#</TableHead>
               <TableHead>Ürün Adı</TableHead>
               <TableHead>Stok Miktarı</TableHead>
               <TableHead>Eklenme Tarihi</TableHead>
@@ -75,8 +82,9 @@ export function StockList({ items, onEdit, onDelete }: StockListProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((item) => (
+            {items.map((item, idx) => (
               <TableRow key={item.id}>
+                <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                 <TableCell className="font-medium">
                   <Link href={`/stock/${item.id}`} className="hover:underline text-primary">
                     {item.name}
