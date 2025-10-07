@@ -178,45 +178,78 @@ export default function StockPage() {
       const ab = await file.arrayBuffer();
       const wb = XLSX.read(ab, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      // Sabit başlık dizisi: Kullanıcının başlıkları değiştirmesinden etkilenmemek için kolon bazlı okumayı kullan.
-      const HEADERS = [
-        'name',
-        'description',
-        'unit',
-        'salePrice.amount',
-        'salePrice.currency',
-        'currentStock',
-        'sku',
-        'barcode',
-        'category',
-        'minStock',
-        'maxStock',
-      ];
-      // İlk satır başlık, veriler 2. satırdan başlar -> range: 1
-      const rows: any[] = XLSX.utils.sheet_to_json(ws, { header: HEADERS as any, range: 1, defval: '' });
-      if (rows.length === 0) {
+      // AOA okuma: ilk satır başlık, kalan satırlar veri
+      const aoa: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as any[];
+      if (!aoa || aoa.length <= 1) {
         toast({ title: 'Boş Dosya', description: 'Excel dosyasında veri bulunamadı.', variant: 'destructive' });
+        return;
+      }
+      const headerRow: string[] = (aoa[0] as any[]).map((v: any) => String(v || '').trim());
+      const dataRows: any[][] = aoa.slice(1);
+
+      // Header alias eşlemesi (küçük harfe indirip boşlukları, noktalama işaretlerini temizle)
+      const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, '').replace(/[._-]/g, '').replace(/[ğüşiöç]/g, (c) => ({'ğ':'g','ü':'u','ş':'s','i':'i','ö':'o','ç':'c'}[c] as string));
+      const CANON: Record<string, string[]> = {
+        'name': ['name','isim','urun','ürun','urunadi','ürünadı','ürünadı','ürün adı'],
+        'description': ['description','aciklama','açıklama'],
+        'unit': ['unit','birim'],
+        'salePrice.amount': ['saleprice.amount','salepriceamount','fiyat','satisfiyati','satışfiyatı','satis_fiyati','satış fiyatı'],
+        'salePrice.currency': ['saleprice.currency','salepricecurrency','parabirimi','currency','para birimi'],
+        'currentStock': ['currentstock','mevcutstok','stok'],
+        'sku': ['sku','stokkodu','stok kodu'],
+        'barcode': ['barcode','barkod'],
+        'category': ['category','kategori'],
+        'minStock': ['minstock','min_stok','minimumstok','minimum stok'],
+        'maxStock': ['maxstock','max_stok','maksimumstok','maksimum stok'],
+      };
+      const EXPECTED_ORDER = ['name','description','unit','salePrice.amount','salePrice.currency','currentStock','sku','barcode','category','minStock','maxStock'];
+
+      // Sütun index -> canonical field eşlemesi
+      const colMap: (string|undefined)[] = headerRow.map((h, idx) => {
+        const n = normalize(h);
+        for (const canon of Object.keys(CANON)) {
+          const aliases = [canon, ...CANON[canon]];
+          if (aliases.some(a => normalize(a) === n)) return canon;
+        }
+        // Bulunamadıysa, beklenen sıraya göre tahmin et (şablon değişmemişse çalışır)
+        return EXPECTED_ORDER[idx];
+      });
+
+      // Objeye dönüştür
+      const rows: any[] = dataRows
+        .map((arr) => {
+          const o: any = {};
+          arr.forEach((val: any, i: number) => {
+            const key = colMap[i];
+            if (!key) return;
+            o[key] = val;
+          });
+          return o;
+        })
+        // Tamamen boş satırları at
+        .filter(o => Object.values(o).some(v => String(v ?? '').trim() !== ''));
+
+      try { console.table(rows.slice(0, 5)); } catch {}
+
+      toast({ title: 'İçe Aktarma', description: `${rows.length} satır bulundu. Kaydediliyor...` });
+      if (rows.length === 0) {
+        toast({ title: 'Boş Dosya', description: 'Excel dosyasında veri satırı bulunamadı.', variant: 'destructive' });
         return;
       }
       let ok = 0, fail = 0;
       for (const r of rows) {
-        // Esnek alan adları: Türkçe başlık gelirse karşılıklarını yakala
-        const get = (keys: string[]) => {
-          for (const k of keys) if (r[k] !== undefined) return r[k];
-          return undefined;
-        };
-        const name = get(['name','isim','ürün','urun','Ürün Adı']);
+        const name = r['name'];
         if (!name || String(name).trim()==='') { fail++; continue; }
-        const description = get(['description','açıklama','aciklama']);
-        const unit = get(['unit','birim']);
-        const priceAmt = Number(get(['salePrice.amount','salePrice_amount','fiyat','satis_fiyati','Satış Fiyatı']) ?? 0) || 0;
-        const priceCur = String(get(['salePrice.currency','salePrice_currency','para_birimi','currency']) ?? 'TRY') || 'TRY';
-        const currentStock = Number(get(['currentStock','mevcut_stok','stok'])) || 0;
-        const sku = get(['sku','stok_kodu']);
-        const barcode = get(['barcode','barkod']);
-        const category = get(['category','kategori']);
-        const minStock = Number(get(['minStock','min_stok'])) || 0;
-        const maxStock = Number(get(['maxStock','max_stok'])) || 0;
+        const description = r['description'];
+        const unit = r['unit'];
+        const priceAmt = Number(r['salePrice.amount'] ?? 0) || 0;
+        const priceCur = String(r['salePrice.currency'] || 'TRY').toUpperCase() || 'TRY';
+        const currentStock = Number(r['currentStock'] || 0) || 0;
+        const sku = r['sku'];
+        const barcode = r['barcode'];
+        const category = r['category'];
+        const minStock = Number(r['minStock'] || 0) || 0;
+        const maxStock = Number(r['maxStock'] || 0) || 0;
 
         try {
           await storageAddStockItem(user.uid, {
@@ -237,7 +270,11 @@ export default function StockPage() {
           fail++;
         }
       }
-      toast({ title: 'Excel İçe Aktarma', description: `${ok} kayıt eklendi, ${fail} kayıt atlandı.` });
+      if (ok === 0) {
+        toast({ title: 'İçe Aktarma Başarısız', description: `Hiç kayıt eklenmedi. Sütun başlıklarını ve veri satırlarını kontrol edin.`, variant: 'destructive' });
+      } else {
+        toast({ title: 'Excel İçe Aktarma', description: `${ok} kayıt eklendi, ${fail} kayıt atlandı.` });
+      }
       await loadItems();
     } catch (err) {
       console.error('Excel okuma hatası', err);
@@ -349,7 +386,7 @@ export default function StockPage() {
           <Button variant="outline" onClick={handleDownloadTemplate}>
             <FileDown className="mr-2 h-4 w-4" /> Excel Şablon
           </Button>
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelChange} />
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.xlsm,.xlsb" className="hidden" onChange={handleExcelChange} />
           <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
             <FileUp className="mr-2 h-4 w-4" /> Excel'den Ekle
           </Button>
