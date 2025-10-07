@@ -1011,27 +1011,27 @@ const handleSaveMarginTarget = async () => {
                 downloadCsv(`para-birimi-toplamlari-${Date.now()}.csv`, headers, rows);
               }}>CSV</Button>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
               {Object.entries(currencyTotals).map(([cur, vals]) => (
-                <Card key={`cur-${cur}`}>
+                <Card key={`cur-${cur}`} className="min-w-0">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Satış Toplamı ({cur})</CardTitle>
+                    <CardTitle className="text-sm font-medium truncate">Satış Toplamı ({cur})</CardTitle>
                   </CardHeader>
                   <CardContent><div className="text-2xl font-bold">{vals.sales.toLocaleString('tr-TR')}</div></CardContent>
                 </Card>
               ))}
               {Object.entries(currencyTotals).map(([cur, vals]) => (
-                <Card key={`cur-p-${cur}`}>
+                <Card key={`cur-p-${cur}`} className="min-w-0">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Alış Toplamı ({cur})</CardTitle>
+                    <CardTitle className="text-sm font-medium truncate">Alış Toplamı ({cur})</CardTitle>
                   </CardHeader>
                   <CardContent><div className="text-2xl font-bold">{vals.purchases.toLocaleString('tr-TR')}</div></CardContent>
                 </Card>
               ))}
               {Object.entries(currencyTotals).map(([cur, vals]) => (
-                <Card key={`cur-pr-${cur}`}>
+                <Card key={`cur-pr-${cur}`} className="min-w-0">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Kâr (FIFO) ({cur})</CardTitle>
+                    <CardTitle className="text-sm font-medium truncate">Kâr (FIFO) ({cur})</CardTitle>
                   </CardHeader>
                     <CardContent><div className="text-2xl font-bold">{vals.profit.toLocaleString('tr-TR')}</div></CardContent>
                 </Card>
@@ -1412,10 +1412,10 @@ const handleSaveMarginTarget = async () => {
           </div>
 
           {/* KPI Kartları */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="min-w-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Toplam Satış</CardTitle>
+                <CardTitle className="text-sm font-medium truncate">Toplam Satış</CardTitle>
               </CardHeader>
               <CardContent><div className="text-2xl font-bold">₺{totalSales.toLocaleString()}</div></CardContent>
             </Card>
@@ -1423,28 +1423,28 @@ const handleSaveMarginTarget = async () => {
           {/* Bu Ay Özet ve Hareketsiz / En hızlı tükenen */}
           {/* Bu Ay Özet (Ciro / Alış / Kâr) */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card>
+            <Card className="min-w-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Bu Ay Ciro (Satış)</CardTitle>
+                <CardTitle className="text-sm font-medium truncate">Bu Ay Ciro (Satış)</CardTitle>
               </CardHeader>
               <CardContent><div className="text-2xl font-bold">{salesAmountThisMonth.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</div></CardContent>
             </Card>
-            <Card>
+            <Card className="min-w-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Bu Ay Alış</CardTitle>
+                <CardTitle className="text-sm font-medium truncate">Bu Ay Alış</CardTitle>
               </CardHeader>
               <CardContent><div className="text-2xl font-bold">{purchaseAmountThisMonth.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</div></CardContent>
             </Card>
-            <Card>
+            <Card className="min-w-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Bu Ay Kâr (FIFO)</CardTitle>
+                <CardTitle className="text-sm font-medium truncate">Bu Ay Kâr (FIFO)</CardTitle>
               </CardHeader>
               <CardContent><div className="text-2xl font-bold">{totalProfitThisMonth.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</div></CardContent>
             </Card>
             {aggProfit!=null && (
-              <Card className="md:col-span-2 lg:col-span-1">
+              <Card className="md:col-span-2 lg:col-span-1 min-w-0">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Ön-agregasyondan Kâr (Filtre)</CardTitle>
+                  <CardTitle className="text-sm font-medium truncate">Ön-agregasyondan Kâr (Filtre)</CardTitle>
                 </CardHeader>
                 <CardContent><div className="text-2xl font-bold">{aggProfit.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</div></CardContent>
               </Card>
@@ -1452,7 +1452,7 @@ const handleSaveMarginTarget = async () => {
           </div>
 
           {/* Hareketsiz ürünler ve en hızlı tükenen ürünler */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
