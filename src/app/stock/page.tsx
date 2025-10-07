@@ -167,14 +167,33 @@ export default function StockPage() {
 
   // Excel'den içe aktar
   const handleExcelChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user) return;
+    if (!user) {
+      toast({ title: 'Giriş Gerekli', description: 'Excel içe aktarma için giriş yapmalısınız.', variant: 'destructive' });
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     try {
+      toast({ title: 'İçe Aktarma', description: 'Excel dosyası işleniyor...' });
       const ab = await file.arrayBuffer();
       const wb = XLSX.read(ab, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      // Sabit başlık dizisi: Kullanıcının başlıkları değiştirmesinden etkilenmemek için kolon bazlı okumayı kullan.
+      const HEADERS = [
+        'name',
+        'description',
+        'unit',
+        'salePrice.amount',
+        'salePrice.currency',
+        'currentStock',
+        'sku',
+        'barcode',
+        'category',
+        'minStock',
+        'maxStock',
+      ];
+      // İlk satır başlık, veriler 2. satırdan başlar -> range: 1
+      const rows: any[] = XLSX.utils.sheet_to_json(ws, { header: HEADERS as any, range: 1, defval: '' });
       if (rows.length === 0) {
         toast({ title: 'Boş Dosya', description: 'Excel dosyasında veri bulunamadı.', variant: 'destructive' });
         return;
