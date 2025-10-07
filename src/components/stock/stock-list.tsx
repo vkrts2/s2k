@@ -26,6 +26,14 @@ interface StockListProps {
 }
 
 export function StockList({ items, onEdit, onDelete }: StockListProps) {
+  // Aynı isimde ürünleri vurgulamak için isim sayacı oluştur
+  const nameKey = (s?: string) => (s || "").trim().toLowerCase();
+  const nameCounts: Record<string, number> = {};
+  for (const it of items) {
+    const k = nameKey(it?.name);
+    if (!k) continue;
+    nameCounts[k] = (nameCounts[k] || 0) + 1;
+  }
   if (!Array.isArray(items)) {
     console.error("StockList: 'items' prop is not an array.", items);
     return (
@@ -89,6 +97,9 @@ export function StockList({ items, onEdit, onDelete }: StockListProps) {
                   <Link href={`/stock/${item.id}`} className="hover:underline text-primary">
                     {item.name}
                   </Link>
+                  {nameCounts[nameKey(item.name)] > 1 && (
+                    <Badge variant="outline" className="ml-2 text-[10px] py-0 px-1">Aynı: {nameCounts[nameKey(item.name)]}</Badge>
+                  )}
                 </TableCell>
                 <TableCell>{typeof item.currentStock === 'number' ? item.currentStock : 0}</TableCell>
                 <TableCell>{format(parseISO(item.createdAt), "dd MMM yyyy", { locale: tr })}</TableCell>
