@@ -952,7 +952,7 @@ const handleSaveMarginTarget = async () => {
       ) : (
         <>
           {/* Filtre arayüzü */}
-          <div className="flex flex-wrap gap-4 mb-4">
+          <div className="flex flex-wrap gap-4 mb-4 sticky top-16 z-10 bg-background/80 supports-[backdrop-filter]:bg-background/60 backdrop-blur p-3 rounded-md">
             <div>
               <Label>Tarih Aralığı</Label>
               <div className="flex gap-2">
@@ -1062,7 +1062,7 @@ const handleSaveMarginTarget = async () => {
                     valueFormatter={(v)=> v.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}
                   />
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-80 overflow-y-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr>
@@ -1346,7 +1346,7 @@ const handleSaveMarginTarget = async () => {
               <CardTitle>Stok Devir Hızı ve Stokta Kalma (gün)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-80 overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
