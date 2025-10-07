@@ -186,8 +186,8 @@ export default function StockPage() {
         toast({ title: 'Boş Dosya', description: 'Excel dosyasında veri bulunamadı.', variant: 'destructive' });
         return;
       }
-      const headerRow: string[] = (aoa[0] as any[]).map((v: any) => String(v || '').trim());
-      const dataRows: any[][] = aoa.slice(1);
+      let headerRow: string[] = (aoa[0] as any[]).map((v: any) => String(v || '').trim());
+      let dataRows: any[][] = aoa.slice(1);
 
       // Header alias eşlemesi (küçük harfe indirip boşlukları, noktalama işaretlerini temizle)
       const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, '').replace(/[._-]/g, '').replace(/[ğüşiöç]/g, (c) => ({'ğ':'g','ü':'u','ş':'s','i':'i','ö':'o','ç':'c'}[c] as string));
@@ -207,7 +207,7 @@ export default function StockPage() {
       const EXPECTED_ORDER = ['name','description','unit','salePrice.amount','salePrice.currency','currentStock','sku','barcode','category','minStock','maxStock'];
 
       // Sütun index -> canonical field eşlemesi
-      const colMap: (string|undefined)[] = headerRow.map((h, idx) => {
+      let colMap: (string|undefined)[] = headerRow.map((h, idx) => {
         const n = normalize(h);
         for (const canon of Object.keys(CANON)) {
           const aliases = [canon, ...CANON[canon]];
@@ -216,6 +216,16 @@ export default function StockPage() {
         // Bulunamadıysa, beklenen sıraya göre tahmin et (şablon değişmemişse çalışır)
         return EXPECTED_ORDER[idx];
       });
+
+      // Eğer başlık satırında hiç tanınan alan yoksa, kullanıcı başlıkları silmiş olabilir.
+      // Bu durumda ilk satırı da veri olarak al ve sütunları EXPECTED_ORDER'a göre eşle.
+      const recognizedCount = colMap.filter(Boolean).length;
+      if (recognizedCount === 0) {
+        toast({ title: 'Başlık Bulunamadı', description: 'İlk satır veri olarak kabul edildi. Sütunlar şablondaki sıraya göre eşlenecek.' });
+        headerRow = EXPECTED_ORDER;
+        dataRows = aoa as any[][]; // ilk satır dahil tüm satırlar veri
+        colMap = EXPECTED_ORDER;
+      }
 
       // Objeye dönüştür
       const rows: any[] = dataRows
