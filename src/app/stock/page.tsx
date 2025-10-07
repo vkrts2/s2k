@@ -35,7 +35,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import BackToHomeButton from '@/components/common/back-to-home-button';
 import { CardContent } from "@/components/ui/card";
 import Link from 'next/link';
-import * as XLSX from 'xlsx';
+// xlsx'i dinamik import edeceğiz (Vercel/Next prod'da client-only kullanım için güvenli)
 
 export default function StockPage() {
   const { user, loading: authLoading } = useAuth();
@@ -131,7 +131,8 @@ export default function StockPage() {
   };
 
   // Excel şablonu indir
-  const handleDownloadTemplate = useCallback(() => {
+  const handleDownloadTemplate = useCallback(async () => {
+    const XLSX = await import('xlsx');
     // Sütunlar ve örnek satır
     const headers = [
       'name',
@@ -175,6 +176,7 @@ export default function StockPage() {
     if (!file) return;
     try {
       toast({ title: 'İçe Aktarma', description: 'Excel dosyası işleniyor...' });
+      const XLSX = await import('xlsx');
       const ab = await file.arrayBuffer();
       const wb = XLSX.read(ab, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -237,9 +239,12 @@ export default function StockPage() {
         return;
       }
       let ok = 0, fail = 0;
-      for (const r of rows) {
+      const CHUNK_SIZE = 100;
+      const CONCURRENCY = 10;
+
+      const addOne = async (r: any) => {
         const name = r['name'];
-        if (!name || String(name).trim()==='') { fail++; continue; }
+        if (!name || String(name).trim()==='') { fail++; return; }
         const description = r['description'];
         const unit = r['unit'];
         const priceAmt = Number(r['salePrice.amount'] ?? 0) || 0;
@@ -250,7 +255,6 @@ export default function StockPage() {
         const category = r['category'];
         const minStock = Number(r['minStock'] || 0) || 0;
         const maxStock = Number(r['maxStock'] || 0) || 0;
-
         try {
           await storageAddStockItem(user.uid, {
             name: String(name),
@@ -269,6 +273,17 @@ export default function StockPage() {
           console.error('Excel import item error', err, r);
           fail++;
         }
+      };
+
+      for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+        const chunk = rows.slice(i, i + CHUNK_SIZE);
+        console.log(`Processing rows ${i + 1}-${Math.min(i + CHUNK_SIZE, rows.length)} of ${rows.length}`);
+        for (let j = 0; j < chunk.length; j += CONCURRENCY) {
+          const group = chunk.slice(j, j + CONCURRENCY);
+          await Promise.allSettled(group.map((r) => addOne(r)));
+        }
+        // Küçük bekleme: aşırı istek fırtınasını önle
+        await new Promise(res => setTimeout(res, 200));
       }
       if (ok === 0) {
         toast({ title: 'İçe Aktarma Başarısız', description: `Hiç kayıt eklenmedi. Sütun başlıklarını ve veri satırlarını kontrol edin.`, variant: 'destructive' });
@@ -276,9 +291,9 @@ export default function StockPage() {
         toast({ title: 'Excel İçe Aktarma', description: `${ok} kayıt eklendi, ${fail} kayıt atlandı.` });
       }
       await loadItems();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Excel okuma hatası', err);
-      toast({ title: 'Hata', description: 'Excel dosyası okunamadı.', variant: 'destructive' });
+      toast({ title: 'Hata', description: `Excel dosyası okunamadı: ${err?.message || 'bilinmeyen hata'}.`, variant: 'destructive' });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
